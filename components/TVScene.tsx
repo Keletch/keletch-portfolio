@@ -1,16 +1,33 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import CRTTelevision from '@/components/CRTTelevision';
 
 export default function TVScene() {
+    const [cameraZ, setCameraZ] = useState(5);
+
+    useEffect(() => {
+        const handleResize = () => {
+            const isMobile = window.innerWidth < 768;
+            setCameraZ(isMobile ? 12 : 5);
+        };
+
+        // Ejecutar al inicio
+        handleResize();
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     return (
         <div style={{ width: '100%', height: '100vh', background: '#000000' }}>
             <Canvas
                 shadows
-                camera={{ position: [0, 0, 5], fov: 35 }}
+                camera={{ position: [0, 0, cameraZ], fov: 35 }}
+                key={cameraZ} // Forzar re-render de la cámara al cambiar Z
                 // --- TRUCO LOWPOLY / CRUNCHY SUPREMO ---
                 // Bajamos la densidad de pixeles a la mitad o menos (0.5 o 0.4)
                 // Esto hace que TODO el canvas se renderice a baja resolución y el navegador lo escale (pixelado)
@@ -79,7 +96,7 @@ export default function TVScene() {
                     enableDamping
                     dampingFactor={0.05}
                     minDistance={1.5}
-                    maxDistance={10}
+                    maxDistance={20} // Aumentado para permitir el alejamiento en mobile
                 />
             </Canvas>
         </div>
