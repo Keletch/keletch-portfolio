@@ -10,7 +10,7 @@ export default function TVScene() {
         <div style={{ width: '100%', height: '100vh', background: '#000000' }}>
             <Canvas
                 shadows
-                camera={{ position: [0, 0, 12], fov: 35 }}
+                camera={{ position: [0, 0, 7], fov: 35 }}
                 // --- TRUCO LOWPOLY / CRUNCHY SUPREMO ---
                 // Bajamos la densidad de pixeles a la mitad o menos (0.5 o 0.4)
                 // Esto hace que TODO el canvas se renderice a baja resolución y el navegador lo escale (pixelado)
@@ -25,10 +25,10 @@ export default function TVScene() {
                 {/* Fondo Negro Absoluto */}
                 <color attach="background" args={['#000000']} />
 
-                {/* 1. Luz Ambiental Base (Más fuerte para que no sea negro total) */}
+                {/* 1. Iluminación Ambiental (Base) */}
                 <ambientLight intensity={0.8} />
 
-                {/* 2. Luz Principal (Key Light) - Fuerte y desde arriba/derecha */}
+                {/* 2. Luz Direccional (Key Light) */}
                 <directionalLight
                     position={[5, 10, 5]}
                     intensity={4.0}
@@ -41,30 +41,27 @@ export default function TVScene() {
                 {/* 3. Luz de Resalte (Spotlight) - Enfocada en el frente para textura */}
                 <spotLight
                     position={[-5, 5, 5]}
-                    angle={0.6}
-                    penumbra={0.5}
+                    angle={0.15}
+                    penumbra={1}
                     intensity={80}
                     color="#ffffff"
+                    castShadow
                 />
 
-                {/* 4. Luz de Recorte (Rim Light) - CRUCIAL para separar del fondo negro */}
-                {/* Luz azulada desde atrás para dibujar la silueta */}
+                {/* 4. Luz de Contorno (Rim Light) - Toque azul para atmósfera CRT */}
                 <spotLight
                     position={[0, 5, -5]}
-                    angle={0.8}
+                    angle={0.3}
                     penumbra={1}
                     intensity={50}
                     color="#4060ff"
-                    lookAt={() => new THREE.Vector3(0, 0, 0)}
                 />
 
-                {/* 5. Luz Frontal Cálida - REFORZADA para ver textura y botones */}
+                {/* 5. Luz Frontal Cálida (Fill Light) - Para que se vea la cara de la TV */}
                 <pointLight
-                    position={[0, -2, 4]}  // Bajé la altura (2 -> 1) para dar más directo al frente
-                    intensity={10.0}       // Tripliqué la intensidad (10 -> 30)
-                    distance={15}
-                    decay={2}
-                    color="#fff0cc"      // Un poco menos naranja, más "luz de sala"
+                    position={[0, 0, 4]}
+                    intensity={20.0}
+                    color="#ffffff"
                 />
 
                 {/* Luces de relleno laterales (Ajustadas) */}
