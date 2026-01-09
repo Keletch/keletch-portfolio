@@ -12,7 +12,7 @@ export default function TVScene() {
     useEffect(() => {
         const handleResize = () => {
             const isMobile = window.innerWidth < 768;
-            setCameraZ(isMobile ? 12 : 5);
+            setCameraZ(isMobile ? 8 : 5);
         };
 
         // Ejecutar al inicio
