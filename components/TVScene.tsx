@@ -25,10 +25,10 @@ export default function TVScene() {
                 {/* Fondo Negro Absoluto */}
                 <color attach="background" args={['#000000']} />
 
-                {/* 1. Iluminación Ambiental (Base) */}
+                {/* 1. Luz Ambiental Base (Más fuerte para que no sea negro total) */}
                 <ambientLight intensity={0.8} />
 
-                {/* 2. Luz Direccional (Key Light) */}
+                {/* 2. Luz Principal (Key Light) - Fuerte y desde arriba/derecha */}
                 <directionalLight
                     position={[5, 10, 5]}
                     intensity={4.0}
@@ -41,27 +41,30 @@ export default function TVScene() {
                 {/* 3. Luz de Resalte (Spotlight) - Enfocada en el frente para textura */}
                 <spotLight
                     position={[-5, 5, 5]}
-                    angle={0.15}
-                    penumbra={1}
+                    angle={0.6}
+                    penumbra={0.5}
                     intensity={80}
                     color="#ffffff"
-                    castShadow
                 />
 
-                {/* 4. Luz de Contorno (Rim Light) - Toque azul para atmósfera CRT */}
+                {/* 4. Luz de Recorte (Rim Light) - CRUCIAL para separar del fondo negro */}
+                {/* Luz azulada desde atrás para dibujar la silueta */}
                 <spotLight
                     position={[0, 5, -5]}
-                    angle={0.3}
+                    angle={0.8}
                     penumbra={1}
                     intensity={50}
                     color="#4060ff"
+                    lookAt={() => new THREE.Vector3(0, 0, 0)}
                 />
 
-                {/* 5. Luz Frontal Cálida (Fill Light) - Para que se vea la cara de la TV */}
+                {/* 5. Luz Frontal Cálida - REFORZADA para ver textura y botones */}
                 <pointLight
-                    position={[0, 0, 4]}
-                    intensity={20.0}
-                    color="#ffffff"
+                    position={[0, -2, 4]}  // Bajé la altura (2 -> 1) para dar más directo al frente
+                    intensity={10.0}       // Tripliqué la intensidad (10 -> 30)
+                    distance={15}
+                    decay={2}
+                    color="#fff0cc"      // Un poco menos naranja, más "luz de sala"
                 />
 
                 {/* Luces de relleno laterales (Ajustadas) */}

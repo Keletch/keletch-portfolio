@@ -114,38 +114,50 @@ export default function CRTTelevision() {
                         side: THREE.DoubleSide,
                     });
                 } else {
-                    // Para el resto de la TV: LOOK PSX / CRUNCHY con iluminación real
+                    // Para el resto de la TV: LOOK PSX / CARTOON
                     if (child.material) {
-                        const convertToPSX = (originalMat: any) => {
-                            // 1. Textura Crunchy
+                        // Función helper para convertir material
+                        const convertToToon = (originalMat: any) => {
+                            // 1. Configurar textura para que sea "Crunchy" (Pixeleada)
                             if (originalMat.map) {
                                 originalMat.map.minFilter = THREE.NearestFilter;
                                 originalMat.map.magFilter = THREE.NearestFilter;
                                 originalMat.map.needsUpdate = true;
                             }
 
-                            // 2. Material que sí reacciona bien a la luz pero se ve Low Poly
-                            const psxMat = new THREE.MeshStandardMaterial({
+                            // 2. Crear material Toon (Cel Shading nativo)
+                            const toonMat = new THREE.MeshToonMaterial({
                                 color: originalMat.color,
                                 map: originalMat.map,
-                                roughness: originalMat.roughness || 0.8,
-                                metalness: originalMat.metalness || 0.2,
-                                flatShading: true, // <--- CLAVE PARA EL LOOK LOWPOLY
                                 transparent: false,
                                 side: THREE.DoubleSide,
+                                gradientMap: null // Por ahora sin gradiente específico, usa lights default
                             });
 
-                            // --- BOOSTER DE SATURACIÓN ---
-                            // Multiplicamos por 1.4 para que los colores "popeen"
-                            psxMat.color.multiplyScalar(1.4);
+                            // --- BOOSTER DE SATURACIÓN (VIVID COLORS) ---
+                            // En lugar de teñir de dorado, simplemente multiplicamos el color base
+                            // para que la textura resalte más (menos lavada).
 
-                            return psxMat;
+                            // Aumentamos la intensidad del color base
+                            toonMat.color.multiplyScalar(1.5);
+
+                            // Opcional: Agregar un poco de emisivo para que "brille" el color
+                            // toonMat.emissive = originalMat.color;
+                            // toonMat.emissiveIntensity = 0.2;
+
+                            // Si tiene textura, aseguramos que la textura no se vea lavada
+                            if (toonMat.map) {
+                                toonMat.map.minFilter = THREE.NearestFilter;
+                                toonMat.map.magFilter = THREE.NearestFilter;
+                            }
+
+                            return toonMat;
                         };
 
                         if (Array.isArray(child.material)) {
-                            child.material = child.material.map(m => convertToPSX(m));
+                            child.material = child.material.map(m => convertToToon(m));
                         } else {
-                            child.material = convertToPSX(child.material);
+                            child.material = convertToToon(child.material);
                         }
                     }
                 }
