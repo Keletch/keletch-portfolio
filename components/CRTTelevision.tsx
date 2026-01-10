@@ -114,50 +114,29 @@ export default function CRTTelevision() {
                         side: THREE.DoubleSide,
                     });
                 } else {
-                    // Para el resto de la TV: LOOK PSX / CARTOON
+                    // Para el resto de la TV: LOOK PSX / CARTOON pero preservando materiales originales
                     if (child.material) {
-                        // Función helper para convertir material
-                        const convertToToon = (originalMat: any) => {
-                            // 1. Configurar textura para que sea "Crunchy" (Pixeleada)
-                            if (originalMat.map) {
-                                originalMat.map.minFilter = THREE.NearestFilter;
-                                originalMat.map.magFilter = THREE.NearestFilter;
-                                originalMat.map.needsUpdate = true;
+                        const processMaterial = (mat: any) => {
+                            // 1. Forzar look crunchy en todas las texturas del material
+                            if (mat.map) {
+                                mat.map.minFilter = THREE.NearestFilter;
+                                mat.map.magFilter = THREE.NearestFilter;
+                                mat.map.needsUpdate = true;
                             }
 
-                            // 2. Crear material Toon (Cel Shading nativo)
-                            const toonMat = new THREE.MeshToonMaterial({
-                                color: originalMat.color,
-                                map: originalMat.map,
-                                transparent: false,
-                                side: THREE.DoubleSide,
-                                gradientMap: null // Por ahora sin gradiente específico, usa lights default
-                            });
+                            // 2. Activar Flat Shading para el look low-poly facetado
+                            mat.flatShading = true;
 
-                            // --- BOOSTER DE SATURACIÓN (VIVID COLORS) ---
-                            // En lugar de teñir de dorado, simplemente multiplicamos el color base
-                            // para que la textura resalte más (menos lavada).
+                            // Aseguramos que no se vea deslavado pero sin multiplicadores exagerados
+                            // mat.color.multiplyScalar(1.05); // Un toque muy sutil de brillo si es necesario
 
-                            // Aumentamos la intensidad del color base
-                            toonMat.color.multiplyScalar(1.5);
-
-                            // Opcional: Agregar un poco de emisivo para que "brille" el color
-                            // toonMat.emissive = originalMat.color;
-                            // toonMat.emissiveIntensity = 0.2;
-
-                            // Si tiene textura, aseguramos que la textura no se vea lavada
-                            if (toonMat.map) {
-                                toonMat.map.minFilter = THREE.NearestFilter;
-                                toonMat.map.magFilter = THREE.NearestFilter;
-                            }
-
-                            return toonMat;
+                            mat.needsUpdate = true;
                         };
 
                         if (Array.isArray(child.material)) {
-                            child.material = child.material.map(m => convertToToon(m));
+                            child.material.forEach(m => processMaterial(m));
                         } else {
-                            child.material = convertToToon(child.material);
+                            processMaterial(child.material);
                         }
                     }
                 }

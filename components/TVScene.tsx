@@ -28,60 +28,54 @@ export default function TVScene() {
                 shadows
                 camera={{ position: [0, 0, cameraZ], fov: 35 }}
                 key={cameraZ} // Forzar re-render de la cámara al cambiar Z
-                // --- TRUCO LOWPOLY / CRUNCHY SUPREMO ---
-                // Bajamos la densidad de pixeles a la mitad o menos (0.5 o 0.4)
-                // Esto hace que TODO el canvas se renderice a baja resolución y el navegador lo escale (pixelado)
+                // --- ULTRA-CRUNCHY PSX LOOK ---
+                // Bajamos aún más el DPR para que los pixeles sean gigantes
                 dpr={[0.3, 0.5]}
                 gl={{
-                    antialias: false, // Sin suavizado de bordes para serruchos (aliasing)
-                    toneMapping: THREE.ACESFilmicToneMapping, // Mejor rango dinámico de color
-                    toneMappingExposure: 1.2, // Un poco más de exposición para resaltar colores
+                    antialias: false,
+                    toneMapping: THREE.ACESFilmicToneMapping,
+                    toneMappingExposure: 1.0,
                     preserveDrawingBuffer: true
                 }}
             >
                 {/* Fondo Negro Absoluto */}
                 <color attach="background" args={['#000000']} />
 
-                {/* 1. Luz Ambiental Base (Más fuerte para que no sea negro total) */}
-                <ambientLight intensity={0.8} />
+                {/* 1. Luz Ambiental (Un poco más de relleno) */}
+                <ambientLight intensity={0.3} />
 
-                {/* 2. Luz Principal (Key Light) - Fuerte y desde arriba/derecha */}
+                {/* 2. Luz Principal (Key Light) */}
                 <directionalLight
                     position={[5, 10, 5]}
-                    intensity={4.0}
+                    intensity={2.0}
                     castShadow
                 />
 
-                {/* --- POST PROCESADO REMOVIDO POR ERROR --- */}
-                {/* Look PSX se mantiene por material y texturas en CRTTelevision.tsx */}
-
-                {/* 3. Luz de Resalte (Spotlight) - Enfocada en el frente para textura */}
+                {/* 3. Luz de Resalte Frontal (Spotlight) */}
                 <spotLight
                     position={[-5, 5, 5]}
                     angle={0.6}
                     penumbra={0.5}
-                    intensity={80}
+                    intensity={25}
                     color="#ffffff"
                 />
 
-                {/* 4. Luz de Recorte (Rim Light) - CRUCIAL para separar del fondo negro */}
-                {/* Luz azulada desde atrás para dibujar la silueta */}
+                {/* 4. Luz de Recorte (Rim Light) */}
                 <spotLight
                     position={[0, 5, -5]}
                     angle={0.8}
                     penumbra={1}
-                    intensity={50}
+                    intensity={15}
                     color="#4060ff"
-                    lookAt={() => new THREE.Vector3(0, 0, 0)}
                 />
 
-                {/* 5. Luz Frontal Cálida - REFORZADA para ver textura y botones */}
+                {/* 5. Luz de Relleno Cálida (Más fuerte para ver mejor la tele) */}
                 <pointLight
-                    position={[0, -2, 4]}  // Bajé la altura (2 -> 1) para dar más directo al frente
-                    intensity={10.0}       // Tripliqué la intensidad (10 -> 30)
+                    position={[0, -2, 4]}
+                    intensity={5.0} // De 2.0 a 5.0
                     distance={15}
                     decay={2}
-                    color="#fff0cc"      // Un poco menos naranja, más "luz de sala"
+                    color="#fff0cc"
                 />
 
                 {/* Luces de relleno laterales (Ajustadas) */}
