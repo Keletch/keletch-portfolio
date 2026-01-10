@@ -5,13 +5,35 @@ import { useGLTF } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
-export default function CRTTelevision() {
+interface TelevisionProps {
+    modelPath: string;
+    screenNames?: string[];
+    position?: [number, number, number];
+    rotation?: [number, number, number];
+    scale?: number;
+    rotationX?: number;
+    theme?: 'classic' | 'toxic'; // Nueva prop de tema
+}
+
+export default function Television({
+    modelPath,
+    screenNames = ['screen', 'pantalla', 'display', 'monitor', 'glass', 'vidrio', 'cristal', 'tube', 'lcdscreen', 'lcd_screen'],
+    position = [0, 0, 0],
+    rotation = [0, 0, 0],
+    scale = 1,
+    rotationX = Math.PI * 0.06,
+    theme = 'classic'
+}: TelevisionProps) {
     const groupRef = useRef<THREE.Group>(null);
-    const { scene: model } = useGLTF('/models/LowPolyTV.glb');
+    const { scene: model } = useGLTF(modelPath);
     const screenTextureRef = useRef<THREE.CanvasTexture | null>(null);
-    const { camera, size } = useThree();
-    const normalizedMouse = useRef({ x: 0, y: 0 }); // Mouse normalizado (-1 a 1)
+    const { size } = useThree();
+    const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });   // Posición suavizada para la esclerótica
+
+    // Referencia para el canvas e id de cada instancia
+    const instanceId = useRef(Math.random().toString(36).substr(2, 9));
+    const screenAspect = useRef(1.0); // 1. Preparamos el ref para el aspect ratio
 
     // Estado del parpadeo
     const blinkState = useRef({
@@ -22,17 +44,8 @@ export default function CRTTelevision() {
         blinkTimer: 0
     });
 
-    // Rastrear posición del mouse
-    useEffect(() => {
-        const handleMouseMove = (event: MouseEvent) => {
-            // Normalizar coordenadas del mouse a -1 a 1
-            normalizedMouse.current.x = (event.clientX / size.width) * 2 - 1;
-            normalizedMouse.current.y = -(event.clientY / size.height) * 2 + 1; // Y invertido aquí para consistencia
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, [size]);
+    // 1. Ya NO necesitamos el listener global de mouse en useEffect
+    // Eliminamos el normalizedMouse y el listener de window)
 
     // Configurar el modelo y encontrar la pantalla
     useEffect(() => {
@@ -40,14 +53,16 @@ export default function CRTTelevision() {
 
         const clonedModel = model.clone();
 
-        console.log('🔍 ===== ANÁLISIS DEL MODELO GLB =====');
+        console.log(`🔍 ===== ANÁLISIS DEL MODELO: ${modelPath} =====`);
         let meshCount = 0;
         let screenFound = false;
 
-        // Buscar la mesh que representa la pantalla
         clonedModel.traverse((child) => {
             if (child instanceof THREE.Mesh) {
                 meshCount++;
+
+                console.log(`📦 Model: ${modelPath} | Mesh #${meshCount}: ${child.name}`);
+
                 // Asegurarse de que el material no sea transparente
                 if (Array.isArray(child.material)) {
                     child.material.forEach(mat => {
@@ -60,21 +75,23 @@ export default function CRTTelevision() {
                     child.material.transparent = false;
                     child.material.opacity = 1;
                 }
-                console.log(`📦 Mesh #${meshCount}:`, {
-                    name: child.name || '(sin nombre)',
-                    type: child.type,
-                    geometry: child.geometry.type,
-                    material: child.material instanceof THREE.Material ? child.material.type : 'múltiples materiales'
-                });
 
-                // Intenta detectar la pantalla por nombre común
-                const screenNames = ['screen', 'pantalla', 'display', 'monitor', 'glass', 'vidrio', 'cristal', 'tube'];
                 const childNameLower = child.name.toLowerCase();
-                const isScreen = screenNames.some(name => childNameLower.includes(name));
+                const isScreen = screenNames.some(name => childNameLower.includes(name.toLowerCase()));
 
                 if (isScreen) {
                     screenFound = true;
-                    console.log('✅ ¡PANTALLA DETECTADA!', child.name);
+                    console.log(`✅ ¡PANTALLA DETECTADA en ${modelPath}!`, child.name);
+
+                    // --- NUEVO: CALCULAR ASPECT RATIO DE LA PANTALLA ---
+                    child.geometry.computeBoundingBox();
+                    const box = child.geometry.boundingBox;
+                    if (box) {
+                        const width = box.max.x - box.min.x;
+                        const height = box.max.y - box.min.y;
+                        screenAspect.current = width / height;
+                        console.log(`📏 Aspect Ratio detectado para ${child.name}: ${screenAspect.current}`);
+                    }
 
                     // Crear textura desde canvas
                     const canvas = document.createElement('canvas');
@@ -86,24 +103,10 @@ export default function CRTTelevision() {
                     texture.magFilter = THREE.NearestFilter;
                     texture.wrapS = THREE.RepeatWrapping;
                     texture.wrapT = THREE.RepeatWrapping;
-
-                    // Al haber arreglado el UV map en Blender, ya no necesitamos hacks
                     texture.repeat.set(1, 1);
                     texture.offset.set(0, 0);
 
                     screenTextureRef.current = texture;
-
-                    console.log('🎨 Canvas texture creada (Zoom ajustado 3x):', {
-                        width: canvas.width,
-                        height: canvas.height,
-                        textureExists: !!texture
-                    });
-
-                    console.log('🎨 Canvas texture creada:', {
-                        width: canvas.width,
-                        height: canvas.height,
-                        textureExists: !!texture
-                    });
 
                     // Aplicar textura a la pantalla con MeshBasicMaterial (auto-iluminado)
                     child.material = new THREE.MeshBasicMaterial({
@@ -117,19 +120,12 @@ export default function CRTTelevision() {
                     // Para el resto de la TV: LOOK PSX / CARTOON pero preservando materiales originales
                     if (child.material) {
                         const processMaterial = (mat: any) => {
-                            // 1. Forzar look crunchy en todas las texturas del material
                             if (mat.map) {
                                 mat.map.minFilter = THREE.NearestFilter;
                                 mat.map.magFilter = THREE.NearestFilter;
                                 mat.map.needsUpdate = true;
                             }
-
-                            // 2. Activar Flat Shading para el look low-poly facetado
                             mat.flatShading = true;
-
-                            // Aseguramos que no se vea deslavado pero sin multiplicadores exagerados
-                            // mat.color.multiplyScalar(1.05); // Un toque muy sutil de brillo si es necesario
-
                             mat.needsUpdate = true;
                         };
 
@@ -143,17 +139,13 @@ export default function CRTTelevision() {
             }
         });
 
-        console.log(`📊 Total de meshes encontradas: ${meshCount}`);
         if (!screenFound) {
-            console.warn('⚠️ NO SE DETECTÓ NINGUNA PANTALLA');
-            console.log('💡 Revisa los nombres arriba y agrega el nombre correcto al array screenNames');
+            console.warn(`⚠️ NO SE DETECTÓ NINGUNA PANTALLA EN ${modelPath}`);
         }
-        console.log('🔍 ===== FIN DEL ANÁLISIS =====');
 
-        // Rotar el modelo para que esté de frente
-        clonedModel.rotation.x = Math.PI * 0.06; // Pequeña inclinación hacia arriba
-        clonedModel.rotation.y = 0;
-        clonedModel.position.y = -0.3; // Ajustar altura
+        // Aplicar transformaciones al modelo clonado
+        clonedModel.rotation.x = rotationX;
+        clonedModel.position.y = -0.3;
 
         if (groupRef.current) {
             groupRef.current.add(clonedModel);
@@ -164,11 +156,56 @@ export default function CRTTelevision() {
                 groupRef.current.clear();
             }
         };
-    }, [model]);
+    }, [model, modelPath, screenNames, rotationX]);
 
     // Actualizar canvas cada frame
     useFrame((state, delta) => {
-        if (screenTextureRef.current) {
+        if (screenTextureRef.current && groupRef.current) {
+            // --- LÓGICA DE MIRADA PRECISA ---
+            // 1. Obtener el CENTRO GEOMÉTRICO de la PANTALLA
+            const targetPos = new THREE.Vector3();
+            let screenFound = false;
+
+            groupRef.current.traverse((child) => {
+                if (!screenFound && child instanceof THREE.Mesh) {
+                    const childNameLower = child.name.toLowerCase();
+                    if (screenNames.some(name => childNameLower.includes(name.toLowerCase()))) {
+                        // Usamos el centro del Bounding Box para evitar errores de pivot
+                        child.geometry.computeBoundingBox();
+                        const box = child.geometry.boundingBox;
+                        if (box) {
+                            box.getCenter(targetPos);
+                            child.localToWorld(targetPos);
+                            screenFound = true;
+                        }
+                    }
+                }
+            });
+
+            // Fallback si no encuentra la mesh por nombre en este frame
+            if (!screenFound) {
+                groupRef.current.getWorldPosition(targetPos);
+            }
+
+            // Proyectar a NDC (-1 a 1)
+            const tvScreenPos = targetPos.project(state.camera);
+
+            // 2. Calcular vector al mouse
+            const gazeX = state.mouse.x - tvScreenPos.x;
+            const gazeY = state.mouse.y - tvScreenPos.y;
+
+            // 3. Sensibilidad equilibrada
+            const sensitivity = 2.2;
+
+            // COMPENSACIÓN AGRESIVA: 
+            // En pantallas LCD anchas, el eje Y es mucho más sensible perceptualmente.
+            // Si el aspect es 1.77 (16:9), multiplicamos por 0.56 para compensar.
+            const aspectCompensation = screenAspect.current > 1.1 ? (1 / screenAspect.current) : 1.0;
+
+            normalizedMouse.current.x = Math.max(-1, Math.min(1, gazeX * sensitivity));
+            normalizedMouse.current.y = Math.max(-1, Math.min(1, gazeY * sensitivity * aspectCompensation));
+
+            // --- LÓGICA DE DIBUJO EXISTENTE ---
             const canvas = screenTextureRef.current.image as HTMLCanvasElement;
             const ctx = canvas.getContext('2d');
 
@@ -182,23 +219,18 @@ export default function CRTTelevision() {
             blink.blinkTimer += delta;
 
             if (!blink.isBlinking) {
-                // Si no está parpadeando, checar si toca parpadear
                 if (state.clock.elapsedTime > blink.nextBlinkTime) {
                     blink.isBlinking = true;
                     blink.blinkTimer = 0;
-                    // Programar siguiente parpadeo aleatorio (entre 2 y 6 segundos)
                     blink.nextBlinkTime = state.clock.elapsedTime + Math.random() * 4 + 2;
                 }
                 blink.openness = 1.0;
             } else {
-                // Animación de parpadeo (Cerrar -> Abrir)
                 const progress = blink.blinkTimer / blink.blinkDuration;
                 if (progress >= 1) {
                     blink.isBlinking = false;
                     blink.openness = 1.0;
                 } else {
-                    // Curva de parpadeo: Cierra rápido, abre un poco más lento
-                    // Usamos sinusoide para simular 1 -> 0 -> 1
                     blink.openness = Math.abs(Math.cos(progress * Math.PI));
                 }
             }
@@ -206,141 +238,137 @@ export default function CRTTelevision() {
             if (ctx) {
                 const w = canvas.width;
                 const h = canvas.height;
+                const time = state.clock.elapsedTime;
 
-                // --- 1. FONDO CRT (Oscuro Total) ---
+                // --- 1. FONDO (Oscuro y Profundo) ---
                 ctx.fillStyle = '#000000';
                 ctx.fillRect(0, 0, w, h);
 
-                // --- 2. RUIDO / ESTÁTICA GRUESA (Coarser Grain) ---
-                // El usuario dice que el grano es "muy fino".
-                // putImageData edita pixeles individuales (1x1), eso es demasiado HD.
-                // Volvemos a rectángulos pero optimizados y MÁS GRANDES.
-                const noiseDensity = 5000; // Muchos granos
-                const grainSize = 3;       // Grano GORDO (3x3 pixeles)
-
-                // Usamos un solo color con transparencia para velocidad
-                // Azul muy oscuro/negroso
+                // --- 2. RUIDO / ESTÁTICA ---
+                // Volvemos a la densidad clásica que gustaba más
+                const noiseDensity = 5000;
+                const grainSize = 3;
 
                 for (let i = 0; i < noiseDensity; i++) {
                     const x = Math.random() * w;
                     const y = Math.random() * h;
-
-                    // Variación de color entre azul oscuro y negro
                     const brightness = Math.random();
-                    if (brightness > 0.5) {
-                        ctx.fillStyle = 'rgba(20, 30, 60, 0.4)'; // Azul oscuro
-                    } else {
-                        ctx.fillStyle = 'rgba(0, 5, 20, 0.5)'; // Casi negro
-                    }
 
+                    if (theme === 'toxic') {
+                        // Estática "Tóxica Oscura": Base azulada pero con chispas verde ácido
+                        if (brightness > 0.8) {
+                            ctx.fillStyle = 'rgba(0, 150, 50, 0.3)'; // Verde vívido pero raro
+                        } else if (brightness > 0.4) {
+                            ctx.fillStyle = 'rgba(10, 20, 40, 0.4)'; // Azul oscuro clásico
+                        } else {
+                            ctx.fillStyle = 'rgba(0, 10, 0, 0.5)'; // Negro verdoso
+                        }
+                    } else {
+                        // Estática clásica azulada
+                        if (brightness > 0.5) {
+                            ctx.fillStyle = 'rgba(20, 30, 60, 0.4)';
+                        } else {
+                            ctx.fillStyle = 'rgba(0, 5, 20, 0.5)';
+                        }
+                    }
                     ctx.fillRect(x, y, grainSize, grainSize);
                 }
 
-                // Capa extra de ruido de color "Video 1"
-                ctx.fillStyle = 'rgba(0, 0, 50, 0.1)';
+                // Capa de color base para unificar
+                ctx.fillStyle = theme === 'toxic' ? 'rgba(0, 20, 5, 0.2)' : 'rgba(0, 0, 50, 0.1)';
                 ctx.fillRect(0, 0, w, h);
 
+                // --- 3. EYE (Con color de tema) ---
+                const scleraMaxOffset = 100;
+                const scleraX = currentLookAt.current.x * scleraMaxOffset;
+                const scleraY = -currentLookAt.current.y * scleraMaxOffset;
 
-                // --- 3. EYE (Ojo) ---
-                // ... (parpadeo igual) ...
+                const eyeCenterX = w / 2 + scleraX;
+                const eyeCenterY = h / 2 + scleraY;
+
                 ctx.save();
-                const centerX = w / 2;
-                const centerY = h / 2;
-                ctx.translate(centerX, centerY);
+                ctx.translate(eyeCenterX, eyeCenterY);
                 ctx.scale(1, blink.openness);
-                ctx.translate(-centerX, -centerY);
 
                 drawPixelEye(
-                    ctx, w, h, normalizedMouse.current, currentLookAt.current
+                    ctx,
+                    normalizedMouse.current,
+                    theme === 'toxic' ? '#00bb33' : '#5090ff' // Verde Vívido pero Oscuro vs Azul
                 );
 
                 ctx.restore();
 
-                // --- 4. SCANLINES (Sutiles pero presentes) ---
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                const scanlineSpacing = 4;
+                // --- 4. SCANLINES ---
+                ctx.fillStyle = theme === 'toxic' ? 'rgba(0, 30, 0, 0.5)' : 'rgba(0, 0, 0, 0.4)';
+                const scanlineSpacing = 4; // Volvemos al espaciado clásico
                 for (let y = 0; y < h; y += scanlineSpacing) {
                     ctx.fillRect(0, y, w, 2);
                 }
 
-                // --- 5. VIGNETTE (EXTREMA) ---
-                // El gradiente anterior era muy suave. Vamos a ser agresivos.
-                // Viñeta dura para que las esquinas sean NEGRAS.
+                // --- 5. VIGNETTE ---
                 const gradient = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
-                gradient.addColorStop(0, 'rgba(0,0,0,0)');       // Centro transparente
-                gradient.addColorStop(0.5, 'rgba(0,0,0,0.2)');  // Transición
-                gradient.addColorStop(1, 'rgba(0,0,0,1.0)');    // ESQUINAS NEGRAS TOTALES
-
+                gradient.addColorStop(0, 'rgba(0,0,0,0)');
+                gradient.addColorStop(0.5, 'rgba(0,0,0,0.1)');
+                gradient.addColorStop(1, theme === 'toxic' ? 'rgba(0, 10, 0, 0.95)' : 'rgba(0,0,0,1.0)');
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, 0, w, h);
 
-                // --- 6. GLOW SUTIL ---
-                // Solo en el centro
+                // --- 6. GLOW ---
                 const glow = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 300);
-                glow.addColorStop(0, 'rgba(20, 40, 100, 0.1)');
+                const glowColor = theme === 'toxic' ? 'rgba(0, 100, 20, 0.15)' : 'rgba(20, 40, 100, 0.1)';
+                glow.addColorStop(0, glowColor);
                 glow.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = glow;
                 ctx.fillRect(0, 0, w, h);
             }
 
-            // Marcar textura para actualización
             screenTextureRef.current.needsUpdate = true;
         }
     });
 
-    return <group ref={groupRef} />;
+    return (
+        <group ref={groupRef} position={position} rotation={rotation} scale={scale} />
+    );
 }
 
-// Función para dibujar ojo pixel art
+// (He dejado drawPixelEye y los helpers igual al final)
+
+
+// Función para dibujar ojo pixel art (ahora dibuja relativo a 0,0 para que el parpadeo sea perfecto)
 function drawPixelEye(
     ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
     mousePos: { x: number; y: number },
-    smoothPos: { x: number; y: number }
+    irisColor: string = '#5090ff'
 ) {
     const pixelSize = 8;
-    const centerX = width / 2;
-    const centerY = height / 2;
 
-    // --- Configuraciones de Movimiento ---
-
-    // 1. Esclerótica (Globo Ocular): Se mueve suavemente (con delay)
-    // El usuario pidió "más libertad", así que aumentamos el rango.
-    // Rango Aumentado: de 40 a 60 (más libertad sin tocar bordes)
-    const scleraMaxOffset = 60;
-    const scleraX = smoothPos.x * scleraMaxOffset;
-    const scleraY = -smoothPos.y * scleraMaxOffset;
-
-    // 2. Pupila y Iris: Se mueven RELATIVOS a la esclerótica
-    // lookOffset es cuánto gira el ojo dentro de su propia órbita
-    const lookRange = 20;
-    const pupilX = scleraX + (mousePos.x * lookRange);
-    const pupilY = scleraY + (-mousePos.y * lookRange);
+    // 1. Pupila e Iris: Solo se mueven RELATIVOS al centro del ojo
+    const lookRange = 35;
+    const pupilX = mousePos.x * lookRange;
+    const pupilY = -mousePos.y * lookRange;
 
     // --- Dibujo ---
 
     // 1. Blanco del ojo (Esclerótica)
     ctx.fillStyle = '#ffffff';
-    // Sombra interna para volumen (Simulado)
     ctx.shadowBlur = 8;
     ctx.shadowColor = "rgba(255,255,255,0.5)";
     drawPixelEllipse(
         ctx,
-        centerX + scleraX,
-        centerY + scleraY,
+        0, // Centro X es 0 (ajustado por translate fuera)
+        0, // Centro Y es 0
         80,
         60,
         pixelSize
     );
-    ctx.shadowBlur = 0; // Reset shadow
+    ctx.shadowBlur = 0;
 
-    // 2. Iris - Sigue a la pupila
-    ctx.fillStyle = '#5090ff';
+    // 2. Iris
+    ctx.fillStyle = irisColor;
     drawPixelCircle(
         ctx,
-        centerX + pupilX,
-        centerY + pupilY,
+        pupilX,
+        pupilY,
         28,
         pixelSize
     );
@@ -349,23 +377,21 @@ function drawPixelEye(
     ctx.fillStyle = '#000000';
     drawPixelCircle(
         ctx,
-        centerX + pupilX,
-        centerY + pupilY,
+        pupilX,
+        pupilY,
         12,
         pixelSize
     );
 
-    // 4. Brillo (Reflejo) - Sigue a la pupila
+    // 4. Brillo (Reflejo)
     ctx.fillStyle = '#ffffff';
     drawPixelCircle(
         ctx,
-        centerX + pupilX + 6,
-        centerY + pupilY - 6,
+        pupilX + 6,
+        pupilY - 6,
         6,
         pixelSize
     );
-
-    // (YA NO DIBUJAMOS PÁRPADOS AQUÍ)
 }
 
 // Helpers de pixel art para estilo "blocky" sin anti-aliasing
@@ -417,3 +443,4 @@ function drawPixelEllipse(
 }
 
 useGLTF.preload('/models/LowPolyTV.glb');
+useGLTF.preload('/models/LCDTVFixed.glb');

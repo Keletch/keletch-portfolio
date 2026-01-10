@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import CRTTelevision from '@/components/CRTTelevision';
+import Television from '@/components/Television';
 
 export default function TVScene() {
     const [cameraZ, setCameraZ] = useState(5);
@@ -15,9 +15,7 @@ export default function TVScene() {
             setCameraZ(isMobile ? 8 : 5);
         };
 
-        // Ejecutar al inicio
         handleResize();
-
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
@@ -27,9 +25,7 @@ export default function TVScene() {
             <Canvas
                 shadows
                 camera={{ position: [0, 0, cameraZ], fov: 35 }}
-                key={cameraZ} // Forzar re-render de la cámara al cambiar Z
-                // --- ULTRA-CRUNCHY PSX LOOK ---
-                // Bajamos aún más el DPR para que los pixeles sean gigantes
+                key={cameraZ}
                 dpr={[0.3, 0.5]}
                 gl={{
                     antialias: false,
@@ -38,59 +34,78 @@ export default function TVScene() {
                     preserveDrawingBuffer: true
                 }}
             >
-                {/* Fondo Negro Absoluto */}
                 <color attach="background" args={['#000000']} />
 
-                {/* 1. Luz Ambiental (Un poco más de relleno) */}
                 <ambientLight intensity={0.3} />
 
-                {/* 2. Luz Principal (Key Light) */}
-                <directionalLight
-                    position={[5, 10, 5]}
-                    intensity={2.0}
-                    castShadow
-                />
+                {/* Luz Principal (Top-Center) */}
+                <directionalLight position={[0, 10, 5]} intensity={2.2} castShadow />
 
-                {/* 3. Luz de Resalte Frontal (Spotlight) */}
+                {/* Luz Blanca Frontal (Más abierta para cubrir ambas) */}
                 <spotLight
-                    position={[-5, 5, 5]}
-                    angle={0.6}
+                    position={[0, 5, 8]}
+                    angle={0.7}
                     penumbra={0.5}
-                    intensity={25}
+                    intensity={35}
                     color="#ffffff"
                 />
 
-                {/* 4. Luz de Recorte (Rim Light) */}
-                <spotLight
-                    position={[0, 5, -5]}
-                    angle={0.8}
-                    penumbra={1}
-                    intensity={15}
+                {/* Luz de Contra Azul (Sigue centrada) */}
+                {/* Luz de Contra Azul (Ampliada para que pegue en las orillas de ambas) */}
+                <pointLight
+                    position={[0, 3, -4]}
+                    intensity={40}
+                    distance={15}
+                    decay={2}
+                    color="#4060ff"
+                />
+                <pointLight
+                    position={[2, 2, -3]}
+                    intensity={20}
+                    distance={10}
+                    decay={2}
+                    color="#4060ff"
+                />
+                <pointLight
+                    position={[-2, 2, -3]}
+                    intensity={20}
+                    distance={10}
+                    decay={2}
                     color="#4060ff"
                 />
 
-                {/* 5. Luz de Relleno Cálida (Más fuerte para ver mejor la tele) */}
+                {/* Luz Cálida Inferior (Sigue centrada y más fuerte) */}
                 <pointLight
-                    position={[0, -2, 4]}
-                    intensity={5.0} // De 2.0 a 5.0
-                    distance={15}
+                    position={[0, -2, 5]}
+                    intensity={10.0}
+                    distance={20}
                     decay={2}
                     color="#fff0cc"
                 />
 
-                {/* Luces de relleno laterales (Ajustadas) */}
-                <pointLight position={[3, 0, 2]} intensity={1.0} color="#ffaa80" />
-                <pointLight position={[-3, -1, 2]} intensity={0.5} color="#80a0ff" />
+                {/* 1. TV Original (CRT) */}
+                <Television
+                    modelPath="/models/LowPolyTV.glb"
+                    position={[-1.2, 0, 0]}
+                    rotation={[0, 0.4, 0]}
+                />
 
-                {/* La TV CRT */}
-                <CRTTelevision />
+                {/* 2. TV Nueva (LCD) - Ajustada con nombre exacto y TEMA TÓXICO */}
+                <Television
+                    modelPath="/models/LCDTVFixed.glb"
+                    screenNames={['LCDScreen', 'screen', 'LCD_Screen']}
+                    position={[1.2, 0, 0]}
+                    rotation={[0, -0.4, 0]}
+                    rotationX={0}
+                    scale={1.2}
+                    theme="toxic"
+                />
 
-                {/* Controles de cámara */}
                 <OrbitControls
                     enableDamping
                     dampingFactor={0.05}
                     minDistance={1.5}
-                    maxDistance={20} // Aumentado para permitir el alejamiento en mobile
+                    maxDistance={20}
                 />
             </Canvas>
         </div>
