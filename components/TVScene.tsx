@@ -12,7 +12,7 @@ export default function TVScene() {
     useEffect(() => {
         const handleResize = () => {
             const isMobile = window.innerWidth < 768;
-            setCameraZ(isMobile ? 8 : 5);
+            setCameraZ(isMobile ? 8 : 10);
         };
 
         handleResize();
@@ -50,55 +50,86 @@ export default function TVScene() {
                     color="#ffffff"
                 />
 
-                {/* Luz de Contra Azul (Sigue centrada) */}
-                {/* Luz de Contra Azul (Ampliada para que pegue en las orillas de ambas) */}
-                <pointLight
-                    position={[0, 3, -4]}
-                    intensity={40}
-                    distance={15}
-                    decay={2}
-                    color="#4060ff"
-                />
-                <pointLight
-                    position={[2, 2, -3]}
-                    intensity={20}
-                    distance={10}
-                    decay={2}
-                    color="#4060ff"
-                />
-                <pointLight
-                    position={[-2, 2, -3]}
-                    intensity={20}
-                    distance={10}
-                    decay={2}
-                    color="#4060ff"
-                />
+                {/* Luz de Contra Azul (Ampliada) */}
+                <pointLight position={[0, 2.2, -4]} intensity={50} distance={18} decay={2} color="#4060ff" />
+                <pointLight position={[3, 1.2, -3]} intensity={25} distance={10} decay={2} color="#4060ff" />
+                <pointLight position={[-3, 1.2, -3]} intensity={25} distance={10} decay={2} color="#4060ff" />
 
-                {/* Luz Cálida Inferior (Sigue centrada y más fuerte) */}
-                <pointLight
-                    position={[0, -2, 5]}
-                    intensity={10.0}
-                    distance={20}
-                    decay={2}
-                    color="#fff0cc"
-                />
+                {/* Luz Púrpura para la TV de abajo-izquierda (Purple/Void) */}
+                <pointLight position={[-0.3, -1.8, 3]} intensity={20.0} distance={12} decay={2} color="#9900ff" />
 
+                {/* Luz de Azufre para la tipicalTV (Amarillo) */}
+                <pointLight position={[-3.5, -1.5, 3]} intensity={15.0} distance={10} decay={2} color="#d4c264" />
+
+                {/* Luz Noir para la toonTV (Blanco/Gris) */}
+                <pointLight position={[-3.5, 1.0, 3]} intensity={12.0} distance={10} decay={2} color="#ffffff" />
+
+                {/* Luz Roja para la TV de abajo-derecha (Dirty/Blood) */}
+                <pointLight position={[2.7, -1.5, 3]} intensity={20.0} distance={12} decay={2} color="#ff0000" />
+
+                {/* Luz Verde para la LCD (Toxic) */}
+                <pointLight position={[3.2, 1.2, 3]} intensity={10.0} distance={10} decay={2} color="#00ff44" />
+
+                {/* STACK IZQUIERDO (CENTRO) */}
                 {/* 1. TV Original (CRT) */}
                 <Television
                     modelPath="/models/LowPolyTV.glb"
-                    position={[-1.2, 0, 0]}
-                    rotation={[0, 0.4, 0]}
+                    position={[0, 1.11, -0.3]}
+                    rotation={[0, 0.1, 0]}
                 />
 
-                {/* 2. TV Nueva (LCD) - Ajustada con nombre exacto y TEMA TÓXICO */}
+                {/* 3. TV Púrpura (redTV - Theme Void) */}
+                <Television
+                    modelPath="/models/redTV.glb"
+                    screenNames={['redTVScreen', 'screen']}
+                    position={[0, -0.8, 0]}
+                    rotation={[0, 0.1, 0]}
+                    rotationX={-Math.PI * 0.04}
+                    scale={1.0}
+                    theme="void"
+                    invertY={true}
+                />
+
+                {/* 5. TV Amarilla (typicalTV - Theme Sulfur) - Simétrica a dirtyTV */}
+                <Television
+                    modelPath="/models/typicalTV.glb"
+                    screenNames={['typicaltvscreen', 'screen', 'typical_tv_screen', 'tipicaltvscreen']}
+                    position={[-2.2, -0.8, 0]}
+                    rotation={[0, 0.4, 0]}
+                    theme="sulfur"
+                />
+
+                {/* 6. TV Toon (toonTV - Theme Toon Noir) - Arriba de la Amarilla */}
+                <Television
+                    modelPath="/models/toonTV.glb"
+                    screenNames={['toonTVScreen', 'screen', 'toontvscreen']}
+                    position={[-2.1, 0.45, .5]}
+                    rotation={[0, 0.4, 0]}
+                    theme="toon"
+                />
+
+                {/* STACK DERECHO */}
+                {/* 2. TV LCD (Theme Toxic) */}
                 <Television
                     modelPath="/models/LCDTVFixed.glb"
                     screenNames={['LCDScreen', 'screen', 'LCD_Screen']}
-                    position={[1.2, 0, 0]}
+                    position={[2.4, 0.6, 0]}
                     rotation={[0, -0.4, 0]}
                     rotationX={0}
-                    scale={1.2}
+                    scale={1.1}
                     theme="toxic"
+                />
+
+                {/* 4. TV Sucia (dirtyTV - Theme Blood) */}
+                <Television
+                    modelPath="/models/dirtyTV.glb"
+                    screenNames={['dirtyTVScreen', 'screen']}
+                    position={[2.4, -0.8, 0]}
+                    rotation={[0, -0.4, 0]}
+                    rotationX={-Math.PI * 0.04}
+                    scale={1.0}
+                    theme="blood"
+                    gazeOffset={{ x: 0, y: -0.1 }}
                 />
 
                 <OrbitControls
