@@ -106,8 +106,8 @@ export default function Television({
                     const texture = new THREE.CanvasTexture(canvas);
                     texture.minFilter = THREE.NearestFilter;
                     texture.magFilter = THREE.NearestFilter;
-                    texture.wrapS = THREE.RepeatWrapping;
-                    texture.wrapT = THREE.RepeatWrapping;
+                    texture.wrapS = THREE.ClampToEdgeWrapping;
+                    texture.wrapT = THREE.ClampToEdgeWrapping;
                     texture.repeat.set(1, 1);
                     texture.offset.set(0, 0);
 
