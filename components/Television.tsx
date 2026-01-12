@@ -15,6 +15,7 @@ interface TelevisionProps {
     theme?: 'classic' | 'toxic' | 'blood' | 'void' | 'sulfur' | 'toon'; // 'toon' es Noir (Blanco y Negro)
     invertY?: boolean; // Invertir eje Y si el modelo tiene UVs invertidas
     gazeOffset?: { x: number; y: number }; // Offset manual para calibración
+    uvRotation?: number; // Rotación de la textura en radianes (ej: Math.PI/4 para 45°)
 }
 
 export default function Television({
@@ -23,10 +24,11 @@ export default function Television({
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
-    rotationX = Math.PI * 0.06,
+    rotationX = 0,
     theme = 'classic',
     invertY = false,
-    gazeOffset = { x: 0, y: 0 }
+    gazeOffset = { x: 0, y: 0 },
+    uvRotation = 0
 }: TelevisionProps) {
     const groupRef = useRef<THREE.Group>(null);
     const { scene: model } = useGLTF(modelPath);
@@ -110,6 +112,8 @@ export default function Television({
                     texture.wrapT = THREE.ClampToEdgeWrapping;
                     texture.repeat.set(1, 1);
                     texture.offset.set(0, 0);
+                    texture.rotation = uvRotation;
+                    texture.center.set(0.5, 0.5); // Rotar desde el centro
 
                     screenTextureRef.current = texture;
 
@@ -161,7 +165,7 @@ export default function Television({
                 groupRef.current.clear();
             }
         };
-    }, [model, modelPath, screenNames, rotationX]);
+    }, [model, modelPath, screenNames, rotationX, uvRotation]);
 
     // Actualizar canvas cada frame
     useFrame((state, delta) => {
@@ -212,11 +216,35 @@ export default function Television({
                 aspectCompensation = 1 / screenAspect.current;
             }
 
-            // Aplicamos sensibilidad y offset manual si existe
-            normalizedMouse.current.x = Math.max(-1, Math.min(1, (gazeX * sensitivity) + gazeOffset.x));
+            // 4. Rotar el vector de mirada si existe uvRotation
+            let finalX = (gazeX * sensitivity) + gazeOffset.x;
+            let finalY = (invertY ? -gazeY : gazeY) * sensitivity * aspectCompensation + gazeOffset.y;
 
-            const finalGazeY = invertY ? -gazeY : gazeY;
-            normalizedMouse.current.y = Math.max(-1, Math.min(1, (finalGazeY * sensitivity * aspectCompensation) + gazeOffset.y));
+            if (uvRotation !== 0) {
+                // Para 90° (Math.PI/2), intercambiamos ejes en vez de rotar
+                if (Math.abs(uvRotation - Math.PI / 2) < 0.01) {
+                    // 90° horario: X_nuevo = -Y_viejo, Y_nuevo = X_viejo
+                    const temp = finalX;
+                    finalX = -finalY;
+                    finalY = temp;
+                } else if (Math.abs(uvRotation + Math.PI / 2) < 0.01) {
+                    // 90° anti-horario: X_nuevo = Y_viejo, Y_nuevo = -X_viejo
+                    const temp = finalX;
+                    finalX = finalY;
+                    finalY = -temp;
+                } else {
+                    // Para otros ángulos, usamos rotación estándar
+                    const cosR = Math.cos(-uvRotation);
+                    const sinR = Math.sin(-uvRotation);
+                    const rotatedX = finalX * cosR - finalY * sinR;
+                    const rotatedY = finalX * sinR + finalY * cosR;
+                    finalX = rotatedX;
+                    finalY = rotatedY;
+                }
+            }
+
+            normalizedMouse.current.x = Math.max(-1, Math.min(1, finalX));
+            normalizedMouse.current.y = Math.max(-1, Math.min(1, finalY));
 
             // --- LÓGICA DE DIBUJO EXISTENTE ---
             const canvas = screenTextureRef.current.image as HTMLCanvasElement;
