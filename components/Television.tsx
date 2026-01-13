@@ -12,10 +12,11 @@ interface TelevisionProps {
     rotation?: [number, number, number];
     scale?: number;
     rotationX?: number;
-    theme?: 'classic' | 'toxic' | 'blood' | 'void' | 'sulfur' | 'toon'; // 'toon' es Noir (Blanco y Negro)
+    theme?: 'classic' | 'toxic' | 'blood' | 'void' | 'sulfur' | 'toon' | 'sonar'; // 'toon' es Noir (Blanco y Negro), 'sonar' es Radiografía
     invertY?: boolean; // Invertir eje Y si el modelo tiene UVs invertidas
     gazeOffset?: { x: number; y: number }; // Offset manual para calibración
     uvRotation?: number; // Rotación de la textura en radianes (ej: Math.PI/4 para 45°)
+    modelYOffset?: number; // Offset vertical del modelo dentro del grupo
 }
 
 export default function Television({
@@ -28,7 +29,8 @@ export default function Television({
     theme = 'classic',
     invertY = false,
     gazeOffset = { x: 0, y: 0 },
-    uvRotation = 0
+    uvRotation = 0,
+    modelYOffset = -0.3
 }: TelevisionProps) {
     const groupRef = useRef<THREE.Group>(null);
     const { scene: model } = useGLTF(modelPath);
@@ -154,7 +156,7 @@ export default function Television({
 
         // Aplicar transformaciones al modelo clonado
         clonedModel.rotation.x = rotationX;
-        clonedModel.position.y = -0.3;
+        clonedModel.position.y = modelYOffset;
 
         if (groupRef.current) {
             groupRef.current.add(clonedModel);
@@ -287,6 +289,7 @@ export default function Television({
                 if (theme === 'void') bgColor = '#0a001a'; // Fondo púrpura profundo
                 if (theme === 'sulfur') bgColor = '#1a1a00'; // Fondo azufre oscuro
                 if (theme === 'toon') bgColor = '#080808'; // Fondo Negro "Noir"
+                if (theme === 'sonar') bgColor = '#000800'; // Fondo Sonar (Verde muy oscuro)
                 ctx.fillStyle = bgColor;
                 ctx.fillRect(0, 0, w, h);
 
@@ -345,6 +348,15 @@ export default function Television({
                         } else {
                             ctx.fillStyle = 'rgba(20, 20, 20, 0.5)';
                         }
+                    } else if (theme === 'sonar') {
+                        // Estática Sonar (Verde radar)
+                        if (brightness > 0.8) {
+                            ctx.fillStyle = 'rgba(0, 255, 50, 0.3)';
+                        } else if (brightness > 0.4) {
+                            ctx.fillStyle = 'rgba(0, 100, 20, 0.4)';
+                        } else {
+                            ctx.fillStyle = 'rgba(0, 50, 10, 0.5)';
+                        }
                     } else {
                         // Estática clásica azulada
                         if (brightness > 0.5) {
@@ -362,6 +374,7 @@ export default function Television({
                 if (theme === 'blood') baseColor = 'rgba(40, 0, 0, 0.2)';
                 if (theme === 'sulfur') baseColor = 'rgba(50, 50, 0, 0.2)'; // Base amarilla deslavada
                 if (theme === 'toon') baseColor = 'rgba(10, 10, 10, 0.3)'; // Base gris oscura
+                if (theme === 'sonar') baseColor = 'rgba(0, 40, 0, 0.2)'; // Base verde radar
                 ctx.fillStyle = baseColor;
                 ctx.fillRect(0, 0, w, h);
 
@@ -394,14 +407,20 @@ export default function Television({
                 if (theme === 'void') irisColor = '#9900ff'; // Iris Púrpura
                 if (theme === 'sulfur') irisColor = '#d4c264'; // Amarillo azufre deslavado
                 if (theme === 'toon') irisColor = '#dcdcdc'; // Iris Gris claro (Noir)
+                if (theme === 'sonar') irisColor = '#00ff44'; // Iris Verde Neon Holográfico
 
                 const customLookRange = isLCD ? 32 : 26;
+                const isHologram = theme === 'sonar';
+                // Para sonar queremos sclera transparente/verdosa
+                const scleraColor = theme === 'sonar' ? 'rgba(0, 255, 50, 0.4)' : '#ffffff';
 
                 drawPixelEye(
                     ctx,
                     normalizedMouse.current,
                     irisColor,
-                    customLookRange
+                    customLookRange,
+                    scleraColor,
+                    isHologram // Flag para modo holograma (sin pupilas negras sólidas, o estilos extra)
                 );
 
                 ctx.restore();
@@ -411,6 +430,7 @@ export default function Television({
                 if (theme === 'blood') scanlineColor = 'rgba(40, 0, 0, 0.6)';
                 if (theme === 'toxic') scanlineColor = 'rgba(0, 30, 0, 0.5)';
                 if (theme === 'void') scanlineColor = 'rgba(20, 0, 40, 0.5)'; // Scanlines purpuras
+                if (theme === 'sonar') scanlineColor = 'rgba(0, 50, 20, 0.5)'; // Scanlines verdes
                 ctx.fillStyle = scanlineColor;
 
                 // Variar el espaciado para "personalidad"
@@ -424,6 +444,10 @@ export default function Television({
                 if (theme === 'toon') {
                     scanlineSpacing = 3; // Muy densos
                     scanlineThickness = 1; // Muy finos (look film grain)
+                }
+                if (theme === 'sonar') {
+                    scanlineSpacing = 4;
+                    scanlineThickness = 2; // Estándar pero marcadas
                 }
 
                 for (let y = 0; y < h; y += scanlineSpacing) {
@@ -441,6 +465,7 @@ export default function Television({
                 if (theme === 'void') vignetteColor = 'rgba(10, 0, 20, 0.95)';
                 if (theme === 'sulfur') vignetteColor = 'rgba(20, 20, 0, 0.95)';
                 if (theme === 'toon') vignetteColor = 'rgba(5, 5, 5, 0.98)';
+                if (theme === 'sonar') vignetteColor = 'rgba(0, 20, 0, 0.95)';
 
                 gradient.addColorStop(1, vignetteColor);
                 ctx.fillStyle = gradient;
@@ -453,6 +478,7 @@ export default function Television({
                 if (theme === 'blood') glowColor = 'rgba(150, 0, 0, 0.15)';
                 if (theme === 'void') glowColor = 'rgba(100, 0, 255, 0.15)';
                 if (theme === 'sulfur') glowColor = 'rgba(200, 200, 50, 0.12)';
+                if (theme === 'sonar') glowColor = 'rgba(0, 255, 50, 0.15)'; // Glow Radioactivo suave
 
                 glow.addColorStop(0, glowColor);
                 glow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -477,7 +503,9 @@ function drawPixelEye(
     ctx: CanvasRenderingContext2D,
     mousePos: { x: number; y: number },
     irisColor: string = '#5090ff',
-    lookRange: number = 26
+    lookRange: number = 26,
+    scleraColor: string = '#ffffff',
+    isHologram: boolean = false
 ) {
     const pixelSize = 8;
 
@@ -488,9 +516,16 @@ function drawPixelEye(
     // --- Dibujo ---
 
     // 1. Blanco del ojo (Esclerótica)
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = scleraColor;
+    if (isHologram) {
+        // En modo holograma, añadimos un borde o efecto extra si se desea
+        ctx.strokeStyle = irisColor;
+        ctx.lineWidth = 2; // Pixel size virtual
+        // drawPixelEllipseStroke... (simplifiquemos: solo color sólido translúcido)
+    }
+
     ctx.shadowBlur = 8;
-    ctx.shadowColor = "rgba(255,255,255,0.5)";
+    ctx.shadowColor = isHologram ? irisColor : "rgba(255,255,255,0.5)";
     drawPixelEllipse(
         ctx,
         0, // Centro X es 0 (ajustado por translate fuera)
@@ -512,7 +547,7 @@ function drawPixelEye(
     );
 
     // 3. Pupila
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = isHologram ? 'rgba(0, 50, 0, 0.8)' : '#000000'; // Pupila verde muy oscura en holograma
     drawPixelCircle(
         ctx,
         pupilX,

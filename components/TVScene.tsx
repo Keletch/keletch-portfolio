@@ -49,8 +49,41 @@ export default function TVScene() {
     const tv5Position = { x: 1.6, y: 1.1, z: 0 };     // LowPoly
     const tv6Position = { x: 0.75, y: 2.1, z: 0 };    // Sulfur
 
-    // Cargar modelo del TV stand
+    // --- CONTROLES DE ACCESORIOS (Valores finales calibrados) ---
+    const dvdCtrl = {
+        pos: [0, -0.45, 0.30] as [number, number, number],
+        rot: [0, 0, 0] as [number, number, number],
+        size: [0.43, 0.08, 0.29] as [number, number, number],
+        offset: [0, 0.08, -0.19] as [number, number, number]
+    };
+
+    const radioCtrl = {
+        pos: [1.50, -0.45, 0] as [number, number, number],
+        rot: [0, 0, 0] as [number, number, number],
+        size: [0.51, 0.14, 0.35] as [number, number, number],
+        offset: [-0.03, 0.15, 0] as [number, number, number]
+    };
+
+    const leftSpkCtrl = {
+        pos: [-4.9, 0, 0] as [number, number, number],
+        rot: [0, 0.2, 0] as [number, number, number], // Ajusta rotación aquí [X, Y, Z]
+        size: [0.45, 1.6, 0.68] as [number, number, number],
+        offset: [-0.05, 1.55, -0.08] as [number, number, number]
+    };
+
+    const rightSpkCtrl = {
+        pos: [5.0, 0, 0] as [number, number, number],
+        rot: [0, -0.4, 0] as [number, number, number], // Ajusta rotación aquí [X, Y, Z]
+        size: [0.45, 1.55, 0.68] as [number, number, number],
+        offset: [0.02, 1.60, 0.08] as [number, number, number]
+    };
+
+    // Cargar modelos
     const { scene: tvStandModel } = useGLTF('/models/tvStand.glb');
+    const { scene: dvdModel } = useGLTF('/models/dvd.glb');
+    const { scene: radioModel } = useGLTF('/models/radio.glb');
+    const { scene: leftSpeakerModel } = useGLTF('/models/leftSpeaker.glb');
+    const { scene: rightSpeakerModel } = useGLTF('/models/rightSpeaker.glb');
 
     return (
         <div style={{ width: '100%', height: '100vh', background: '#000000' }}>
@@ -143,6 +176,32 @@ export default function TVScene() {
                             <Television modelPath="/models/typicalTV.glb" screenNames={['typicaltvscreen', 'screen', 'typical_tv_screen', 'tipicaltvscreen']} theme="sulfur" invertY={true} />
                         </RigidBody>
 
+                        {/* --- ACCESORIOS --- */}
+
+                        {/* DVD PLAYER */}
+                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={dvdCtrl.pos} rotation={dvdCtrl.rot}>
+                            <CuboidCollider args={dvdCtrl.size} position={dvdCtrl.offset} friction={0.5} restitution={0.1} />
+                            <primitive object={dvdModel.clone()} />
+                        </RigidBody>
+
+                        {/* RADIO */}
+                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={radioCtrl.pos} rotation={radioCtrl.rot}>
+                            <CuboidCollider args={radioCtrl.size} position={radioCtrl.offset} friction={0.5} restitution={0.1} />
+                            <Television modelPath="/models/radio.glb" screenNames={['radioScreen']} theme="sonar" modelYOffset={0} invertY={true} />
+                        </RigidBody>
+
+                        {/* LEFT SPEAKER */}
+                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={leftSpkCtrl.pos} rotation={leftSpkCtrl.rot}>
+                            <CuboidCollider args={leftSpkCtrl.size} position={leftSpkCtrl.offset} friction={0.5} restitution={0.1} />
+                            <primitive object={leftSpeakerModel.clone()} />
+                        </RigidBody>
+
+                        {/* RIGHT SPEAKER */}
+                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={rightSpkCtrl.pos} rotation={rightSpkCtrl.rot}>
+                            <CuboidCollider args={rightSpkCtrl.size} position={rightSpkCtrl.offset} friction={0.5} restitution={0.1} />
+                            <primitive object={rightSpeakerModel.clone()} />
+                        </RigidBody>
+
                     </Physics>
                 </Suspense>
 
@@ -151,7 +210,7 @@ export default function TVScene() {
                     dampingFactor={0.05}
                     minDistance={1.5}
                     maxDistance={20}
-                    target={[-0.5, 1.2, 0]} // [X, Y, Z] -> Cambia el primer valor (0.5) para mover la cámara izquierda/derecha
+                    target={[-0.2, 1.2, 0]} // [X, Y, Z] -> Cambia el primer valor (0.5) para mover la cámara izquierda/derecha
                 />
             </Canvas>
         </div>
