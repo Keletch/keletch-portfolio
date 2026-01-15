@@ -19,6 +19,86 @@ interface TelevisionProps {
     modelYOffset?: number; // Offset vertical del modelo dentro del grupo
 }
 
+const THEMES = {
+    classic: {
+        bgColor: '#000515',
+        baseColor: 'rgba(0, 20, 100, 0.2)',
+        glowCenter: 'rgba(40, 60, 255, 0.1)',
+        irisColor: '#5090ff',
+        lightColor: '#2040ff',
+        lightIntensity: 6.0,
+        vignetteColor: 'rgba(0, 5, 20, 0.95)',
+        lookRange: 26,
+        scleraColor: '#ffffff'
+    },
+    toxic: {
+        bgColor: '#001a05',
+        baseColor: 'rgba(0, 40, 10, 0.3)',
+        glowCenter: 'rgba(0, 255, 50, 0.1)',
+        irisColor: '#00bb33',
+        lightColor: '#00ff44',
+        lightIntensity: 8.0,
+        vignetteColor: 'rgba(0, 10, 0, 0.95)',
+        lookRange: 32,
+        scleraColor: '#ffffff'
+    },
+    blood: {
+        bgColor: '#200000',
+        baseColor: 'rgba(60, 0, 0, 0.3)',
+        glowCenter: 'rgba(255, 0, 0, 0.1)',
+        irisColor: '#cc0000',
+        lightColor: '#ff0000',
+        lightIntensity: 8.0,
+        vignetteColor: 'rgba(20, 0, 0, 0.95)',
+        lookRange: 26,
+        scleraColor: '#ffffff'
+    },
+    void: {
+        bgColor: '#150020',
+        baseColor: 'rgba(30, 0, 40, 0.3)', // Added missing baseColor for void
+        glowCenter: 'rgba(100, 0, 255, 0.1)',
+        irisColor: '#9900ff',
+        lightColor: '#a000ff',
+        lightIntensity: 7.0,
+        vignetteColor: 'rgba(10, 0, 20, 0.95)',
+        lookRange: 26,
+        scleraColor: '#ffffff'
+    },
+    sulfur: {
+        bgColor: '#1a1a00',
+        baseColor: 'rgba(60, 60, 0, 0.3)',
+        glowCenter: 'rgba(255, 255, 0, 0.08)',
+        irisColor: '#d4c264',
+        lightColor: '#ffee00',
+        lightIntensity: 6.0,
+        vignetteColor: 'rgba(20, 20, 0, 0.95)',
+        lookRange: 26,
+        scleraColor: '#ffffff'
+    },
+    toon: {
+        bgColor: '#151515',
+        baseColor: 'rgba(20, 20, 20, 0.3)',
+        glowCenter: 'rgba(255, 255, 255, 0.05)',
+        irisColor: '#dcdcdc',
+        lightColor: '#ffffff',
+        lightIntensity: 4.0,
+        vignetteColor: 'rgba(5, 5, 5, 0.98)',
+        lookRange: 26,
+        scleraColor: '#ffffff'
+    },
+    sonar: {
+        bgColor: '#001a05',
+        baseColor: 'rgba(0, 60, 10, 0.3)',
+        glowCenter: 'rgba(0, 255, 50, 0.15)',
+        irisColor: '#00ff44',
+        lightColor: '#00ff33',
+        lightIntensity: 7.0,
+        vignetteColor: 'rgba(0, 20, 0, 0.95)',
+        lookRange: 15,
+        scleraColor: 'rgba(0, 255, 50, 0.4)'
+    }
+};
+
 export default function Television({
     modelPath,
     screenNames = ['screen', 'pantalla', 'display', 'monitor', 'glass', 'vidrio', 'cristal', 'tube', 'lcdscreen', 'lcd_screen', 'redtvscreen', 'dirtytvscreen', 'tipicaltvscreen', 'toontvscreen', 'toontv_screen'],
@@ -42,7 +122,8 @@ export default function Television({
 
     // Referencia para el canvas e id de cada instancia
     const instanceId = useRef(Math.random().toString(36).substr(2, 9));
-    const screenAspect = useRef(1.0); // 1. Preparamos el ref para el aspect ratio
+    const screenAspect = useRef(1.0);
+    const screenDimensions = useRef({ width: 1.0, height: 1.0 }); // Default size
 
     // Estado del parpadeo
     const blinkState = useRef({
@@ -52,6 +133,9 @@ export default function Television({
         blinkDuration: 0.15, // Velocidad del parpadeo
         blinkTimer: 0
     });
+
+    // Configuración del Tema Activo
+    const activeTheme = THEMES[theme] || THEMES.classic;
 
     // 1. Ya NO necesitamos el listener global de mouse en useEffect
     // Eliminamos el normalizedMouse y el listener de window)
@@ -72,18 +156,6 @@ export default function Television({
 
                 console.log(`📦 Model: ${modelPath} | Mesh #${meshCount}: ${child.name}`);
 
-                // Asegurarse de que el material no sea transparente
-                if (Array.isArray(child.material)) {
-                    child.material.forEach(mat => {
-                        if (mat instanceof THREE.Material) {
-                            mat.transparent = false;
-                            mat.opacity = 1;
-                        }
-                    });
-                } else if (child.material instanceof THREE.Material) {
-                    child.material.transparent = false;
-                    child.material.opacity = 1;
-                }
 
                 const childNameLower = child.name.toLowerCase();
                 const isScreen = screenNames.some(name => childNameLower.includes(name.toLowerCase()));
@@ -99,7 +171,11 @@ export default function Television({
                         const width = box.max.x - box.min.x;
                         const height = box.max.y - box.min.y;
                         screenAspect.current = width / height;
-                        console.log(`📏 Aspect Ratio detectado para ${child.name}: ${screenAspect.current}`);
+
+                        // Guardar dimensiones reales para la luz
+                        screenDimensions.current = { width, height };
+
+                        console.log(`📏 Pantalla ${child.name}: ${width.toFixed(2)}x${height.toFixed(2)} (Aspect: ${screenAspect.current.toFixed(2)})`);
                     }
 
                     // Crear textura desde canvas
@@ -283,18 +359,19 @@ export default function Television({
                 const h = canvas.height;
                 const time = state.clock.elapsedTime;
 
-                // --- 1. FONDO (Oscuro y Profundo) ---
-                let bgColor = '#000000';
-                if (theme === 'blood') bgColor = '#1a0000';
-                if (theme === 'void') bgColor = '#0a001a'; // Fondo púrpura profundo
-                if (theme === 'sulfur') bgColor = '#1a1a00'; // Fondo azufre oscuro
-                if (theme === 'toon') bgColor = '#080808'; // Fondo Negro "Noir"
-                if (theme === 'sonar') bgColor = '#000800'; // Fondo Sonar (Verde muy oscuro)
-                ctx.fillStyle = bgColor;
+                // --- 1. FONDO (Configurable via THEMES) ---
+                ctx.fillStyle = activeTheme.bgColor;
                 ctx.fillRect(0, 0, w, h);
 
-                // --- 2. RUIDO / ESTÁTICA ---
-                // Volvemos a la densidad clásica que gustaba más
+                // --- 1.5 BACKLIGHT GLOW ---
+                const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
+                backlight.addColorStop(0, activeTheme.glowCenter);
+                backlight.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = backlight;
+                ctx.fillRect(0, 0, w, h);
+
+                // --- 2. RUIDO / ESTÁTICA (ELIMINADO) ---
+                /*
                 const noiseDensity = 5000;
                 const grainSize = 3;
 
@@ -367,16 +444,12 @@ export default function Television({
                     }
                     ctx.fillRect(x, y, grainSize, grainSize);
                 }
+                */
 
-                // Capa de color base para unificar
-                let baseColor = 'rgba(0, 0, 50, 0.1)';
-                if (theme === 'toxic') baseColor = 'rgba(0, 20, 5, 0.2)';
-                if (theme === 'blood') baseColor = 'rgba(40, 0, 0, 0.2)';
-                if (theme === 'sulfur') baseColor = 'rgba(50, 50, 0, 0.2)'; // Base amarilla deslavada
-                if (theme === 'toon') baseColor = 'rgba(10, 10, 10, 0.3)'; // Base gris oscura
-                if (theme === 'sonar') baseColor = 'rgba(0, 40, 0, 0.2)'; // Base verde radar
-                ctx.fillStyle = baseColor;
+                // Capa de color base para unificar (SATURACIÓN AUMENTADA)
+                ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
+
 
                 // --- 3. EYE (Con color de tema) ---
                 // Expandimos el recorrido horizontal SOLO para la LCD (Toxic)
@@ -399,19 +472,28 @@ export default function Television({
 
                 ctx.save();
                 ctx.translate(eyeCenterX, eyeCenterY);
-                ctx.scale(geoCorrectionX, blink.openness);
+
+                // SCALE:
+                // 1. Geo Correction (Toxic)
+                // 2. Blink (Y axis)
+                // 3. Radio/Sonar Sizing fix (User said it's too big)
+                let scaleEye = 1.0;
+                if (theme === 'sonar') scaleEye = 0.6; // Radio eye 40% smaller
+
+                ctx.scale(geoCorrectionX * scaleEye, blink.openness * scaleEye);
 
                 let irisColor = '#5090ff';
                 if (theme === 'toxic') irisColor = '#00bb33';
                 if (theme === 'blood') irisColor = '#cc0000';
-                if (theme === 'void') irisColor = '#9900ff'; // Iris Púrpura
-                if (theme === 'sulfur') irisColor = '#d4c264'; // Amarillo azufre deslavado
-                if (theme === 'toon') irisColor = '#dcdcdc'; // Iris Gris claro (Noir)
-                if (theme === 'sonar') irisColor = '#00ff44'; // Iris Verde Neon Holográfico
+                if (theme === 'void') irisColor = '#9900ff';
+                if (theme === 'sulfur') irisColor = '#d4c264';
+                if (theme === 'toon') irisColor = '#dcdcdc';
+                if (theme === 'sonar') irisColor = '#00ff44';
 
-                const customLookRange = isLCD ? 32 : 26;
+                const customLookRange = (theme === 'toxic') ? 32
+                    : (theme === 'sonar') ? 15 // Reduced range for small Radio screen
+                        : 26;
                 const isHologram = theme === 'sonar';
-                // Para sonar queremos sclera transparente/verdosa
                 const scleraColor = theme === 'sonar' ? 'rgba(0, 255, 50, 0.4)' : '#ffffff';
 
                 drawPixelEye(
@@ -420,12 +502,13 @@ export default function Television({
                     irisColor,
                     customLookRange,
                     scleraColor,
-                    isHologram // Flag para modo holograma (sin pupilas negras sólidas, o estilos extra)
+                    isHologram
                 );
 
                 ctx.restore();
 
-                // --- 4. SCANLINES ---
+                // --- 4. SCANLINES (ELIMINADO) ---
+                /*
                 let scanlineColor = 'rgba(0, 0, 0, 0.4)';
                 if (theme === 'blood') scanlineColor = 'rgba(40, 0, 0, 0.6)';
                 if (theme === 'toxic') scanlineColor = 'rgba(0, 30, 0, 0.5)';
@@ -453,6 +536,7 @@ export default function Television({
                 for (let y = 0; y < h; y += scanlineSpacing) {
                     ctx.fillRect(0, y, w, scanlineThickness);
                 }
+                */
 
                 // --- 5. VIGNETTE ---
                 const gradient = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
@@ -466,6 +550,8 @@ export default function Television({
                 if (theme === 'sulfur') vignetteColor = 'rgba(20, 20, 0, 0.95)';
                 if (theme === 'toon') vignetteColor = 'rgba(5, 5, 5, 0.98)';
                 if (theme === 'sonar') vignetteColor = 'rgba(0, 20, 0, 0.95)';
+                // Classic: Ensure it's not too dark
+                if (theme === 'classic') vignetteColor = 'rgba(0, 5, 20, 0.95)';
 
                 gradient.addColorStop(1, vignetteColor);
                 ctx.fillStyle = gradient;
@@ -474,7 +560,7 @@ export default function Television({
                 // --- 6. GLOW ---
                 const glow = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 300);
 
-                let glowColor = 'rgba(20, 40, 100, 0.1)';
+                let glowColor = 'rgba(20, 40, 100, 0.1)'; // Classic Blue (Default)
                 if (theme === 'blood') glowColor = 'rgba(150, 0, 0, 0.15)';
                 if (theme === 'void') glowColor = 'rgba(100, 0, 255, 0.15)';
                 if (theme === 'sulfur') glowColor = 'rgba(200, 200, 50, 0.12)';
@@ -490,8 +576,39 @@ export default function Television({
         }
     });
 
+    // --- LIGHTING LOGIC ---
+    let lightColor = '#2040ff'; // Classic Deep Blue (More saturated)
+    let baseIntensity = 3.0;
+
+    if (theme === 'toxic') { lightColor = '#00ff44'; baseIntensity = 4.0; } // Green is bright
+    if (theme === 'blood') { lightColor = '#ff0000'; baseIntensity = 4.0; } // Red needs punch
+    if (theme === 'void') { lightColor = '#a000ff'; baseIntensity = 3.5; }
+    if (theme === 'sulfur') { lightColor = '#ffee00'; baseIntensity = 3.0; }
+    if (theme === 'toon') { lightColor = '#ffffff'; baseIntensity = 2.0; }
+    if (theme === 'sonar') { lightColor = '#00ff33'; baseIntensity = 3.5; }
+
+    // Ref para la luz
+    const lightRef = useRef<THREE.RectAreaLight>(null);
+
+    useFrame((state) => {
+        if (lightRef.current) {
+            // Flicker: 0.8 to 1.2 variation
+            const flicker = 0.85 + Math.random() * 0.3;
+            lightRef.current.intensity = baseIntensity * flicker;
+        }
+    });
+
     return (
-        <group ref={groupRef} position={position} rotation={rotation} scale={scale} />
+        <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
+            <rectAreaLight
+                ref={lightRef}
+                width={screenDimensions.current.width}
+                height={screenDimensions.current.height}
+                color={activeTheme.lightColor}
+                position={[0, 0, 0.05]} // 5cm in front of screen
+                rotation={[0, 0, 0]} // Default Y-up plane facing Z (Check logic if needed, usually default is forward)
+            />
+        </group>
     );
 }
 
