@@ -576,38 +576,11 @@ export default function Television({
         }
     });
 
-    // --- LIGHTING LOGIC ---
-    let lightColor = '#2040ff'; // Classic Deep Blue (More saturated)
-    let baseIntensity = 3.0;
-
-    if (theme === 'toxic') { lightColor = '#00ff44'; baseIntensity = 4.0; } // Green is bright
-    if (theme === 'blood') { lightColor = '#ff0000'; baseIntensity = 4.0; } // Red needs punch
-    if (theme === 'void') { lightColor = '#a000ff'; baseIntensity = 3.5; }
-    if (theme === 'sulfur') { lightColor = '#ffee00'; baseIntensity = 3.0; }
-    if (theme === 'toon') { lightColor = '#ffffff'; baseIntensity = 2.0; }
-    if (theme === 'sonar') { lightColor = '#00ff33'; baseIntensity = 3.5; }
-
-    // Ref para la luz
-    const lightRef = useRef<THREE.RectAreaLight>(null);
-
-    useFrame((state) => {
-        if (lightRef.current) {
-            // Flicker: 0.8 to 1.2 variation
-            const flicker = 0.85 + Math.random() * 0.3;
-            lightRef.current.intensity = baseIntensity * flicker;
-        }
-    });
+    // --- LIGHTING REMOVED ON USER REQUEST ---
 
     return (
         <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
-            <rectAreaLight
-                ref={lightRef}
-                width={screenDimensions.current.width}
-                height={screenDimensions.current.height}
-                color={activeTheme.lightColor}
-                position={[0, 0, 0.05]} // 5cm in front of screen
-                rotation={[0, 0, 0]} // Default Y-up plane facing Z (Check logic if needed, usually default is forward)
-            />
+            {/* Lights removed for performance */}
         </group>
     );
 }
