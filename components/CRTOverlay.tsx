@@ -133,13 +133,16 @@ void main() {
     // --- GLITCH SWEEP ("Hum Bar") ---
     vec2 distortedUV = uv;
     
-    // Faster: 10 seconds cycle, sweep takes 5.0 seconds
-    float sweepCycle = mod(uTime, 10.0);
+    // Cycle duration: 15 seconds
+    // Sweep happens only in the LAST 5 seconds (10s to 15s)
+    // This creates an initial 10s silence on load.
+    float sweepCycle = mod(uTime, 15.0);
     float sweepY = -10.0;
     
-    if (sweepCycle < 5.0) {
-        // Linear drop top to bottom
-        sweepY = 1.1 - (sweepCycle / 5.0) * 1.2; 
+    if (sweepCycle > 10.0) {
+        float phase = sweepCycle - 10.0;
+        // Linear drop top to bottom over 5 seconds
+        sweepY = 1.1 - (phase / 5.0) * 1.2; 
     }
     
     float sweepDist = abs(uv.y - sweepY);

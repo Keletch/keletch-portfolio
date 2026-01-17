@@ -14,6 +14,8 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 // Inicializar luces de área
 RectAreaLightUniformsLib.init();
 
+import { AdjustableModel } from '@/components/AdjustableModel';
+
 export default function TVScene() {
     const [cameraZ, setCameraZ] = useState(5);
 
@@ -44,6 +46,7 @@ export default function TVScene() {
     const standCollider2 = { size: [0.70, 0.04, 0.58] as [number, number, number], offset: [-1.21, 0.41, 0.00] as [number, number, number] };
     const standCollider3 = { size: [2.15, 0.03, 0.56] as [number, number, number], offset: [1.65, 1.23, 0.00] as [number, number, number] };
     const standCollider4 = { size: [3.90, 0.05, 0.55] as [number, number, number], offset: [-0.10, 0.02, 0.00] as [number, number, number] };
+    const standCollider5 = { size: [0.02, 0.68, 0.50] as [number, number, number], offset: [-1.94, 1.10, 0.00] as [number, number, number] };
 
     const standPosition = { x: 0, y: -2.0, z: 0 };
 
@@ -82,6 +85,51 @@ export default function TVScene() {
         rot: [0, -0.4, 0] as [number, number, number], // Ajusta rotación aquí [X, Y, Z]
         size: [0.45, 1.55, 0.68] as [number, number, number],
         offset: [0.02, 1.60, 0.08] as [number, number, number]
+    };
+
+    // --- BOOKS CONFIG (HARDCODED) ---
+    // User can update these values from Leva debug later
+    const book1Ctrl = {
+        pos: [0.4, -1.3, 0] as [number, number, number],
+        rot: [0, 0, 0.2] as [number, number, number],
+        scale: 1.3,
+        size: [0.04, 0.42, 0.30] as [number, number, number],
+        offset: [-1.95, 0.89, 0.11] as [number, number, number]
+    };
+    const book2Ctrl = {
+        pos: [0.35, -1.8, 0] as [number, number, number],
+        rot: [0, 0, 0.0] as [number, number, number],
+        scale: 1.3,
+        size: [0.06, 0.52, 0.34] as [number, number, number],
+        offset: [-1.84, 1.0, 0.08] as [number, number, number]
+    };
+    const mobileCtrl = {
+        pos: [-5.0, 5.0, 0.10] as [number, number, number],
+        rot: [0, 0, .05] as [number, number, number],
+        scale: 1.0,
+        size: [0.09, 0.20, 0.03] as [number, number, number],
+        offset: [0.01, 0.23, 0.00] as [number, number, number]
+    };
+    const book3Ctrl = {
+        pos: [0.3, -1.9, 0] as [number, number, number],
+        rot: [0, 0, 0] as [number, number, number],
+        scale: 1.3,
+        size: [0.07, 0.40, 0.28] as [number, number, number],
+        offset: [-1.69, 0.88, 0.15] as [number, number, number]
+    };
+    const book4Ctrl = {
+        pos: [0.32, -1.9, 0] as [number, number, number],
+        rot: [0, 0, 0] as [number, number, number],
+        scale: 1.3,
+        size: [0.09, 0.44, 0.30] as [number, number, number],
+        offset: [-1.54, 0.91, 0.13] as [number, number, number]
+    };
+    const book5Ctrl = {
+        pos: [0.33, -1.9, 0] as [number, number, number],
+        rot: [0, 0, 0] as [number, number, number],
+        scale: 1.3,
+        size: [0.05, 0.35, 0.27] as [number, number, number],
+        offset: [-1.39, 0.82, 0.14] as [number, number, number]
     };
 
     // Cargar modelos
@@ -138,6 +186,9 @@ export default function TVScene() {
 
                             {/* Collider 4 */}
                             <CuboidCollider args={standCollider4.size} position={standCollider4.offset} friction={0.8} restitution={0.1} />
+
+                            {/* Collider 5 (Extra) */}
+                            <CuboidCollider args={standCollider5.size} position={standCollider5.offset} friction={0.8} restitution={0.1} />
 
                             <primitive object={tvStandModel.clone()} scale={1.2} />
                         </RigidBody>
@@ -205,6 +256,71 @@ export default function TVScene() {
                         <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={rightSpkCtrl.pos} rotation={rightSpkCtrl.rot}>
                             <CuboidCollider args={rightSpkCtrl.size} position={rightSpkCtrl.offset} friction={0.5} restitution={0.1} />
                             <primitive object={rightSpeakerModel.clone()} />
+                        </RigidBody>
+
+                        {/* --- NEW BOOKS (Adjustable with Hardcoded Config) --- */}
+                        <AdjustableModel
+                            modelPath="/models/b1.glb"
+                            initialPos={book1Ctrl.pos}
+                            initialRot={book1Ctrl.rot}
+                            initialScale={book1Ctrl.scale}
+                            initialColliderSize={book1Ctrl.size}
+                            initialColliderOffset={book1Ctrl.offset}
+                        />
+                        <AdjustableModel
+                            modelPath="/models/b2.glb"
+                            initialPos={book2Ctrl.pos}
+                            initialRot={book2Ctrl.rot}
+                            initialScale={book2Ctrl.scale}
+                            initialColliderSize={book2Ctrl.size}
+                            initialColliderOffset={book2Ctrl.offset}
+                        />
+                        <AdjustableModel
+                            modelPath="/models/b3.glb"
+                            initialPos={book3Ctrl.pos}
+                            initialRot={book3Ctrl.rot}
+                            initialScale={book3Ctrl.scale}
+                            initialColliderSize={book3Ctrl.size}
+                            initialColliderOffset={book3Ctrl.offset}
+                        />
+                        <AdjustableModel
+                            modelPath="/models/b4.glb"
+                            initialPos={book4Ctrl.pos}
+                            initialRot={book4Ctrl.rot}
+                            initialScale={book4Ctrl.scale}
+                            initialColliderSize={book4Ctrl.size}
+                            initialColliderOffset={book4Ctrl.offset}
+                        />
+                        <AdjustableModel
+                            modelPath="/models/b5.glb"
+                            initialPos={book5Ctrl.pos}
+                            initialRot={book5Ctrl.rot}
+                            initialScale={book5Ctrl.scale}
+                            initialColliderSize={book5Ctrl.size}
+                            initialColliderOffset={book5Ctrl.offset}
+                        />
+
+                        {/* --- MOBILE (Baked Physics + Active Screen) --- */}
+                        <RigidBody
+                            colliders={false}
+                            position={mobileCtrl.pos}
+                            rotation={mobileCtrl.rot}
+                            enabledRotations={[true, true, true]}
+                        >
+                            <CuboidCollider
+                                args={mobileCtrl.size}
+                                position={mobileCtrl.offset}
+                                friction={0.5}
+                                restitution={0.1}
+                            />
+                            <Television
+                                modelPath="/models/mobile.glb"
+                                screenNames={['mobileScreen']}
+                                scale={mobileCtrl.scale}
+                                theme="mobile"
+                                invertY={true} // Fixed inverted Y axis
+                                gazeOffset={{ x: 0, y: 0 }}
+                            />
                         </RigidBody>
 
                     </Physics>

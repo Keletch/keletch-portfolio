@@ -12,7 +12,7 @@ interface TelevisionProps {
     rotation?: [number, number, number];
     scale?: number;
     rotationX?: number;
-    theme?: 'classic' | 'toxic' | 'blood' | 'void' | 'sulfur' | 'toon' | 'sonar'; // 'toon' es Noir (Blanco y Negro), 'sonar' es Radiografía
+    theme?: 'classic' | 'toxic' | 'blood' | 'void' | 'sulfur' | 'toon' | 'sonar' | 'mobile'; // 'mobile' is Nokia Blue
     invertY?: boolean; // Invertir eje Y si el modelo tiene UVs invertidas
     gazeOffset?: { x: number; y: number }; // Offset manual para calibración
     uvRotation?: number; // Rotación de la textura en radianes (ej: Math.PI/4 para 45°)
@@ -96,6 +96,17 @@ const THEMES = {
         vignetteColor: 'rgba(0, 20, 0, 0.95)',
         lookRange: 15,
         scleraColor: 'rgba(0, 255, 50, 0.4)'
+    },
+    mobile: {
+        bgColor: '#00051a', // Dark Blue
+        baseColor: 'rgba(0, 20, 60, 0.3)', // Deep Blue Base
+        glowCenter: 'rgba(0, 100, 255, 0.2)', // Nokia Blue Glow
+        irisColor: '#0088ff', // Electric Blue Iris
+        lightColor: '#00aaff',
+        lightIntensity: 6.0,
+        vignetteColor: 'rgba(0, 0, 20, 0.95)',
+        lookRange: 15, // Small screen range
+        scleraColor: 'rgba(0, 100, 255, 0.4)' // Digital Blue Sclera
     }
 };
 
@@ -479,6 +490,7 @@ export default function Television({
                 // 3. Radio/Sonar Sizing fix (User said it's too big)
                 let scaleEye = 1.0;
                 if (theme === 'sonar') scaleEye = 0.6; // Radio eye 40% smaller
+                if (theme === 'mobile') scaleEye = 0.6; // Mobile eye small too
 
                 ctx.scale(geoCorrectionX * scaleEye, blink.openness * scaleEye);
 
@@ -489,12 +501,13 @@ export default function Television({
                 if (theme === 'sulfur') irisColor = '#d4c264';
                 if (theme === 'toon') irisColor = '#dcdcdc';
                 if (theme === 'sonar') irisColor = '#00ff44';
+                if (theme === 'mobile') irisColor = '#0088ff';
 
                 const customLookRange = (theme === 'toxic') ? 32
-                    : (theme === 'sonar') ? 15 // Reduced range for small Radio screen
+                    : (theme === 'sonar' || theme === 'mobile') ? 15 // Reduced range for small screens
                         : 26;
-                const isHologram = theme === 'sonar';
-                const scleraColor = theme === 'sonar' ? 'rgba(0, 255, 50, 0.4)' : '#ffffff';
+                const isHologram = theme === 'sonar' || theme === 'mobile';
+                const scleraColor = (theme === 'sonar' || theme === 'mobile') ? activeTheme.scleraColor : '#ffffff';
 
                 drawPixelEye(
                     ctx,
@@ -564,7 +577,9 @@ export default function Television({
                 if (theme === 'blood') glowColor = 'rgba(150, 0, 0, 0.15)';
                 if (theme === 'void') glowColor = 'rgba(100, 0, 255, 0.15)';
                 if (theme === 'sulfur') glowColor = 'rgba(200, 200, 50, 0.12)';
+                if (theme === 'sulfur') glowColor = 'rgba(200, 200, 50, 0.12)';
                 if (theme === 'sonar') glowColor = 'rgba(0, 255, 50, 0.15)'; // Glow Radioactivo suave
+                if (theme === 'mobile') glowColor = 'rgba(0, 100, 255, 0.2)'; // Glow Nokia Blue
 
                 glow.addColorStop(0, glowColor);
                 glow.addColorStop(1, 'rgba(0,0,0,0)');
