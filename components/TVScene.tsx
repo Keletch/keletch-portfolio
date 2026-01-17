@@ -16,6 +16,7 @@ RectAreaLightUniformsLib.init();
 
 import { AdjustableModel } from '@/components/AdjustableModel';
 
+
 export default function TVScene() {
     const [cameraZ, setCameraZ] = useState(5);
 
@@ -90,14 +91,14 @@ export default function TVScene() {
     // --- BOOKS CONFIG (HARDCODED) ---
     // User can update these values from Leva debug later
     const book1Ctrl = {
-        pos: [0.4, -1.3, 0] as [number, number, number],
+        pos: [0.4, -1.3, -0.15] as [number, number, number],
         rot: [0, 0, 0.2] as [number, number, number],
         scale: 1.3,
         size: [0.04, 0.42, 0.30] as [number, number, number],
         offset: [-1.95, 0.89, 0.11] as [number, number, number]
     };
     const book2Ctrl = {
-        pos: [0.35, -1.8, 0] as [number, number, number],
+        pos: [0.35, -1.8, -0.15] as [number, number, number],
         rot: [0, 0, 0.0] as [number, number, number],
         scale: 1.3,
         size: [0.06, 0.52, 0.34] as [number, number, number],
@@ -111,25 +112,39 @@ export default function TVScene() {
         offset: [0.01, 0.23, 0.00] as [number, number, number]
     };
     const book3Ctrl = {
-        pos: [0.3, -1.9, 0] as [number, number, number],
+        pos: [0.3, -1.9, -0.15] as [number, number, number],
         rot: [0, 0, 0] as [number, number, number],
         scale: 1.3,
         size: [0.07, 0.40, 0.28] as [number, number, number],
         offset: [-1.69, 0.88, 0.15] as [number, number, number]
     };
     const book4Ctrl = {
-        pos: [0.32, -1.9, 0] as [number, number, number],
+        pos: [0.32, -1.9, -0.15] as [number, number, number],
         rot: [0, 0, 0] as [number, number, number],
         scale: 1.3,
         size: [0.09, 0.44, 0.30] as [number, number, number],
         offset: [-1.54, 0.91, 0.13] as [number, number, number]
     };
     const book5Ctrl = {
-        pos: [0.33, -1.9, 0] as [number, number, number],
+        pos: [0.33, -1.9, -0.15] as [number, number, number],
         rot: [0, 0, 0] as [number, number, number],
         scale: 1.3,
         size: [0.05, 0.35, 0.27] as [number, number, number],
         offset: [-1.39, 0.82, 0.14] as [number, number, number]
+    };
+    const luckyCatCtrl = {
+        pos: [-0.75, -1.0, 0.0] as [number, number, number],
+        rot: [0, 0, 0] as [number, number, number],
+        scale: 1.0,
+        size: [0.18, 0.20, 0.14] as [number, number, number],
+        offset: [0.01, 0.18, 0.00] as [number, number, number]
+    };
+    const rubiksGoldCtrl = {
+        pos: [5.00, 6.00, 0.40] as [number, number, number],
+        rot: [0, 0.5, 0] as [number, number, number],
+        scale: 2.45,
+        size: [0.20, 0.20, 0.20] as [number, number, number],
+        offset: [-0.01, 0.20, -0.01] as [number, number, number]
     };
 
     // Cargar modelos
@@ -155,13 +170,45 @@ export default function TVScene() {
                 }}
             >
                 <color attach="background" args={['#000000']} />
-                <ambientLight intensity={0.3} />
+                <ambientLight intensity={0.7} />
 
-                {/* Iluminación Principal */}
-                <directionalLight position={[0, 10, 5]} intensity={2.2} castShadow />
-                <spotLight position={[0, 5, 8]} angle={0.7} penumbra={0.5} intensity={35} color="#ffffff" />
-                <pointLight position={[0, 2.2, -4]} intensity={50} distance={18} decay={2} color="#4060ff" />
-                <pointLight position={[0, -1, 3]} intensity={30.0} distance={15} decay={2} color="#ffffff" />
+                {/* Iluminación Principal - WARM STUDIO SETUP (BRIGHTER) */}
+                <directionalLight position={[0, 10, 5]} intensity={2.0} color="#fff0dd" castShadow />
+
+                {/* Main Overhead Warm Light (Stronger) */}
+                <spotLight position={[0, 8, 6]} angle={1.2} penumbra={0.4} intensity={80} color="#ffc485" />
+
+                {/* Side Fill Lights (Brighter, ensuring no dark spots) */}
+                <pointLight position={[-6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
+                <pointLight position={[6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
+
+                {/* Back Light (Cool Rim) - SLIGHTLY REDUCED */}
+                <pointLight position={[0, 2.0, -4]} intensity={50} distance={20} decay={2} color="#3050ff" />
+
+                {/* Speaker Front Lights (Dedicated Fill) */}
+                <pointLight position={[-4.9, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
+                <pointLight position={[5.0, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
+
+                {/* RUBIKS GOLD LIGHTS (BAKED) */}
+                {/* Specular Highlight */}
+                <pointLight
+                    position={[5.3, 1.9, 0.9]}
+                    intensity={10}
+                    distance={6.5}
+                    decay={2.75}
+                    color="#ffaa00"
+                />
+                {/* Metallic Reflection (Softbox) */}
+                <rectAreaLight
+                    position={[5.7, 1.4, 1.0]}
+                    width={1.0}
+                    height={1.2}
+                    color="#ffcc00"
+                    intensity={5}
+                    onUpdate={self => self.lookAt(0.1, 6.0, 0.40)}
+                />
+
+
 
                 <Suspense fallback={null}>
                     <Physics gravity={[0, -9.81, 0]} numSolverIterations={12}>
@@ -322,6 +369,26 @@ export default function TVScene() {
                                 gazeOffset={{ x: 0, y: 0 }}
                             />
                         </RigidBody>
+
+                        {/* --- LUCKY CAT (Baked) --- */}
+                        <AdjustableModel
+                            modelPath="/models/luckyCat.glb"
+                            initialPos={luckyCatCtrl.pos}
+                            initialRot={luckyCatCtrl.rot}
+                            initialScale={luckyCatCtrl.scale}
+                            initialColliderSize={luckyCatCtrl.size}
+                            initialColliderOffset={luckyCatCtrl.offset}
+                        />
+
+                        {/* --- RUBIKS GOLD (Baked) --- */}
+                        <AdjustableModel
+                            modelPath="/models/rubiksGold.glb"
+                            initialPos={rubiksGoldCtrl.pos}
+                            initialRot={rubiksGoldCtrl.rot}
+                            initialScale={rubiksGoldCtrl.scale}
+                            initialColliderSize={rubiksGoldCtrl.size}
+                            initialColliderOffset={rubiksGoldCtrl.offset}
+                        />
 
                     </Physics>
                 </Suspense>
