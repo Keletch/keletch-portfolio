@@ -22,6 +22,10 @@ interface TelevisionProps {
     textYOffset?: number;
     showStartButton?: boolean;
     onStartClick?: () => void;
+    showBackButton?: boolean;
+    onBackClick?: () => void;
+    showMenuButton?: boolean;
+    onMenuClick?: () => void;
 }
 
 const THEMES = {
@@ -131,7 +135,11 @@ export default function Television({
     isFocused = false,
     textYOffset = 60,
     showStartButton = false,
-    onStartClick
+    onStartClick,
+    showBackButton = false,
+    onBackClick,
+    showMenuButton = false,
+    onMenuClick
 }: TelevisionProps) {
     const groupRef = useRef<THREE.Group>(null);
     const { scene: model } = useGLTF(modelPath);
@@ -141,6 +149,8 @@ export default function Television({
     const currentLookAt = useRef({ x: 0, y: 0 });   // Posición suavizada para la esclerótica
     const screenMeshRef = useRef<THREE.Mesh | null>(null); // Cache para la malla de la pantalla
     const [startButtonHovered, setStartButtonHovered] = useState(false); // Hover state for start button
+    const [backButtonHovered, setBackButtonHovered] = useState(false); // Hover state for back button
+    const [menuButtonHovered, setMenuButtonHovered] = useState(false); // Hover state for menu button
 
     // Referencia para el canvas e id de cada instancia
     const instanceId = useRef(Math.random().toString(36).substr(2, 9));
@@ -175,6 +185,23 @@ export default function Television({
         let meshCount = 0;
         let screenFound = false;
 
+        // 1.5 Crear textura compartida (SINGLETON for this instance)
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.NearestFilter;
+        texture.magFilter = THREE.NearestFilter;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.repeat.set(1, 1);
+        texture.offset.set(0, 0);
+        texture.rotation = uvRotation;
+        texture.center.set(0.5, 0.5);
+
+        screenTextureRef.current = texture;
+
         clone.traverse((child) => {
             if (child instanceof THREE.Mesh) {
                 meshCount++;
@@ -186,41 +213,18 @@ export default function Television({
                     // --- NUEVO: CALCULAR ASPECT RATIO DE LA PANTALLA ---
                     child.geometry.computeBoundingBox();
                     const box = child.geometry.boundingBox;
-                    if (box) {
+                    if (box && screenAspect.current === 1.0) { // Keep first valid aspect
                         const width = box.max.x - box.min.x;
                         const height = box.max.y - box.min.y;
                         screenAspect.current = width / height;
-
-                        // Guardar dimensiones reales
-                        // Note: We can't set state in useMemo easily, but we can store it in ref or handle in useEffect
-                        // However, we need state for external consumers? Or just for internal logic?
-                        // For the button, we need it. But with UV interaction, we don't need physical size anymore!
-                        // We only need pixel coordinates on the texture.
-                        // So we can drop screenSize dependency for interaction!
                     }
 
-                    // Crear textura desde canvas
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 512;
-                    canvas.height = 512;
-
-                    const texture = new THREE.CanvasTexture(canvas);
-                    texture.minFilter = THREE.NearestFilter;
-                    texture.magFilter = THREE.NearestFilter;
-                    texture.wrapS = THREE.ClampToEdgeWrapping;
-                    texture.wrapT = THREE.ClampToEdgeWrapping;
-                    texture.repeat.set(1, 1);
-                    texture.offset.set(0, 0);
-                    texture.rotation = uvRotation;
-                    texture.center.set(0.5, 0.5); // Rotar desde el centro
-
-                    screenTextureRef.current = texture;
                     // Mark this mesh as the screen for interaction checks
                     child.userData.isScreen = true;
 
-                    // Aplicar textura a la pantalla con MeshBasicMaterial (auto-iluminado)
+                    // Aplicar textura a la pantalla COMPARTIDA
                     child.material = new THREE.MeshBasicMaterial({
-                        map: texture,
+                        map: texture, // Use SHARED texture
                         toneMapped: false,
                         transparent: false,
                         opacity: 1,
@@ -274,28 +278,9 @@ export default function Television({
     }, [clonedModel]);
 
 
-    // Helper: Check if UV is hitting the button
-    const checkButtonHover = (uv: THREE.Vector2) => {
-        if (!showStartButton) return false;
-
-        // Canvas is 512x512
-        // UV is 0..1
-        // We need to match the drawing logic.
-        // Drawing:
-        // Center (256, 256)
-        // If invertY is true, context was rotated 180 (Math.PI).
-        // Button Y: 160 (relative to center).
-        // Button Size: 160x50.
-
-        // Map UV to Pixel Coordinates
-        // UV (0,0) is usually Top-Left (or Bottom-Left depending on GL).
-        // In ThreeJS UV (0,0) is Bottom-Left. (1,1) is Top-Right.
-        // Canvas (0,0) is Top-Left.
-
-        // Let's assume standard UV mapping for now.
-        // PixelX = uv.x * 512
-        // PixelY = (1 - uv.y) * 512 // Invert Y because Canvas Y is Down
-
+    // Helper: Check if UV is hitting a button
+    const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | null => {
+        // Canvas is 512x512, UV is 0..1
         let px = uv.x * 512;
         let py = (1 - uv.y) * 512;
 
@@ -304,29 +289,70 @@ export default function Television({
         let dy = py - 256;
 
         // If Inverted Y logic (from drawing):
-        // Context was rotated 180.
-        // Rotated 180 means: dx -> -dx, dy -> -dy.
-        // Button was drawn at (0, 160) in that rotated space.
-        // Or un-rotate the point.
-
         if (invertY) {
-            dx = -dx; // Rotate 180
+            // dx = -dx; // FIX: Don't invert X! UVs are usually only vertically flipped.
             dy = -dy;
         }
 
-        // Button Shape: Pixelated Circle Play Button
-        // Center(0, 160), Radius ~35px
+        // Check Play Button (Bottom-Left: -200, 190)
+        if (showStartButton) {
+            const distPlay = Math.sqrt((dx + 200) * (dx + 200) + (dy - 190) * (dy - 190));
+            if (distPlay < 40) return 'play';
+        }
 
-        // Distance check from button center (0, 160)
-        const dist = Math.sqrt(dx * dx + (dy - 160) * (dy - 160));
-        return dist < 40; // 40px radius for comfortable hit area
+        // Check Back Button (Bottom-Right: 200, 190)
+        if (showBackButton) {
+            const distBack = Math.sqrt((dx - 200) * (dx - 200) + (dy - 190) * (dy - 190));
+            if (distBack < 40) return 'back';
+        }
+
+        // Check Menu Button (Bottom-Center: 0, 190)
+        if (showMenuButton) {
+            const distMenu = Math.sqrt((dx - 0) * (dx - 0) + (dy - 190) * (dy - 190));
+            if (distMenu < 40) return 'menu';
+        }
+
+        return null;
     };
 
-    // Actualizar canvas cada frame
+    // Actualizar canvas cada frame (THROTTLED TO 24FPS for Cinematic/Crunchy Feel)
+    // 24 FPS is the standard for film and gives a distinct "intentional" look compared to 30.
+    const renderAccumulator = useRef(0);
+    const FPS_LIMIT = 24;
+    const FRAME_DURATION = 1 / FPS_LIMIT;
+
     useFrame((state, delta) => {
+        // 0. VISIBILITY CULLING (Basic Distance Check)
+        if (groupRef.current) {
+            const dist = state.camera.position.distanceTo(groupRef.current.position);
+            if (dist > 15) return; // Don't animate if far away
+        }
+
+        // 1. FRAME THROTTLING
+        renderAccumulator.current += delta;
+        if (renderAccumulator.current < FRAME_DURATION) {
+            return; // Skip frame
+        }
+
+        // Capture the ACTUAL time passed since last update for accurate physics
+        const dt = renderAccumulator.current;
+
+        // Reset (Keep remainder to avoid drift)
+        renderAccumulator.current %= FRAME_DURATION;
+
         if (screenTextureRef.current && groupRef.current) {
             // --- LÓGICA DE MIRADA PRECISA ---
-            // 1. Obtener el CENTRO GEOMÉTRICO de la PANTALLA
+            // ... (pos retrieval) ...
+
+            // ... (gaze calculation) ...
+
+            // NOTE: We need to recreate the gaze logic slightly to use 'dt' if dependent on speed
+            // But gaze is mostly absolute position based on mouse. 
+            // EXCEPT for the "smooth look" interpolation below.
+
+            // ... (omitted setup lines for brevity, assume they are unchanged) ...
+
+            // RE-IMPLEMENTING SETUP TO ACCESS `normalizedMouse` correctly
             const targetPos = new THREE.Vector3();
 
             if (!screenMeshRef.current) {
@@ -335,7 +361,6 @@ export default function Television({
                         const childNameLower = child.name.toLowerCase();
                         if (screenNames.some(name => childNameLower.includes(name.toLowerCase()))) {
                             screenMeshRef.current = child;
-                            console.log(`📡 Pantalla vinculada a Ref: ${child.name}`);
                         }
                     }
                 });
@@ -360,35 +385,21 @@ export default function Television({
             const gazeX = state.mouse.x - tvScreenPos.x;
             const gazeY = state.mouse.y - tvScreenPos.y;
 
-            // 3. Sensibilidad AGRESIVA (Revertido a 5.0 por petición del usuario)
             const sensitivity = 5.0;
-
-            // COMPENSACIÓN DINÁMICA: 
-            // Solo aplicamos compensación de velocidad a la LCD (Toxic) para que el eje Y no sea hipersensible.
-            // Para las demás (CRT, Dirty, RedTV), usamos 1.0 para mantener la lógica de LowPoly.
             let aspectCompensation = 1.0;
             if (theme === 'toxic' && screenAspect.current > 1.1) {
                 aspectCompensation = 1 / screenAspect.current;
             }
 
-            // 4. Rotar el vector de mirada si existe uvRotation
             let finalX = (gazeX * sensitivity) + gazeOffset.x;
             let finalY = (invertY ? -gazeY : gazeY) * sensitivity * aspectCompensation + gazeOffset.y;
 
             if (uvRotation !== 0) {
-                // Para 90° (Math.PI/2), intercambiamos ejes en vez de rotar
                 if (Math.abs(uvRotation - Math.PI / 2) < 0.01) {
-                    // 90° horario: X_nuevo = -Y_viejo, Y_nuevo = X_viejo
-                    const temp = finalX;
-                    finalX = -finalY;
-                    finalY = temp;
+                    const temp = finalX; finalX = -finalY; finalY = temp;
                 } else if (Math.abs(uvRotation + Math.PI / 2) < 0.01) {
-                    // 90° anti-horario: X_nuevo = Y_viejo, Y_nuevo = -X_viejo
-                    const temp = finalX;
-                    finalX = finalY;
-                    finalY = -temp;
+                    const temp = finalX; finalX = finalY; finalY = -temp;
                 } else {
-                    // Para otros ángulos, usamos rotación estándar
                     const cosR = Math.cos(-uvRotation);
                     const sinR = Math.sin(-uvRotation);
                     const rotatedX = finalX * cosR - finalY * sinR;
@@ -401,18 +412,18 @@ export default function Television({
             normalizedMouse.current.x = Math.max(-1, Math.min(1, finalX));
             normalizedMouse.current.y = Math.max(-1, Math.min(1, finalY));
 
-            // --- LÓGICA DE DIBUJO EXISTENTE ---
+
             const canvas = screenTextureRef.current.image as HTMLCanvasElement;
             const ctx = canvas.getContext('2d');
 
-            // 1. Interpolación de movimiento
-            const speed = 2.0 * delta;
+            // 1. Interpolación de movimiento USING DT (Accumulated Delta)
+            const speed = 2.0 * dt; // Use dt instead of delta!
             currentLookAt.current.x += (normalizedMouse.current.x - currentLookAt.current.x) * speed;
             currentLookAt.current.y += (normalizedMouse.current.y - currentLookAt.current.y) * speed;
 
-            // 2. Lógica de Parpadeo
+            // 2. Lógica de Parpadeo USING DT
             const blink = blinkState.current;
-            blink.blinkTimer += delta;
+            blink.blinkTimer += dt; // Use dt!
 
             if (!blink.isBlinking) {
                 if (state.clock.elapsedTime > blink.nextBlinkTime) {
@@ -699,10 +710,10 @@ export default function Television({
                         // IF inverted: We already rotated the context 180 deg above.
                         // So +Y is indeed "visually down" relative to the text.
 
-                        const btnY = 160; // 160px down from center
+                        const btnY = 190; // 190px down from center
                         const btnW = 140; // Smaller button (was 160)
                         const btnH = 45; // Smaller button (was 50)
-                        const btnX = 0; // Center
+                        const btnX = -200; // Bottom Left
 
                         // Hover Detection
                         // normalizedMouse is -1 to 1.
@@ -762,59 +773,320 @@ export default function Television({
                             hoverProgress = screenTextureRef.current.userData.hoverAnim;
                         }
 
-                        // 1. Draw Dot (Fading Out as it expands)
-                        // Radius 8 -> 15? Fade 1 -> 0
-                        if (hoverProgress < 1.0) {
-                            const circleAlpha = 1 - hoverProgress;
-                            const circleRadius = 8 + (10 * hoverProgress); // Expand to assist morph illusion
+                        // ANIMATION LOGIC: True Morph (Circle to Triangle)
+                        // Uses Bezier curves. 
+                        // Circle = Triangle vertices with "bulged" control points (Handle length ~0.77 radius).
+                        // Triangle = Straight lines (Handle length 0).
 
-                            ctx.globalAlpha = circleAlpha;
-                            ctx.fillStyle = '#ffffff';
-                            ctx.globalCompositeOperation = 'source-over';
+                        const p = hoverProgress; // 0 (Circle) -> 1 (Triangle)
 
+                        // CONSTANTS
+
+                        // 1. Crunchy Shockwave Pulse (Idle state)
+                        const time = state.clock.elapsedTime;
+                        const fps = 8;
+                        const steppedTime = Math.floor(time * fps) / fps;
+
+                        // Loop every 2 seconds
+                        const waveProgress = (steppedTime % 2.0) / 2.0;
+
+                        // Shockwave ring parameters
+                        const maxRippleSize = 25;
+                        const rippleRadius = 10 + (waveProgress * maxRippleSize);
+
+                        // FADE LOGIC:
+                        // 1. Natural fade over time (1.0 - waveProgress)
+                        // 2. Interaction fade: Fade out quickly as p increases (1 - p * 5)
+                        // Clamped to 0
+                        const interactionAlpha = Math.max(0, 1 - (p * 5));
+                        const rippleAlpha = Math.max(0, 1.0 - waveProgress) * interactionAlpha;
+
+                        // Base Radius (Fixed, no breathing)
+                        const r = 8 + (5 * p); // Reduced size
+
+                        // DRAW SHOCKWAVE (Behind button)
+                        // Draw as long as it's visible
+                        if (rippleAlpha > 0.01) {
                             ctx.beginPath();
-                            ctx.arc(btnX, btnY, circleRadius, 0, Math.PI * 2);
-                            ctx.fill();
-                            ctx.globalAlpha = 1.0; // Reset
+                            ctx.arc(btnX, btnY, rippleRadius, 0, Math.PI * 2);
+                            ctx.strokeStyle = `rgba(255, 255, 255, ${rippleAlpha})`;
+                            ctx.lineWidth = 2;
+                            ctx.stroke();
                         }
 
-                        // 2. Draw White Triangle (Fading In / Growing)
-                        if (hoverProgress > 0.01) {
-                            const triAlpha = hoverProgress;
-                            const triScale = hoverProgress;
+                        // HOLOGRAPHIC EFFECT: Semi-transparent
+                        ctx.globalAlpha = 0.8;
 
-                            ctx.globalAlpha = triAlpha;
-                            ctx.fillStyle = '#ffffff'; // White Triangle
-                            ctx.globalCompositeOperation = 'source-over';
+                        // Control Point Handle Factor
+                        // Circle approx: k = 0.77
+                        // Triangle (Sharp): k = 0
+                        // Target (Rounded Triangle): k = 0.25
+                        // Interpolate p: 0.77 -> 0.25
+                        const startK = 0.77;
+                        const endK = 0.25; // Keep it rounded!
+                        const k = startK * (1 - p) + endK * p;
 
-                            let btnJitterX = 0;
-                            let btnJitterY = 0;
+                        // Jitter (Only at high progress for glitch effect)
+                        let jx = 0;
+                        let jy = 0;
+                        if (p > 0.8) {
+                            jx = (Math.random() - 0.5) * 3 * p;
+                            jy = (Math.random() - 0.5) * 3 * p;
+                        }
+                        const cx = btnX + jx;
+                        const cy = btnY + jy;
 
-                            // Apply Jitter to triangle
-                            if (isHover || hoverProgress > 0.1) {
-                                btnJitterX = (Math.random() - 0.5) * 4 * hoverProgress;
-                                btnJitterY = (Math.random() - 0.5) * 4 * hoverProgress;
+                        // VERTICES (Triangle pointing Right - 0 deg)
+                        // V0: Right (0 deg)
+                        // V1: Top Left (240 deg / -120 deg)
+                        // V2: Bottom Left (120 deg)
+
+                        // Coordinates relative to cx, cy
+                        const v0 = { x: r, y: 0 };
+                        // cos(240)=-0.5, sin(240)=-0.866
+                        const v1 = { x: -0.5 * r, y: -0.866 * r };
+                        // cos(120)=-0.5, sin(120)=0.866
+                        const v2 = { x: -0.5 * r, y: 0.866 * r };
+
+                        // TANGENTS (For Circle Approximation)
+                        // Tangent vectors at vertices, scaled by Handle Length (r * k)
+                        // Calculated for CCW traversal (V0 -> V1 -> V2)
+                        // T = (-y, x) normalized * length? No, specific directions
+
+                        // T0 (at V0): Points Up (0, -1)
+                        const t0 = { x: 0, y: -r * k };
+
+                        // T1 (at V1): Points Left-Down (-0.866, 0.5)
+                        const t1 = { x: -0.866 * r * k, y: 0.5 * r * k };
+
+                        // T2 (at V2): Points Right-Down (0.866, 0.5) ?? 
+                        // Wait, flow V2->V0 (BottomLeft -> Right). Curve must bulge Right-Down.
+                        // Tangent at V2 should point towards 30 deg?
+                        // Tangent vector: (0.866, 0.5). Yes.
+                        const t2 = { x: 0.866 * r * k, y: 0.5 * r * k };
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.globalCompositeOperation = 'source-over';
+
+                        ctx.beginPath();
+                        // Start at V0
+                        ctx.moveTo(cx + v0.x, cy + v0.y);
+
+                        // Curve V0 -> V1
+                        // CP1 = V0 + T0
+                        // CP2 = V1 - T1 (Incoming, so invert tangent)
+                        ctx.bezierCurveTo(
+                            cx + v0.x + t0.x, cy + v0.y + t0.y,
+                            cx + v1.x - t1.x, cy + v1.y - t1.y,
+                            cx + v1.x, cy + v1.y
+                        );
+
+                        // Curve V1 -> V2
+                        ctx.bezierCurveTo(
+                            cx + v1.x + t1.x, cy + v1.y + t1.y,
+                            cx + v2.x - t2.x, cy + v2.y - t2.y,
+                            cx + v2.x, cy + v2.y
+                        );
+
+                        // Curve V2 -> V0
+                        ctx.bezierCurveTo(
+                            cx + v2.x + t2.x, cy + v2.y + t2.y,
+                            cx + v0.x - t0.x, cy + v0.y - t0.y,
+                            cx + v0.x, cy + v0.y
+                        );
+
+                        ctx.closePath();
+                        ctx.fill();
+                        // Reset alpha
+                        ctx.globalAlpha = 1.0;
+
+                        // ===== BACK BUTTON (Bottom-Right) =====
+                        if (showBackButton) {
+                            const btnBackX = 200;
+                            const btnBackY = 190;
+                            const isBackHover = backButtonHovered;
+
+                            // Independent hover progress for Back button
+                            let hoverProgressBack = 0;
+                            if (screenTextureRef.current) {
+                                if (typeof screenTextureRef.current.userData.hoverAnimBack === 'undefined') {
+                                    screenTextureRef.current.userData.hoverAnimBack = 0;
+                                }
+
+                                const targetBack = isBackHover ? 1 : 0;
+                                screenTextureRef.current.userData.hoverAnimBack += (targetBack - screenTextureRef.current.userData.hoverAnimBack) * 0.1;
+
+                                if (Math.abs(screenTextureRef.current.userData.hoverAnimBack) < 0.001) {
+                                    screenTextureRef.current.userData.hoverAnimBack = 0;
+                                }
+
+                                hoverProgressBack = screenTextureRef.current.userData.hoverAnimBack;
                             }
 
-                            const drawTriangle = (offsetX: number, offsetY: number) => {
-                                const cx = btnX + offsetX;
-                                const cy = btnY + offsetY;
-                                const triSize = 25 * triScale; // Max size 25
+                            const pBack = hoverProgressBack;
 
+                            // NO PULSE for Back button
+
+                            // HOLOGRAPHIC EFFECT
+                            ctx.globalAlpha = 0.8;
+
+                            // Back Button Morph: Circle -> Diagonal (/) -> X
+                            const rBack = 8; // Base radius (matched to Play button)
+
+                            // PHASE 1 (pBack 0 -> 0.5): Circle -> Diagonal Bar (/)
+                            // PHASE 2 (pBack 0.5 -> 1.0): Add second bar (\) to form X
+
+                            let phase1ProgressBack = Math.min(pBack * 2, 1.0); // 0->1 during first half
+                            let phase2ProgressBack = Math.max((pBack - 0.5) * 2, 0); // 0->1 during second half
+
+                            // Morph from circle to diagonal bar
+                            const startWidthBack = rBack * 2;
+                            const endWidthBack = 4; // Narrow bar
+                            const startHeightBack = rBack * 2;
+                            const endHeightBack = 18; // Tall bar
+                            const startRadiusBack = rBack;
+                            const endRadiusBack = 2; // Small corner radius
+
+                            const widthBack = startWidthBack * (1 - phase1ProgressBack) + endWidthBack * phase1ProgressBack;
+                            const heightBack = startHeightBack * (1 - phase1ProgressBack) + endHeightBack * phase1ProgressBack;
+                            const cornerRadiusBack = startRadiusBack * (1 - phase1ProgressBack) + endRadiusBack * phase1ProgressBack;
+
+                            let jxBack = 0;
+                            let jyBack = 0;
+                            if (pBack > 0.8) {
+                                jxBack = (Math.random() - 0.5) * 3 * pBack;
+                                jyBack = (Math.random() - 0.5) * 3 * pBack;
+                            }
+                            const cxBack = btnBackX + jxBack;
+                            const cyBack = btnBackY + jyBack;
+
+                            ctx.fillStyle = '#ffffff';
+
+                            // Draw first diagonal bar (/)
+                            const rotationAngleBack1 = -0.5; // ~-28deg (/)
+                            ctx.save();
+                            ctx.translate(cxBack, cyBack);
+                            ctx.rotate(rotationAngleBack1);
+                            ctx.beginPath();
+                            ctx.roundRect(-widthBack / 2, -heightBack / 2, widthBack, heightBack, cornerRadiusBack);
+                            ctx.fill();
+                            ctx.restore();
+
+                            // Phase 2: Draw second diagonal bar (\) to form X
+                            if (phase2ProgressBack > 0) {
+                                const rotationAngleBack2 = 0.5; // ~+28deg (\)
+                                const alphaBack2 = phase2ProgressBack; // Fade in second bar
+
+                                ctx.save();
+                                ctx.globalAlpha = 0.8 * alphaBack2; // Fade in with holographic effect
+                                ctx.translate(cxBack, cyBack);
+                                ctx.rotate(rotationAngleBack2);
                                 ctx.beginPath();
-                                ctx.moveTo(cx + triSize, cy);
-                                ctx.lineTo(cx - triSize / 1.2, cy + triSize);
-                                ctx.lineTo(cx - triSize / 1.2, cy - triSize);
-                                ctx.closePath();
+                                ctx.roundRect(-widthBack / 2, -heightBack / 2, widthBack, heightBack, cornerRadiusBack);
+                                ctx.fill();
+                                ctx.restore();
+                            }
+
+                            // Reset alpha
+                            ctx.globalAlpha = 1.0;
+                        }
+
+                        // ===== MENU BUTTON (Bottom-Center) =====
+                        if (showMenuButton) {
+                            const btnMenuX = 0; // Bottom-Center
+                            const btnMenuY = 190;
+                            const isMenuHover = menuButtonHovered;
+
+                            // Independent hover progress for Menu button
+                            let hoverProgressMenu = 0;
+                            if (screenTextureRef.current) {
+                                if (typeof screenTextureRef.current.userData.hoverAnimMenu === 'undefined') {
+                                    screenTextureRef.current.userData.hoverAnimMenu = 0;
+                                }
+
+                                const targetMenu = isMenuHover ? 1 : 0;
+                                screenTextureRef.current.userData.hoverAnimMenu += (targetMenu - screenTextureRef.current.userData.hoverAnimMenu) * 0.1;
+
+                                if (Math.abs(screenTextureRef.current.userData.hoverAnimMenu) < 0.001) {
+                                    screenTextureRef.current.userData.hoverAnimMenu = 0;
+                                }
+
+                                hoverProgressMenu = screenTextureRef.current.userData.hoverAnimMenu;
+                            }
+
+                            const pMenu = hoverProgressMenu;
+
+                            // NO PULSE for Menu button
+
+                            // HOLOGRAPHIC EFFECT
+                            ctx.globalAlpha = 0.8;
+
+                            // Menu Button Morph: Circle -> Vertical Bar -> 3 Bars (/ | |)
+                            const rMenu = 8; // Base radius (matched to Play button)
+
+                            // PHASE 1 (pMenu 0 -> 0.5): Circle -> Single Vertical Bar
+                            // PHASE 2 (pMenu 0.5 -> 1.0): Single Bar -> 3 Bars (/ | |)
+
+                            let phase1Progress = Math.min(pMenu * 2, 1.0); // 0->1 during first half
+                            let phase2Progress = Math.max((pMenu - 0.5) * 2, 0); // 0->1 during second half
+
+                            // Phase 1: Circle -> Vertical Bar
+                            const startWidth = rMenu * 2;
+                            const endWidth = 4; // Narrow bar
+                            const startHeight = rMenu * 2;
+                            const endHeight = 18; // Tall bar
+                            const startRadius = rMenu;
+                            const endRadius = 2; // Small corner radius
+
+                            const width = startWidth * (1 - phase1Progress) + endWidth * phase1Progress;
+                            const height = startHeight * (1 - phase1Progress) + endHeight * phase1Progress;
+                            const cornerRadius = startRadius * (1 - phase1Progress) + endRadius * phase1Progress;
+
+                            let jxMenu = 0;
+                            let jyMenu = 0;
+                            if (pMenu > 0.8) {
+                                jxMenu = (Math.random() - 0.5) * 2 * pMenu;
+                                jyMenu = (Math.random() - 0.5) * 2 * pMenu;
+                            }
+
+                            const cxMenu = btnMenuX + jxMenu;
+                            const cyMenu = btnMenuY + jyMenu;
+
+                            ctx.fillStyle = '#ffffff';
+
+                            // Phase 2: Split into 3 bars
+                            if (phase2Progress > 0) {
+                                const barSpacing = 6 * phase2Progress; // Spacing between bars
+                                const rotationAngle = -0.5 * phase2Progress; // Rotate first bar ~-28deg
+
+                                // Draw 3 bars
+                                // Bar 1: Left, rotated (/)
+                                ctx.save();
+                                ctx.translate(cxMenu - barSpacing, cyMenu);
+                                ctx.rotate(rotationAngle);
+                                ctx.beginPath();
+                                ctx.roundRect(-width / 2, -height / 2, width, height, cornerRadius);
+                                ctx.fill();
+                                ctx.restore();
+
+                                // Bar 2: Center (|)
+                                ctx.beginPath();
+                                ctx.roundRect(cxMenu - width / 2, cyMenu - height / 2, width, height, cornerRadius);
+                                ctx.fill();
+
+                                // Bar 3: Right (|)
+                                ctx.beginPath();
+                                ctx.roundRect(cxMenu + barSpacing - width / 2, cyMenu - height / 2, width, height, cornerRadius);
+                                ctx.fill();
+                            } else {
+                                // Phase 1: Single bar
+                                ctx.beginPath();
+                                ctx.roundRect(cxMenu - width / 2, cyMenu - height / 2, width, height, cornerRadius);
                                 ctx.fill();
                             }
 
-                            // Jittery Passes
-                            drawTriangle(btnJitterX, btnJitterY);
-                            drawTriangle(btnJitterX - 2, btnJitterY);
-                            drawTriangle(btnJitterX + 2, btnJitterY);
-
-                            ctx.globalAlpha = 1.0; // Reset
+                            // Reset alpha
+                            ctx.globalAlpha = 1.0;
                         }
 
                         // Reset
@@ -840,32 +1112,45 @@ export default function Television({
                         // UV Raycasting Interaction
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
-                            const isHit = checkButtonHover(e.uv);
+                            const buttonHit = checkButtonHover(e.uv);
 
-                            if (isHit) {
-                                if (!startButtonHovered) {
-                                    setStartButtonHovered(true);
-                                    document.body.style.cursor = 'pointer';
-                                }
-                            } else {
-                                if (startButtonHovered) {
-                                    setStartButtonHovered(false);
-                                    document.body.style.cursor = 'auto';
-                                }
+                            // Update hover states
+                            const newPlayHover = buttonHit === 'play';
+                            const newBackHover = buttonHit === 'back';
+                            const newMenuHover = buttonHit === 'menu';
+
+                            if (newPlayHover !== startButtonHovered) {
+                                setStartButtonHovered(newPlayHover);
                             }
+                            if (newBackHover !== backButtonHovered) {
+                                setBackButtonHovered(newBackHover);
+                            }
+                            if (newMenuHover !== menuButtonHovered) {
+                                setMenuButtonHovered(newMenuHover);
+                            }
+
+                            // Set cursor
+                            document.body.style.cursor = (newPlayHover || newBackHover || newMenuHover) ? 'pointer' : 'auto';
                         }
                     }}
                     onPointerLeave={() => {
-                        if (startButtonHovered) {
-                            setStartButtonHovered(false);
-                            document.body.style.cursor = 'auto';
-                        }
+                        if (startButtonHovered) setStartButtonHovered(false);
+                        if (backButtonHovered) setBackButtonHovered(false);
+                        if (menuButtonHovered) setMenuButtonHovered(false);
+                        document.body.style.cursor = 'auto';
                     }}
                     onClick={(e: any) => {
                         if (e.object.userData.isScreen && e.uv) {
-                            if (checkButtonHover(e.uv)) {
+                            const buttonHit = checkButtonHover(e.uv);
+                            if (buttonHit === 'play' && onStartClick) {
                                 e.stopPropagation();
-                                if (onStartClick) onStartClick();
+                                onStartClick();
+                            } else if (buttonHit === 'back' && onBackClick) {
+                                e.stopPropagation();
+                                onBackClick();
+                            } else if (buttonHit === 'menu' && onMenuClick) {
+                                e.stopPropagation();
+                                onMenuClick();
                             }
                         }
                     }}

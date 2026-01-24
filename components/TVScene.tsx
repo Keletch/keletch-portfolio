@@ -1,8 +1,6 @@
-'use client';
-
-import { useState, useEffect, Suspense, useMemo } from 'react';
+import { useState, useEffect, Suspense, useMemo, useRef, useLayoutEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useTexture, Html } from '@react-three/drei';
+import { OrbitControls, useTexture, Html, PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { useGLTF } from '@react-three/drei';
@@ -21,16 +19,43 @@ import { BackButton3D } from '@/components/BackButton3D';
 import { LuckyCat } from '@/components/LuckyCat';
 // Helper for interaction zone is baked now
 
+// PRELOAD ASSETS (Optimization)
+useGLTF.preload('/models/b1.glb');
+useGLTF.preload('/models/b2.glb');
+useGLTF.preload('/models/b3.glb');
+useGLTF.preload('/models/b4.glb');
+useGLTF.preload('/models/b5.glb');
+useGLTF.preload('/models/radio.glb');
+useGLTF.preload('/models/dvd.glb');
+useGLTF.preload('/models/leftSpeaker.glb');
+useGLTF.preload('/models/rightSpeaker.glb');
+useGLTF.preload('/models/rubiksGold.glb');
+useGLTF.preload('/models/tvStand.glb');
+
 
 export default function TVScene() {
     const [cameraZ, setCameraZ] = useState(5);
     const [viewState, setViewState] = useState<'default' | 'shelf_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus'>('default');
     const [startHovered, setStartHovered] = useState(false);
 
+    // PERFORMANCE OPTIMIZATION
+    const [dpr, setDpr] = useState(1.0); // Start at 1.0 (Safe default)
+
+    // RectAreaLight Ref for static targeting
+    const rectLightRef = useRef<THREE.RectAreaLight>(null);
+
+    useLayoutEffect(() => {
+        if (rectLightRef.current) {
+            rectLightRef.current.lookAt(0.1, 6.0, 0.40);
+        }
+    }, []);
+
     useEffect(() => {
         const handleResize = () => {
             const isMobile = window.innerWidth < 768;
             setCameraZ(isMobile ? 20 : 14);
+            // Lower DPR on mobile initially
+            if (isMobile) setDpr(0.8);
         };
 
         handleResize();
@@ -168,7 +193,7 @@ export default function TVScene() {
                 shadows
                 camera={{ position: [-3.5, 2.5, cameraZ], fov: 35 }}
                 key={cameraZ}
-                dpr={[0.3, 0.8]}
+                dpr={dpr} // DYNAMIC DPR
                 gl={{
                     antialias: false,
                     toneMapping: THREE.ACESFilmicToneMapping,
@@ -176,366 +201,429 @@ export default function TVScene() {
                     preserveDrawingBuffer: true
                 }}
             >
-                <color attach="background" args={['#000000']} />
-                <ambientLight intensity={0.7} />
+                <PerformanceMonitor onIncline={() => setDpr(1.5)} onDecline={() => setDpr(0.7)} >
+                    <color attach="background" args={['#000000']} />
+                    <ambientLight intensity={0.7} />
 
-                {/* Iluminación Principal - WARM STUDIO SETUP (BRIGHTER) */}
-                <directionalLight position={[0, 10, 5]} intensity={2.0} color="#fff0dd" castShadow />
+                    {/* Iluminación Principal - WARM STUDIO SETUP (BRIGHTER) */}
+                    <directionalLight position={[0, 10, 5]} intensity={2.0} color="#fff0dd" castShadow />
 
-                {/* Main Overhead Warm Light (Stronger) */}
-                <spotLight position={[0, 8, 6]} angle={1.2} penumbra={0.4} intensity={80} color="#ffc485" />
+                    {/* Main Overhead Warm Light (Stronger) */}
+                    <spotLight position={[0, 8, 6]} angle={1.2} penumbra={0.4} intensity={80} color="#ffc485" />
 
-                {/* Side Fill Lights (Brighter, ensuring no dark spots) */}
-                <pointLight position={[-6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
-                <pointLight position={[6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
+                    {/* Side Fill Lights (Brighter, ensuring no dark spots) */}
+                    <pointLight position={[-6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
+                    <pointLight position={[6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
 
-                {/* Back Light (Cool Rim) - SLIGHTLY REDUCED */}
-                <pointLight position={[0, 2.0, -4]} intensity={50} distance={20} decay={2} color="#3050ff" />
+                    {/* Back Light (Cool Rim) - SLIGHTLY REDUCED */}
+                    <pointLight position={[0, 2.0, -4]} intensity={50} distance={20} decay={2} color="#3050ff" />
 
-                {/* Speaker Front Lights (Dedicated Fill) */}
-                <pointLight position={[-4.9, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
-                <pointLight position={[5.0, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
+                    {/* Speaker Front Lights (Dedicated Fill) */}
+                    <pointLight position={[-4.9, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
+                    <pointLight position={[5.0, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
 
-                {/* RUBIKS GOLD LIGHTS (BAKED) */}
-                {/* Specular Highlight */}
-                <pointLight
-                    position={[5.3, 1.9, 0.9]}
-                    intensity={10}
-                    distance={6.5}
-                    decay={2.75}
-                    color="#ffaa00"
-                />
-                {/* Metallic Reflection (Softbox) */}
-                <rectAreaLight
-                    position={[5.7, 1.4, 1.0]}
-                    width={1.0}
-                    height={1.2}
-                    color="#ffcc00"
-                    intensity={5}
-                    onUpdate={self => self.lookAt(0.1, 6.0, 0.40)}
-                />
+                    {/* RUBIKS GOLD LIGHTS (BAKED) */}
+                    {/* Specular Highlight */}
+                    <pointLight
+                        position={[5.3, 1.9, 0.9]}
+                        intensity={10}
+                        distance={6.5}
+                        decay={2.75}
+                        color="#ffaa00"
+                    />
+                    {/* Metallic Reflection (Softbox) */}
+                    <rectAreaLight
+                        ref={rectLightRef}
+                        position={[5.7, 1.4, 1.0]}
+                        width={1.0}
+                        height={1.2}
+                        color="#ffcc00"
+                        intensity={5}
+                    />
 
 
 
-                <Suspense fallback={null}>
-                    <Physics gravity={[0, -9.81, 0]} numSolverIterations={12}>
+                    <Suspense fallback={null}>
+                        <Physics gravity={[0, -9.81, 0]} numSolverIterations={12}>
 
-                        {/* TV STAND (MUEBLE) - DEBAJO DE LAS TVs */}
-                        <RigidBody
-                            colliders={false}
-                            enabledRotations={[true, false, true]}
-                            ccd={true}
-                            linearDamping={0.5}
-                            angularDamping={0.5}
-                            position={[standPosition.x, standPosition.y, standPosition.z]}
-                        >
-                            {/* Collider 1 */}
-                            <CuboidCollider args={standCollider1.size} position={standCollider1.offset} friction={0.8} restitution={0.1} />
+                            {/* TV STAND (MUEBLE) - DEBAJO DE LAS TVs */}
+                            <RigidBody
+                                colliders={false}
+                                enabledRotations={[true, false, true]}
+                                ccd={true}
+                                linearDamping={0.5}
+                                angularDamping={0.5}
+                                position={[standPosition.x, standPosition.y, standPosition.z]}
+                            >
+                                {/* Collider 1 */}
+                                <CuboidCollider args={standCollider1.size} position={standCollider1.offset} friction={0.8} restitution={0.1} />
 
-                            {/* Collider 2 */}
-                            <CuboidCollider args={standCollider2.size} position={standCollider2.offset} friction={0.8} restitution={0.1} />
+                                {/* Collider 2 */}
+                                <CuboidCollider args={standCollider2.size} position={standCollider2.offset} friction={0.8} restitution={0.1} />
 
-                            {/* Collider 3 */}
-                            <CuboidCollider args={standCollider3.size} position={standCollider3.offset} friction={0.8} restitution={0.1} />
+                                {/* Collider 3 */}
+                                <CuboidCollider args={standCollider3.size} position={standCollider3.offset} friction={0.8} restitution={0.1} />
 
-                            {/* Collider 4 */}
-                            <CuboidCollider args={standCollider4.size} position={standCollider4.offset} friction={0.8} restitution={0.1} />
+                                {/* Collider 4 */}
+                                <CuboidCollider args={standCollider4.size} position={standCollider4.offset} friction={0.8} restitution={0.1} />
 
-                            {/* Collider 5 (Extra) */}
-                            <CuboidCollider args={standCollider5.size} position={standCollider5.offset} friction={0.8} restitution={0.1} />
+                                {/* Collider 5 (Extra) */}
+                                <CuboidCollider args={standCollider5.size} position={standCollider5.offset} friction={0.8} restitution={0.1} />
 
-                            <primitive object={tvStandModel.clone()} scale={1.2} />
-                        </RigidBody>
+                                <primitive object={tvStandModel.clone()} scale={1.2} />
+                            </RigidBody>
 
-                        {/* PISO FÍSICO Y VISUAL */}
-                        <RoomFloor />
+                            {/* PISO FÍSICO Y VISUAL */}
+                            <RoomFloor />
 
-                        {/* COLUMNA 1 (IZQUIERDA) */}
-                        {/* toonTV Arriba */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv1Position.x, tv1Position.y, tv1Position.z]}>
-                            <CuboidCollider args={colliders.toon.size} position={colliders.toon.offset} friction={0.3} restitution={0.1} />
-                            <Television modelPath="/models/toonTV.glb" screenNames={['toonTVScreen', 'screen', 'toontvscreen']} theme="toon" invertY={true} />
-                        </RigidBody>
-                        {/* redTV Abajo */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv2Position.x, tv2Position.y, tv2Position.z]}>
-                            <CuboidCollider args={colliders.void.size} position={colliders.void.offset} friction={0.3} restitution={0.1} />
-                            <Television
-                                modelPath="/models/redTV.glb"
-                                screenNames={['redTVScreen', 'screen']}
-                                theme="void"
-                                invertY={true}
-                                focusedText="About Me"
-                                isFocused={viewState === 'tv_red_focus'}
-                                textYOffset={40} // AJUSTA AQUÍ LA POSICIÓN VERTICAL DEL TEXTO (Más pequeño = más arriba)
-                                showStartButton={true}
-                                onStartClick={() => {
-                                    // Handle click
-                                    console.log("Start Clicked");
+                            {/* COLUMNA 1 (IZQUIERDA) */}
+                            {/* toonTV Arriba */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv1Position.x, tv1Position.y, tv1Position.z]}>
+                                <CuboidCollider args={colliders.toon.size} position={colliders.toon.offset} friction={0.3} restitution={0.1} />
+                                <Television modelPath="/models/toonTV.glb" screenNames={['toonTVScreen', 'screen', 'toontvscreen']} theme="toon" invertY={true} />
+                            </RigidBody>
+                            {/* redTV Abajo */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv2Position.x, tv2Position.y, tv2Position.z]}>
+                                <CuboidCollider args={colliders.void.size} position={colliders.void.offset} friction={0.3} restitution={0.1} />
+                                <Television
+                                    modelPath="/models/redTV.glb"
+                                    screenNames={['redTVScreen', 'screen']}
+                                    theme="void"
+                                    invertY={true}
+                                    focusedText="About Me"
+                                    isFocused={viewState === 'tv_red_focus'}
+                                    textYOffset={40} // AJUSTA AQUÍ LA POSICIÓN VERTICAL DEL TEXTO (Más pequeño = más arriba)
+                                    showStartButton={true}
+                                    onStartClick={() => {
+                                        // Handle click
+                                        console.log("Start Clicked");
+                                    }}
+                                    showBackButton={true}
+                                    onBackClick={() => setViewState('default')}
+                                    showMenuButton={true}
+                                    onMenuClick={() => setViewState('shelf_focus')}
+                                />
+                            </RigidBody>
+
+                            {/* COLUMNA 2 (CENTRO) */}
+                            {/* lcdtv (Toxic) Arriba */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv3Position.x, tv3Position.y, tv3Position.z]}>
+                                <CuboidCollider args={colliders.toxic.size} position={colliders.toxic.offset} friction={0.3} restitution={0.1} />
+                                <Television
+                                    modelPath="/models/LCDTVFixed.glb"
+                                    screenNames={['LCDScreen', 'screen', 'LCD_Screen']}
+                                    theme="toxic"
+                                    scale={1.1}
+                                    invertY={true}
+                                    focusedText="My Works"
+                                    isFocused={viewState === 'tv_lcd_focus'}
+                                    textYOffset={40}
+                                    showStartButton={true}
+                                    onStartClick={() => console.log("Start Clicked: My Works")}
+                                    showBackButton={true}
+                                    onBackClick={() => setViewState('default')}
+                                    showMenuButton={true}
+                                    onMenuClick={() => setViewState('shelf_focus')}
+                                />
+                            </RigidBody>
+                            {/* dirtytv (Blood) Abajo */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv4Position.x, tv4Position.y, tv4Position.z]}>
+                                <CuboidCollider args={colliders.blood.size} position={colliders.blood.offset} friction={0.3} restitution={0.1} />
+                                <Television
+                                    modelPath="/models/dirtyTV.glb"
+                                    screenNames={['dirtyTVScreen', 'screen']}
+                                    theme="blood"
+                                    gazeOffset={{ x: 0, y: -0.1 }}
+                                    invertY={true}
+                                    focusedText="Vision"
+                                    isFocused={viewState === 'tv_dirty_focus'}
+                                    textYOffset={40}
+                                    showStartButton={true}
+                                    onStartClick={() => console.log("Start Clicked: Vision")}
+                                    showBackButton={true}
+                                    onBackClick={() => setViewState('default')}
+                                    showMenuButton={true}
+                                    onMenuClick={() => setViewState('shelf_focus')}
+                                />
+                            </RigidBody>
+
+                            {/* COLUMNA 3 (DERECHA) */}
+                            {/* lowpolytv Arriba */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv5Position.x, tv5Position.y, tv5Position.z]}>
+                                <CuboidCollider args={colliders.lowPoly.size} position={colliders.lowPoly.offset} friction={0.3} restitution={0.1} />
+                                <Television
+                                    modelPath="/models/LowPolyTV.glb"
+                                    invertY={true}
+                                    screenNames={['screen']} // Restrict to main screen mesh only (Ignore Glass)
+                                    focusedText="Extras"
+                                    isFocused={viewState === 'tv_lowpoly_focus'}
+                                    textYOffset={40}
+                                    showStartButton={true}
+                                    onStartClick={() => console.log("Start Clicked: Extras")}
+                                    showBackButton={true}
+                                    onBackClick={() => setViewState('default')}
+                                    showMenuButton={true}
+                                    onMenuClick={() => setViewState('shelf_focus')}
+                                />
+                            </RigidBody>
+                            {/* typicaltv (Sulfur) Abajo */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv6Position.x, tv6Position.y, tv6Position.z]}>
+                                <CuboidCollider args={colliders.sulfur.size} position={colliders.sulfur.offset} friction={0.3} restitution={0.1} />
+                                <Television
+                                    modelPath="/models/typicalTV.glb"
+                                    screenNames={['typicaltvscreen', 'screen', 'typical_tv_screen', 'tipicaltvscreen']}
+                                    theme="sulfur"
+                                    invertY={true}
+                                    focusedText="Lifestyle"
+                                    isFocused={viewState === 'tv_typical_focus'}
+                                    textYOffset={40}
+                                    showStartButton={true}
+                                    onStartClick={() => console.log("Start Clicked: Lifestyle")}
+                                    showBackButton={true}
+                                    onBackClick={() => setViewState('default')}
+                                    showMenuButton={true}
+                                    onMenuClick={() => setViewState('shelf_focus')}
+                                />
+                            </RigidBody>
+
+                            {/* --- ACCESORIOS --- */}
+
+                            {/* DVD PLAYER */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={dvdCtrl.pos} rotation={dvdCtrl.rot}>
+                                <CuboidCollider args={dvdCtrl.size} position={dvdCtrl.offset} friction={0.5} restitution={0.1} />
+                                <primitive object={dvdModel.clone()} />
+                            </RigidBody>
+
+                            {/* RADIO */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={radioCtrl.pos} rotation={radioCtrl.rot}>
+                                <CuboidCollider args={radioCtrl.size} position={radioCtrl.offset} friction={0.5} restitution={0.1} />
+                                <Television modelPath="/models/radio.glb" screenNames={['radioScreen']} theme="sonar" modelYOffset={0} invertY={true} />
+                            </RigidBody>
+
+                            {/* LEFT SPEAKER */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={leftSpkCtrl.pos} rotation={leftSpkCtrl.rot}>
+                                <CuboidCollider args={leftSpkCtrl.size} position={leftSpkCtrl.offset} friction={0.5} restitution={0.1} />
+                                <primitive object={leftSpeakerModel.clone()} />
+                            </RigidBody>
+
+                            {/* RIGHT SPEAKER */}
+                            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={rightSpkCtrl.pos} rotation={rightSpkCtrl.rot}>
+                                <CuboidCollider args={rightSpkCtrl.size} position={rightSpkCtrl.offset} friction={0.5} restitution={0.1} />
+                                <primitive object={rightSpeakerModel.clone()} />
+                            </RigidBody>
+
+                            {/* --- NEW BOOKS (Adjustable with Hardcoded Config) --- */}
+                            <AdjustableModel
+                                modelPath="/models/b1.glb"
+                                initialPos={book1Ctrl.pos}
+                                initialRot={book1Ctrl.rot}
+                                initialScale={book1Ctrl.scale}
+                                initialColliderSize={book1Ctrl.size}
+                                initialColliderOffset={book1Ctrl.offset}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (viewState === 'shelf_focus') {
+                                        console.log('Book 1 Clicked - Navigating to Red TV');
+                                        setViewState('tv_red_focus');
+                                    }
                                 }}
+                                onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                                onPointerLeave={() => document.body.style.cursor = 'auto'}
+                                label="About me"
+                                labelConfig={{
+                                    position: [-1.882, 0.96, 0.51],
+                                    rotation: [0, -0.2, 0],
+                                    fontSize: 0.1,
+                                    lineHeight: 1.0,
+                                    color: '#ffffff'
+                                }}
+                                isInteractive={viewState === 'shelf_focus'}
                             />
-                        </RigidBody>
+                            <AdjustableModel
+                                modelPath="/models/b2.glb"
+                                initialPos={book2Ctrl.pos}
+                                initialRot={book2Ctrl.rot}
+                                initialScale={book2Ctrl.scale}
+                                initialColliderSize={book2Ctrl.size}
+                                initialColliderOffset={book2Ctrl.offset}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (viewState === 'shelf_focus') {
+                                        console.log('Book 2 Clicked - Navigating to LCD TV');
+                                        setViewState('tv_lcd_focus');
+                                    }
+                                }}
+                                onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                                onPointerLeave={() => document.body.style.cursor = 'auto'}
+                                label="My Works"
+                                labelConfig={{
+                                    position: [-1.80, 1.05, 0.52],
+                                    rotation: [0, -0.2, 0],
+                                    fontSize: 0.12,
+                                    lineHeight: 1.0,
+                                    color: '#ffffff'
+                                }}
+                                isInteractive={viewState === 'shelf_focus'}
+                            />
+                            <AdjustableModel
+                                modelPath="/models/b3.glb"
+                                initialPos={book3Ctrl.pos}
+                                initialRot={book3Ctrl.rot}
+                                initialScale={book3Ctrl.scale}
+                                initialColliderSize={book3Ctrl.size}
+                                initialColliderOffset={book3Ctrl.offset}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (viewState === 'shelf_focus') {
+                                        console.log('Book 3 Clicked - Navigating to Dirty TV');
+                                        setViewState('tv_dirty_focus');
+                                    }
+                                }}
+                                onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                                onPointerLeave={() => document.body.style.cursor = 'auto'}
+                                label="Vision"
+                                labelConfig={{
+                                    position: [-1.65, 0.90, 0.53],
+                                    rotation: [0, -0.2, 0],
+                                    fontSize: 0.12,
+                                    lineHeight: 1.0,
+                                    color: '#ffffff'
+                                }}
+                                isInteractive={viewState === 'shelf_focus'}
+                            />
+                            <AdjustableModel
+                                modelPath="/models/b4.glb"
+                                initialPos={book4Ctrl.pos}
+                                initialRot={book4Ctrl.rot}
+                                initialScale={book4Ctrl.scale}
+                                initialColliderSize={book4Ctrl.size}
+                                initialColliderOffset={book4Ctrl.offset}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (viewState === 'shelf_focus') {
+                                        console.log('Book 4 Clicked - Navigating to Typical TV');
+                                        setViewState('tv_typical_focus');
+                                    }
+                                }}
+                                onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                                onPointerLeave={() => document.body.style.cursor = 'auto'}
+                                label="Lifestyle"
+                                labelConfig={{
+                                    position: [-1.49, 0.92, 0.53],
+                                    rotation: [0, -0.2, 0],
+                                    fontSize: 0.12,
+                                    lineHeight: 1.0,
+                                    color: '#ffffff'
+                                }}
+                                isInteractive={viewState === 'shelf_focus'}
+                            />
+                            <AdjustableModel
+                                modelPath="/models/b5.glb"
+                                initialPos={book5Ctrl.pos}
+                                initialRot={book5Ctrl.rot}
+                                initialScale={book5Ctrl.scale}
+                                initialColliderSize={book5Ctrl.size}
+                                initialColliderOffset={book5Ctrl.offset}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (viewState === 'shelf_focus') {
+                                        console.log('Book 5 Clicked - Navigating to LowPoly TV');
+                                        setViewState('tv_lowpoly_focus');
+                                    }
+                                }}
+                                onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                                onPointerLeave={() => document.body.style.cursor = 'auto'}
+                                label="Extras"
+                                labelConfig={{
+                                    position: [-1.35, 0.85, 0.51],
+                                    rotation: [0, -0.2, 0],
+                                    fontSize: 0.12,
+                                    lineHeight: 1.0,
+                                    color: '#ffffff'
+                                }}
+                                isInteractive={viewState === 'shelf_focus'}
+                            />
 
-                        {/* COLUMNA 2 (CENTRO) */}
-                        {/* lcdtv (Toxic) Arriba */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv3Position.x, tv3Position.y, tv3Position.z]}>
-                            <CuboidCollider args={colliders.toxic.size} position={colliders.toxic.offset} friction={0.3} restitution={0.1} />
-                            <Television modelPath="/models/LCDTVFixed.glb" screenNames={['LCDScreen', 'screen', 'LCD_Screen']} theme="toxic" scale={1.1} invertY={true} />
-                        </RigidBody>
-                        {/* dirtytv (Blood) Abajo */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv4Position.x, tv4Position.y, tv4Position.z]}>
-                            <CuboidCollider args={colliders.blood.size} position={colliders.blood.offset} friction={0.3} restitution={0.1} />
-                            <Television modelPath="/models/dirtyTV.glb" screenNames={['dirtyTVScreen', 'screen']} theme="blood" gazeOffset={{ x: 0, y: -0.1 }} invertY={true} />
-                        </RigidBody>
+                            {/* --- MOBILE (Baked Physics + Active Screen) --- */}
+                            <RigidBody
+                                colliders={false}
+                                position={mobileCtrl.pos}
+                                rotation={mobileCtrl.rot}
+                                enabledRotations={[true, true, true]}
+                            >
+                                <CuboidCollider
+                                    args={mobileCtrl.size}
+                                    position={mobileCtrl.offset}
+                                    friction={0.5}
+                                    restitution={0.1}
+                                />
+                                <Television
+                                    modelPath="/models/mobile.glb"
+                                    screenNames={['mobileScreen']}
+                                    scale={mobileCtrl.scale}
+                                    theme="mobile"
+                                    invertY={true} // Fixed inverted Y axis
+                                    gazeOffset={{ x: 0, y: 0 }}
+                                />
+                            </RigidBody>
 
-                        {/* COLUMNA 3 (DERECHA) */}
-                        {/* lowpolytv Arriba */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv5Position.x, tv5Position.y, tv5Position.z]}>
-                            <CuboidCollider args={colliders.lowPoly.size} position={colliders.lowPoly.offset} friction={0.3} restitution={0.1} />
-                            <Television modelPath="/models/LowPolyTV.glb" invertY={true} />
-                        </RigidBody>
-                        {/* typicaltv (Sulfur) Abajo */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv6Position.x, tv6Position.y, tv6Position.z]}>
-                            <CuboidCollider args={colliders.sulfur.size} position={colliders.sulfur.offset} friction={0.3} restitution={0.1} />
-                            <Television modelPath="/models/typicalTV.glb" screenNames={['typicaltvscreen', 'screen', 'typical_tv_screen', 'tipicaltvscreen']} theme="sulfur" invertY={true} />
-                        </RigidBody>
+                            {/* --- LUCKY CAT (Animated Waving Arm) --- */}
+                            <RigidBody
+                                colliders={false}
+                                position={luckyCatCtrl.pos}
+                                rotation={luckyCatCtrl.rot}
+                                enabledRotations={[true, true, true]}
+                            >
+                                <CuboidCollider
+                                    args={luckyCatCtrl.size}
+                                    position={luckyCatCtrl.offset}
+                                    friction={0.5}
+                                    restitution={0.1}
+                                />
+                                <LuckyCat scale={luckyCatCtrl.scale} />
+                            </RigidBody>
 
-                        {/* --- ACCESORIOS --- */}
+                            {/* --- RUBIKS GOLD (Baked) --- */}
+                            <AdjustableModel
+                                modelPath="/models/rubiksGold.glb"
+                                initialPos={rubiksGoldCtrl.pos}
+                                initialRot={rubiksGoldCtrl.rot}
+                                initialScale={rubiksGoldCtrl.scale}
+                                initialColliderSize={rubiksGoldCtrl.size}
+                                initialColliderOffset={rubiksGoldCtrl.offset}
+                                isInteractive={false}
+                            />
 
-                        {/* DVD PLAYER */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={dvdCtrl.pos} rotation={dvdCtrl.rot}>
-                            <CuboidCollider args={dvdCtrl.size} position={dvdCtrl.offset} friction={0.5} restitution={0.1} />
-                            <primitive object={dvdModel.clone()} />
-                        </RigidBody>
+                        </Physics>
+                    </Suspense>
 
-                        {/* RADIO */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={radioCtrl.pos} rotation={radioCtrl.rot}>
-                            <CuboidCollider args={radioCtrl.size} position={radioCtrl.offset} friction={0.5} restitution={0.1} />
-                            <Television modelPath="/models/radio.glb" screenNames={['radioScreen']} theme="sonar" modelYOffset={0} invertY={true} />
-                        </RigidBody>
+                    <CameraRig viewState={viewState} />
 
-                        {/* LEFT SPEAKER */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={leftSpkCtrl.pos} rotation={leftSpkCtrl.rot}>
-                            <CuboidCollider args={leftSpkCtrl.size} position={leftSpkCtrl.offset} friction={0.5} restitution={0.1} />
-                            <primitive object={leftSpeakerModel.clone()} />
-                        </RigidBody>
-
-                        {/* RIGHT SPEAKER */}
-                        <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={rightSpkCtrl.pos} rotation={rightSpkCtrl.rot}>
-                            <CuboidCollider args={rightSpkCtrl.size} position={rightSpkCtrl.offset} friction={0.5} restitution={0.1} />
-                            <primitive object={rightSpeakerModel.clone()} />
-                        </RigidBody>
-
-                        {/* --- NEW BOOKS (Adjustable with Hardcoded Config) --- */}
-                        <AdjustableModel
-                            modelPath="/models/b1.glb"
-                            initialPos={book1Ctrl.pos}
-                            initialRot={book1Ctrl.rot}
-                            initialScale={book1Ctrl.scale}
-                            initialColliderSize={book1Ctrl.size}
-                            initialColliderOffset={book1Ctrl.offset}
+                    {/* BAKED INTERACTION ZONE (Invisible Clickable Area) */}
+                    {viewState === 'default' && (
+                        <mesh
+                            position={[-1.3, -0.8, 0.95]}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (viewState === 'shelf_focus') {
-                                    console.log('Book 1 Clicked - Navigating to Red TV');
-                                    setViewState('tv_red_focus');
-                                }
+                                document.body.style.cursor = 'auto';
+                                setViewState('shelf_focus');
                             }}
                             onPointerEnter={() => document.body.style.cursor = 'pointer'}
                             onPointerLeave={() => document.body.style.cursor = 'auto'}
-                            label="About me"
-                            labelConfig={{
-                                position: [-1.882, 0.96, 0.51],
-                                rotation: [0, -0.2, 0],
-                                fontSize: 0.1,
-                                lineHeight: 1.0,
-                                color: '#ffffff'
-                            }}
-                            isInteractive={viewState === 'shelf_focus'}
-                        />
-                        <AdjustableModel
-                            modelPath="/models/b2.glb"
-                            initialPos={book2Ctrl.pos}
-                            initialRot={book2Ctrl.rot}
-                            initialScale={book2Ctrl.scale}
-                            initialColliderSize={book2Ctrl.size}
-                            initialColliderOffset={book2Ctrl.offset}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (viewState === 'shelf_focus') {
-                                    console.log('Book 2 Clicked - Navigating to LCD TV');
-                                    setViewState('tv_lcd_focus');
-                                }
-                            }}
-                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
-                            onPointerLeave={() => document.body.style.cursor = 'auto'}
-                            label="My Works"
-                            labelConfig={{
-                                position: [-1.80, 1.05, 0.52],
-                                rotation: [0, -0.2, 0],
-                                fontSize: 0.12,
-                                lineHeight: 1.0,
-                                color: '#ffffff'
-                            }}
-                            isInteractive={viewState === 'shelf_focus'}
-                        />
-                        <AdjustableModel
-                            modelPath="/models/b3.glb"
-                            initialPos={book3Ctrl.pos}
-                            initialRot={book3Ctrl.rot}
-                            initialScale={book3Ctrl.scale}
-                            initialColliderSize={book3Ctrl.size}
-                            initialColliderOffset={book3Ctrl.offset}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (viewState === 'shelf_focus') {
-                                    console.log('Book 3 Clicked - Navigating to Dirty TV');
-                                    setViewState('tv_dirty_focus');
-                                }
-                            }}
-                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
-                            onPointerLeave={() => document.body.style.cursor = 'auto'}
-                            label="Vision"
-                            labelConfig={{
-                                position: [-1.65, 0.90, 0.53],
-                                rotation: [0, -0.2, 0],
-                                fontSize: 0.12,
-                                lineHeight: 1.0,
-                                color: '#ffffff'
-                            }}
-                            isInteractive={viewState === 'shelf_focus'}
-                        />
-                        <AdjustableModel
-                            modelPath="/models/b4.glb"
-                            initialPos={book4Ctrl.pos}
-                            initialRot={book4Ctrl.rot}
-                            initialScale={book4Ctrl.scale}
-                            initialColliderSize={book4Ctrl.size}
-                            initialColliderOffset={book4Ctrl.offset}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (viewState === 'shelf_focus') {
-                                    console.log('Book 4 Clicked - Navigating to Typical TV');
-                                    setViewState('tv_typical_focus');
-                                }
-                            }}
-                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
-                            onPointerLeave={() => document.body.style.cursor = 'auto'}
-                            label="Lifestyle"
-                            labelConfig={{
-                                position: [-1.49, 0.92, 0.53],
-                                rotation: [0, -0.2, 0],
-                                fontSize: 0.12,
-                                lineHeight: 1.0,
-                                color: '#ffffff'
-                            }}
-                            isInteractive={viewState === 'shelf_focus'}
-                        />
-                        <AdjustableModel
-                            modelPath="/models/b5.glb"
-                            initialPos={book5Ctrl.pos}
-                            initialRot={book5Ctrl.rot}
-                            initialScale={book5Ctrl.scale}
-                            initialColliderSize={book5Ctrl.size}
-                            initialColliderOffset={book5Ctrl.offset}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (viewState === 'shelf_focus') {
-                                    console.log('Book 5 Clicked - Navigating to LowPoly TV');
-                                    setViewState('tv_lowpoly_focus');
-                                }
-                            }}
-                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
-                            onPointerLeave={() => document.body.style.cursor = 'auto'}
-                            label="Extras"
-                            labelConfig={{
-                                position: [-1.35, 0.85, 0.51],
-                                rotation: [0, -0.2, 0],
-                                fontSize: 0.12,
-                                lineHeight: 1.0,
-                                color: '#ffffff'
-                            }}
-                            isInteractive={viewState === 'shelf_focus'}
-                        />
-
-                        {/* --- MOBILE (Baked Physics + Active Screen) --- */}
-                        <RigidBody
-                            colliders={false}
-                            position={mobileCtrl.pos}
-                            rotation={mobileCtrl.rot}
-                            enabledRotations={[true, true, true]}
                         >
-                            <CuboidCollider
-                                args={mobileCtrl.size}
-                                position={mobileCtrl.offset}
-                                friction={0.5}
-                                restitution={0.1}
-                            />
-                            <Television
-                                modelPath="/models/mobile.glb"
-                                screenNames={['mobileScreen']}
-                                scale={mobileCtrl.scale}
-                                theme="mobile"
-                                invertY={true} // Fixed inverted Y axis
-                                gazeOffset={{ x: 0, y: 0 }}
-                            />
-                        </RigidBody>
+                            <boxGeometry args={[1.20, 1.30, 0.15]} />
+                            <meshBasicMaterial transparent opacity={0} />
+                        </mesh>
+                    )}
 
-                        {/* --- LUCKY CAT (Animated Waving Arm) --- */}
-                        <RigidBody
-                            colliders={false}
-                            position={luckyCatCtrl.pos}
-                            rotation={luckyCatCtrl.rot}
-                            enabledRotations={[true, true, true]}
-                        >
-                            <CuboidCollider
-                                args={luckyCatCtrl.size}
-                                position={luckyCatCtrl.offset}
-                                friction={0.5}
-                                restitution={0.1}
-                            />
-                            <LuckyCat scale={luckyCatCtrl.scale} />
-                        </RigidBody>
+                    {/* UI OVERLAY (Now 3D Text in Scene) */}
+                    <BackButton3D
+                        onClick={() => setViewState('default')}
+                        visible={viewState === 'shelf_focus'}
+                    />
 
-                        {/* --- RUBIKS GOLD (Baked) --- */}
-                        <AdjustableModel
-                            modelPath="/models/rubiksGold.glb"
-                            initialPos={rubiksGoldCtrl.pos}
-                            initialRot={rubiksGoldCtrl.rot}
-                            initialScale={rubiksGoldCtrl.scale}
-                            initialColliderSize={rubiksGoldCtrl.size}
-                            initialColliderOffset={rubiksGoldCtrl.offset}
-                            isInteractive={false}
-                        />
-
-                    </Physics>
-                </Suspense>
-
-                <CameraRig viewState={viewState} />
-
-                {/* BAKED INTERACTION ZONE (Invisible Clickable Area) */}
-                {viewState === 'default' && (
-                    <mesh
-                        position={[-1.3, -0.8, 0.95]}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            document.body.style.cursor = 'auto';
-                            setViewState('shelf_focus');
-                        }}
-                        onPointerEnter={() => document.body.style.cursor = 'pointer'}
-                        onPointerLeave={() => document.body.style.cursor = 'auto'}
-                    >
-                        <boxGeometry args={[1.20, 1.30, 0.15]} />
-                        <meshBasicMaterial transparent opacity={0} />
-                    </mesh>
-                )}
-
-                {/* UI OVERLAY (Now 3D Text in Scene) */}
-                <BackButton3D
-                    onClick={() => setViewState('default')}
-                    visible={viewState === 'shelf_focus'}
-                />
-
-                <CRTOverlay />
+                    <CRTOverlay />
+                </PerformanceMonitor>
             </Canvas>
         </div>
     );
