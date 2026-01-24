@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -17,6 +17,11 @@ interface TelevisionProps {
     gazeOffset?: { x: number; y: number }; // Offset manual para calibración
     uvRotation?: number; // Rotación de la textura en radianes (ej: Math.PI/4 para 45°)
     modelYOffset?: number; // Offset vertical del modelo dentro del grupo
+    focusedText?: string;
+    isFocused?: boolean;
+    textYOffset?: number;
+    showStartButton?: boolean;
+    onStartClick?: () => void;
 }
 
 const THEMES = {
@@ -121,7 +126,12 @@ export default function Television({
     invertY = false,
     gazeOffset = { x: 0, y: 0 },
     uvRotation = 0,
-    modelYOffset = -0.3
+    modelYOffset = -0.3,
+    focusedText,
+    isFocused = false,
+    textYOffset = 60,
+    showStartButton = false,
+    onStartClick
 }: TelevisionProps) {
     const groupRef = useRef<THREE.Group>(null);
     const { scene: model } = useGLTF(modelPath);
@@ -130,11 +140,14 @@ export default function Television({
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });   // Posición suavizada para la esclerótica
     const screenMeshRef = useRef<THREE.Mesh | null>(null); // Cache para la malla de la pantalla
+    const [startButtonHovered, setStartButtonHovered] = useState(false); // Hover state for start button
 
     // Referencia para el canvas e id de cada instancia
     const instanceId = useRef(Math.random().toString(36).substr(2, 9));
     const screenAspect = useRef(1.0);
-    const screenDimensions = useRef({ width: 1.0, height: 1.0 }); // Default size
+
+    // Use state instead of ref for dimensions to ensure re-render of geometry
+    const [screenSize, setScreenSize] = useState<{ width: number, height: number } | null>(null);
 
     // Estado del parpadeo
     const blinkState = useRef({
@@ -152,29 +165,24 @@ export default function Television({
     // Eliminamos el normalizedMouse y el listener de window)
 
     // Configurar el modelo y encontrar la pantalla
-    useEffect(() => {
-        if (!model) return;
+    // 1. Clonar y configurar modelo en useMemo
+    const clonedModel = useMemo(() => {
+        if (!model) return null;
 
-        const clonedModel = model.clone();
+        const clone = model.clone();
 
         console.log(`🔍 ===== ANÁLISIS DEL MODELO: ${modelPath} =====`);
         let meshCount = 0;
         let screenFound = false;
 
-        clonedModel.traverse((child) => {
+        clone.traverse((child) => {
             if (child instanceof THREE.Mesh) {
                 meshCount++;
-
-                console.log(`📦 Model: ${modelPath} | Mesh #${meshCount}: ${child.name}`);
-
-
                 const childNameLower = child.name.toLowerCase();
                 const isScreen = screenNames.some(name => childNameLower.includes(name.toLowerCase()));
 
                 if (isScreen) {
                     screenFound = true;
-                    console.log(`✅ ¡PANTALLA DETECTADA en ${modelPath}!`, child.name);
-
                     // --- NUEVO: CALCULAR ASPECT RATIO DE LA PANTALLA ---
                     child.geometry.computeBoundingBox();
                     const box = child.geometry.boundingBox;
@@ -183,10 +191,12 @@ export default function Television({
                         const height = box.max.y - box.min.y;
                         screenAspect.current = width / height;
 
-                        // Guardar dimensiones reales para la luz
-                        screenDimensions.current = { width, height };
-
-                        console.log(`📏 Pantalla ${child.name}: ${width.toFixed(2)}x${height.toFixed(2)} (Aspect: ${screenAspect.current.toFixed(2)})`);
+                        // Guardar dimensiones reales
+                        // Note: We can't set state in useMemo easily, but we can store it in ref or handle in useEffect
+                        // However, we need state for external consumers? Or just for internal logic?
+                        // For the button, we need it. But with UV interaction, we don't need physical size anymore!
+                        // We only need pixel coordinates on the texture.
+                        // So we can drop screenSize dependency for interaction!
                     }
 
                     // Crear textura desde canvas
@@ -205,6 +215,8 @@ export default function Television({
                     texture.center.set(0.5, 0.5); // Rotar desde el centro
 
                     screenTextureRef.current = texture;
+                    // Mark this mesh as the screen for interaction checks
+                    child.userData.isScreen = true;
 
                     // Aplicar textura a la pantalla con MeshBasicMaterial (auto-iluminado)
                     child.material = new THREE.MeshBasicMaterial({
@@ -242,19 +254,73 @@ export default function Television({
         }
 
         // Aplicar transformaciones al modelo clonado
-        clonedModel.rotation.x = rotationX;
-        clonedModel.position.y = modelYOffset;
+        clone.rotation.x = rotationX;
+        clone.position.y = modelYOffset;
 
-        if (groupRef.current) {
+        return clone;
+    }, [model, modelPath, modelYOffset, rotationX, screenNames, uvRotation]); // Dependencies
+
+    // Effect to add the cloned model to the group
+    useEffect(() => {
+        if (groupRef.current && clonedModel) {
             groupRef.current.add(clonedModel);
         }
-
         return () => {
-            if (groupRef.current) {
-                groupRef.current.clear();
+            if (groupRef.current && clonedModel) {
+                groupRef.current.remove(clonedModel);
             }
+            screenMeshRef.current = null; // Clear ref to detached mesh
         };
-    }, [model, modelPath, screenNames, rotationX, uvRotation]);
+    }, [clonedModel]);
+
+
+    // Helper: Check if UV is hitting the button
+    const checkButtonHover = (uv: THREE.Vector2) => {
+        if (!showStartButton) return false;
+
+        // Canvas is 512x512
+        // UV is 0..1
+        // We need to match the drawing logic.
+        // Drawing:
+        // Center (256, 256)
+        // If invertY is true, context was rotated 180 (Math.PI).
+        // Button Y: 160 (relative to center).
+        // Button Size: 160x50.
+
+        // Map UV to Pixel Coordinates
+        // UV (0,0) is usually Top-Left (or Bottom-Left depending on GL).
+        // In ThreeJS UV (0,0) is Bottom-Left. (1,1) is Top-Right.
+        // Canvas (0,0) is Top-Left.
+
+        // Let's assume standard UV mapping for now.
+        // PixelX = uv.x * 512
+        // PixelY = (1 - uv.y) * 512 // Invert Y because Canvas Y is Down
+
+        let px = uv.x * 512;
+        let py = (1 - uv.y) * 512;
+
+        // Apply transformations relative to center (256, 256)
+        let dx = px - 256;
+        let dy = py - 256;
+
+        // If Inverted Y logic (from drawing):
+        // Context was rotated 180.
+        // Rotated 180 means: dx -> -dx, dy -> -dy.
+        // Button was drawn at (0, 160) in that rotated space.
+        // Or un-rotate the point.
+
+        if (invertY) {
+            dx = -dx; // Rotate 180
+            dy = -dy;
+        }
+
+        // Button Shape: Pixelated Circle Play Button
+        // Center(0, 160), Radius ~35px
+
+        // Distance check from button center (0, 160)
+        const dist = Math.sqrt(dx * dx + (dy - 160) * (dy - 160));
+        return dist < 40; // 40px radius for comfortable hit area
+    };
 
     // Actualizar canvas cada frame
     useFrame((state, delta) => {
@@ -581,10 +647,182 @@ export default function Television({
                 if (theme === 'sonar') glowColor = 'rgba(0, 255, 50, 0.15)'; // Glow Radioactivo suave
                 if (theme === 'mobile') glowColor = 'rgba(0, 100, 255, 0.2)'; // Glow Nokia Blue
 
-                glow.addColorStop(0, glowColor);
                 glow.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = glow;
                 ctx.fillRect(0, 0, w, h);
+
+                // --- 7. RETRO FOCUSED TEXT (CRUNCHY STATIC) ---
+                if (isFocused && focusedText) {
+                    ctx.save();
+
+                    // Center origin for rotation
+                    ctx.translate(w / 2, h / 2);
+
+                    // Rotate if inverted (Fix for Red TV upside down text)
+                    if (invertY) {
+                        ctx.rotate(Math.PI);
+                        ctx.scale(-1, 1); // Fix mirror effect
+                    }
+
+                    // Jitter / Shake effect (High frequency)
+                    const jitterX = (Math.random() - 0.5) * 4;
+                    const jitterY = (Math.random() - 0.5) * 4;
+
+                    ctx.font = '900 50px "Courier New", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+
+                    // Coordinates relative to center
+                    // Top of screen = -h/2
+                    const textY = -h / 2 + textYOffset;
+
+                    // Glitch Shadow (Red/Cyan Split hint)
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
+
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+                    ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
+
+                    // Main Text (White/Crunchy)
+                    ctx.fillStyle = '#ffffff';
+
+                    // Randomly "missing" scanlines in text/opacity drop
+                    if (Math.random() > 0.1) {
+                        ctx.fillText(focusedText, jitterX, textY + jitterY);
+                    }
+
+                    // --- START BUTTON (Pixel Art In-Screen) ---
+                    if (showStartButton) {
+                        // Position relative to center
+                        // User wanted "bottom center".
+                        // In internal canvas coords: 0,0 is center. +Y is DOWN (Canvas standard).
+                        // IF inverted: We already rotated the context 180 deg above.
+                        // So +Y is indeed "visually down" relative to the text.
+
+                        const btnY = 160; // 160px down from center
+                        const btnW = 140; // Smaller button (was 160)
+                        const btnH = 45; // Smaller button (was 50)
+                        const btnX = 0; // Center
+
+                        // Hover Detection
+                        // normalizedMouse is -1 to 1.
+                        // We need to map button area to normalized space.
+                        // Note: Context is rotated/scaled if inverted. 
+                        // But normalizedMouse is in SCREEN space (already compensated for UV rotation in calculation?).
+                        // Let's check calculation of normalizedMouse.
+                        // It uses `uvRotation` logic. It does NOT seemingly account for `invertY` of the MESH flipping UVs?
+                        // Line 317 handles `invertY` for gaze calculation.
+                        // So normalizedMouse should be correct relative to visual screen.
+
+                        // BUT we are drawing inside a transformed context (translated/rotated).
+                        // It's easier to transform mouse to local contact space? 
+                        // Actually, normalizedMouse is simpler: 0,0 is center.
+                        // Button center is (0, btnY) relative to canvas center (512x512).
+                        // Normalized positions:
+                        // Canvas is 512x512.
+                        // BtnY = 160 -> Normalized Y = 160 / 256 = 0.625.
+                        // BtnW = 220 -> Normalized Half Width = 110 / 256 = 0.43.
+                        // BtnH = 70 -> Normalized Half Height = 35 / 256 = 0.13.
+
+                        // MOUSE CHECK:
+                        // normalizedMouse.y is +1 UP (GL convention) usually? 
+                        // Line 343: normalizedMouse.y = Math.max(-1, Math.min(1, finalY));
+                        // finalY comes from `gazeY`. `gazeY` is `mouse.y - tvScreenPos.y`.
+                        // R3F `state.mouse.y` is +1 UP.
+                        // Canvas Y is +Down.
+                        // So Normalized Mouse Y needs inversion to match Canvas Y if we map directly.
+                        // BUT logical "Down" (Visual Bottom) is -1 in R3F mouse, +1 in Canvas?
+                        // Let's use a simpler heuristic: Distance check for hover to start.
+                        // Or Rect check.
+
+                        // We assume normalizedMouse matches the visual cursor.
+                        // Visual Button is at Bottom. So Mouse Y should be approx -0.6 (if 0 is center).
+                        // But wait, `isLCD` logic compensated gaze.
+
+                        // Hover is now handled by invisible mesh (see return statement)
+                        const isHover = startButtonHovered;
+
+                        // ANIMATED PLAY BUTTON
+                        // Transition: Small Dot (Idle) -> Full Play Button (Hover)
+
+                        // Animation State (Lerp)
+                        // Store animation value on the texture user data to persist across frames
+                        let hoverProgress = 0;
+                        if (screenTextureRef.current) {
+                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
+                            if (typeof screenTextureRef.current.userData.hoverAnim === 'undefined') screenTextureRef.current.userData.hoverAnim = 0;
+
+                            const target = isHover ? 1 : 0;
+                            // Smooth Lerp (0.1)
+                            screenTextureRef.current.userData.hoverAnim += (target - screenTextureRef.current.userData.hoverAnim) * 0.1;
+
+                            // Snap almost-zero to zero to avoid drawing tiny triangles
+                            if (Math.abs(screenTextureRef.current.userData.hoverAnim) < 0.001) screenTextureRef.current.userData.hoverAnim = 0;
+
+                            hoverProgress = screenTextureRef.current.userData.hoverAnim;
+                        }
+
+                        // 1. Draw Dot (Fading Out as it expands)
+                        // Radius 8 -> 15? Fade 1 -> 0
+                        if (hoverProgress < 1.0) {
+                            const circleAlpha = 1 - hoverProgress;
+                            const circleRadius = 8 + (10 * hoverProgress); // Expand to assist morph illusion
+
+                            ctx.globalAlpha = circleAlpha;
+                            ctx.fillStyle = '#ffffff';
+                            ctx.globalCompositeOperation = 'source-over';
+
+                            ctx.beginPath();
+                            ctx.arc(btnX, btnY, circleRadius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.globalAlpha = 1.0; // Reset
+                        }
+
+                        // 2. Draw White Triangle (Fading In / Growing)
+                        if (hoverProgress > 0.01) {
+                            const triAlpha = hoverProgress;
+                            const triScale = hoverProgress;
+
+                            ctx.globalAlpha = triAlpha;
+                            ctx.fillStyle = '#ffffff'; // White Triangle
+                            ctx.globalCompositeOperation = 'source-over';
+
+                            let btnJitterX = 0;
+                            let btnJitterY = 0;
+
+                            // Apply Jitter to triangle
+                            if (isHover || hoverProgress > 0.1) {
+                                btnJitterX = (Math.random() - 0.5) * 4 * hoverProgress;
+                                btnJitterY = (Math.random() - 0.5) * 4 * hoverProgress;
+                            }
+
+                            const drawTriangle = (offsetX: number, offsetY: number) => {
+                                const cx = btnX + offsetX;
+                                const cy = btnY + offsetY;
+                                const triSize = 25 * triScale; // Max size 25
+
+                                ctx.beginPath();
+                                ctx.moveTo(cx + triSize, cy);
+                                ctx.lineTo(cx - triSize / 1.2, cy + triSize);
+                                ctx.lineTo(cx - triSize / 1.2, cy - triSize);
+                                ctx.closePath();
+                                ctx.fill();
+                            }
+
+                            // Jittery Passes
+                            drawTriangle(btnJitterX, btnJitterY);
+                            drawTriangle(btnJitterX - 2, btnJitterY);
+                            drawTriangle(btnJitterX + 2, btnJitterY);
+
+                            ctx.globalAlpha = 1.0; // Reset
+                        }
+
+                        // Reset
+                        ctx.globalCompositeOperation = 'source-over';
+                    }
+
+                    ctx.restore();
+                }
             }
 
             screenTextureRef.current.needsUpdate = true;
@@ -595,7 +833,44 @@ export default function Television({
 
     return (
         <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
-            {/* Lights removed for performance */}
+            {clonedModel && (
+                <primitive
+                    object={clonedModel}
+                    onPointerMove={(e: any) => {
+                        // UV Raycasting Interaction
+                        if (e.object.userData.isScreen && e.uv) {
+                            e.stopPropagation();
+                            const isHit = checkButtonHover(e.uv);
+
+                            if (isHit) {
+                                if (!startButtonHovered) {
+                                    setStartButtonHovered(true);
+                                    document.body.style.cursor = 'pointer';
+                                }
+                            } else {
+                                if (startButtonHovered) {
+                                    setStartButtonHovered(false);
+                                    document.body.style.cursor = 'auto';
+                                }
+                            }
+                        }
+                    }}
+                    onPointerLeave={() => {
+                        if (startButtonHovered) {
+                            setStartButtonHovered(false);
+                            document.body.style.cursor = 'auto';
+                        }
+                    }}
+                    onClick={(e: any) => {
+                        if (e.object.userData.isScreen && e.uv) {
+                            if (checkButtonHover(e.uv)) {
+                                e.stopPropagation();
+                                if (onStartClick) onStartClick();
+                            }
+                        }
+                    }}
+                />
+            )}
         </group>
     );
 }
@@ -722,3 +997,23 @@ function drawPixelEllipse(
 
 useGLTF.preload('/models/LowPolyTV.glb');
 useGLTF.preload('/models/LCDTVFixed.glb');
+
+function drawPixelRoundedRect(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+) {
+    if (width < 2 * radius) radius = width / 2;
+    if (height < 2 * radius) radius = height / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + width, y, x + width, y + height, radius);
+    ctx.arcTo(x + width, y + height, x, y + height, radius);
+    ctx.arcTo(x, y + height, x, y, radius);
+    ctx.arcTo(x, y, x + width, y, radius);
+    ctx.closePath();
+    ctx.fill();
+}

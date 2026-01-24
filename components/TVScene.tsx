@@ -2,12 +2,14 @@
 
 import { useState, useEffect, Suspense, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useTexture } from '@react-three/drei';
+import { OrbitControls, useTexture, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { useGLTF } from '@react-three/drei';
 import Television from '@/components/Television';
+import { RetroTextPlane } from '@/components/RetroTextPlane';
 import { CRTOverlay } from '@/components/CRTOverlay';
+import { CameraRig } from '@/components/CameraRig';
 // @ts-ignore
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib';
 
@@ -15,10 +17,15 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 RectAreaLightUniformsLib.init();
 
 import { AdjustableModel } from '@/components/AdjustableModel';
+import { BackButton3D } from '@/components/BackButton3D';
+import { LuckyCat } from '@/components/LuckyCat';
+// Helper for interaction zone is baked now
 
 
 export default function TVScene() {
     const [cameraZ, setCameraZ] = useState(5);
+    const [viewState, setViewState] = useState<'default' | 'shelf_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus'>('default');
+    const [startHovered, setStartHovered] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -252,7 +259,20 @@ export default function TVScene() {
                         {/* redTV Abajo */}
                         <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv2Position.x, tv2Position.y, tv2Position.z]}>
                             <CuboidCollider args={colliders.void.size} position={colliders.void.offset} friction={0.3} restitution={0.1} />
-                            <Television modelPath="/models/redTV.glb" screenNames={['redTVScreen', 'screen']} theme="void" invertY={true} />
+                            <Television
+                                modelPath="/models/redTV.glb"
+                                screenNames={['redTVScreen', 'screen']}
+                                theme="void"
+                                invertY={true}
+                                focusedText="About Me"
+                                isFocused={viewState === 'tv_red_focus'}
+                                textYOffset={40} // AJUSTA AQUÍ LA POSICIÓN VERTICAL DEL TEXTO (Más pequeño = más arriba)
+                                showStartButton={true}
+                                onStartClick={() => {
+                                    // Handle click
+                                    console.log("Start Clicked");
+                                }}
+                            />
                         </RigidBody>
 
                         {/* COLUMNA 2 (CENTRO) */}
@@ -313,6 +333,24 @@ export default function TVScene() {
                             initialScale={book1Ctrl.scale}
                             initialColliderSize={book1Ctrl.size}
                             initialColliderOffset={book1Ctrl.offset}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (viewState === 'shelf_focus') {
+                                    console.log('Book 1 Clicked - Navigating to Red TV');
+                                    setViewState('tv_red_focus');
+                                }
+                            }}
+                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                            onPointerLeave={() => document.body.style.cursor = 'auto'}
+                            label="About me"
+                            labelConfig={{
+                                position: [-1.882, 0.96, 0.51],
+                                rotation: [0, -0.2, 0],
+                                fontSize: 0.1,
+                                lineHeight: 1.0,
+                                color: '#ffffff'
+                            }}
+                            isInteractive={viewState === 'shelf_focus'}
                         />
                         <AdjustableModel
                             modelPath="/models/b2.glb"
@@ -321,6 +359,24 @@ export default function TVScene() {
                             initialScale={book2Ctrl.scale}
                             initialColliderSize={book2Ctrl.size}
                             initialColliderOffset={book2Ctrl.offset}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (viewState === 'shelf_focus') {
+                                    console.log('Book 2 Clicked - Navigating to LCD TV');
+                                    setViewState('tv_lcd_focus');
+                                }
+                            }}
+                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                            onPointerLeave={() => document.body.style.cursor = 'auto'}
+                            label="My Works"
+                            labelConfig={{
+                                position: [-1.80, 1.05, 0.52],
+                                rotation: [0, -0.2, 0],
+                                fontSize: 0.12,
+                                lineHeight: 1.0,
+                                color: '#ffffff'
+                            }}
+                            isInteractive={viewState === 'shelf_focus'}
                         />
                         <AdjustableModel
                             modelPath="/models/b3.glb"
@@ -329,6 +385,24 @@ export default function TVScene() {
                             initialScale={book3Ctrl.scale}
                             initialColliderSize={book3Ctrl.size}
                             initialColliderOffset={book3Ctrl.offset}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (viewState === 'shelf_focus') {
+                                    console.log('Book 3 Clicked - Navigating to Dirty TV');
+                                    setViewState('tv_dirty_focus');
+                                }
+                            }}
+                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                            onPointerLeave={() => document.body.style.cursor = 'auto'}
+                            label="Vision"
+                            labelConfig={{
+                                position: [-1.65, 0.90, 0.53],
+                                rotation: [0, -0.2, 0],
+                                fontSize: 0.12,
+                                lineHeight: 1.0,
+                                color: '#ffffff'
+                            }}
+                            isInteractive={viewState === 'shelf_focus'}
                         />
                         <AdjustableModel
                             modelPath="/models/b4.glb"
@@ -337,6 +411,24 @@ export default function TVScene() {
                             initialScale={book4Ctrl.scale}
                             initialColliderSize={book4Ctrl.size}
                             initialColliderOffset={book4Ctrl.offset}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (viewState === 'shelf_focus') {
+                                    console.log('Book 4 Clicked - Navigating to Typical TV');
+                                    setViewState('tv_typical_focus');
+                                }
+                            }}
+                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                            onPointerLeave={() => document.body.style.cursor = 'auto'}
+                            label="Lifestyle"
+                            labelConfig={{
+                                position: [-1.49, 0.92, 0.53],
+                                rotation: [0, -0.2, 0],
+                                fontSize: 0.12,
+                                lineHeight: 1.0,
+                                color: '#ffffff'
+                            }}
+                            isInteractive={viewState === 'shelf_focus'}
                         />
                         <AdjustableModel
                             modelPath="/models/b5.glb"
@@ -345,6 +437,24 @@ export default function TVScene() {
                             initialScale={book5Ctrl.scale}
                             initialColliderSize={book5Ctrl.size}
                             initialColliderOffset={book5Ctrl.offset}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (viewState === 'shelf_focus') {
+                                    console.log('Book 5 Clicked - Navigating to LowPoly TV');
+                                    setViewState('tv_lowpoly_focus');
+                                }
+                            }}
+                            onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                            onPointerLeave={() => document.body.style.cursor = 'auto'}
+                            label="Extras"
+                            labelConfig={{
+                                position: [-1.35, 0.85, 0.51],
+                                rotation: [0, -0.2, 0],
+                                fontSize: 0.12,
+                                lineHeight: 1.0,
+                                color: '#ffffff'
+                            }}
+                            isInteractive={viewState === 'shelf_focus'}
                         />
 
                         {/* --- MOBILE (Baked Physics + Active Screen) --- */}
@@ -370,15 +480,21 @@ export default function TVScene() {
                             />
                         </RigidBody>
 
-                        {/* --- LUCKY CAT (Baked) --- */}
-                        <AdjustableModel
-                            modelPath="/models/luckyCat.glb"
-                            initialPos={luckyCatCtrl.pos}
-                            initialRot={luckyCatCtrl.rot}
-                            initialScale={luckyCatCtrl.scale}
-                            initialColliderSize={luckyCatCtrl.size}
-                            initialColliderOffset={luckyCatCtrl.offset}
-                        />
+                        {/* --- LUCKY CAT (Animated Waving Arm) --- */}
+                        <RigidBody
+                            colliders={false}
+                            position={luckyCatCtrl.pos}
+                            rotation={luckyCatCtrl.rot}
+                            enabledRotations={[true, true, true]}
+                        >
+                            <CuboidCollider
+                                args={luckyCatCtrl.size}
+                                position={luckyCatCtrl.offset}
+                                friction={0.5}
+                                restitution={0.1}
+                            />
+                            <LuckyCat scale={luckyCatCtrl.scale} />
+                        </RigidBody>
 
                         {/* --- RUBIKS GOLD (Baked) --- */}
                         <AdjustableModel
@@ -388,17 +504,35 @@ export default function TVScene() {
                             initialScale={rubiksGoldCtrl.scale}
                             initialColliderSize={rubiksGoldCtrl.size}
                             initialColliderOffset={rubiksGoldCtrl.offset}
+                            isInteractive={false}
                         />
 
                     </Physics>
                 </Suspense>
 
-                <OrbitControls
-                    enableDamping
-                    dampingFactor={0.05}
-                    minDistance={1.5}
-                    maxDistance={20}
-                    target={[-0.2, 1.2, 0]} // [X, Y, Z] -> Cambia el primer valor (0.5) para mover la cámara izquierda/derecha
+                <CameraRig viewState={viewState} />
+
+                {/* BAKED INTERACTION ZONE (Invisible Clickable Area) */}
+                {viewState === 'default' && (
+                    <mesh
+                        position={[-1.3, -0.8, 0.95]}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            document.body.style.cursor = 'auto';
+                            setViewState('shelf_focus');
+                        }}
+                        onPointerEnter={() => document.body.style.cursor = 'pointer'}
+                        onPointerLeave={() => document.body.style.cursor = 'auto'}
+                    >
+                        <boxGeometry args={[1.20, 1.30, 0.15]} />
+                        <meshBasicMaterial transparent opacity={0} />
+                    </mesh>
+                )}
+
+                {/* UI OVERLAY (Now 3D Text in Scene) */}
+                <BackButton3D
+                    onClick={() => setViewState('default')}
+                    visible={viewState === 'shelf_focus'}
                 />
 
                 <CRTOverlay />
