@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF, Text } from '@react-three/drei';
-import { RetroTextPlane } from './RetroTextPlane';
+import { RetroTextPlane } from '@/components/UI/RetroTextPlane';
 import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
 

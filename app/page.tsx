@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 
-const TVScene = dynamic(() => import('@/components/TVScene'), {
+const TVScene = dynamic(() => import('@/components/Scene/TVScene'), {
     ssr: false,
     loading: () => (
         <div style={{

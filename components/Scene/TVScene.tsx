@@ -5,18 +5,18 @@ import * as THREE from 'three';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { useGLTF } from '@react-three/drei';
 import Television from '@/components/Television';
-import { RetroTextPlane } from '@/components/RetroTextPlane';
-import { CRTOverlay } from '@/components/CRTOverlay';
-import { CameraRig } from '@/components/CameraRig';
+import { RetroTextPlane } from '@/components/UI/RetroTextPlane';
+import { CRTOverlay } from '@/components/Effects/CRTOverlay';
+import { CameraRig } from '@/components/Scene/CameraRig';
 // @ts-ignore
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib';
 
 // Inicializar luces de área
 RectAreaLightUniformsLib.init();
 
-import { AdjustableModel } from '@/components/AdjustableModel';
-import { BackButton3D } from '@/components/BackButton3D';
-import { LuckyCat } from '@/components/LuckyCat';
+import { AdjustableModel } from '@/components/Debug/AdjustableModel';
+import { BackButton3D } from '@/components/Props/BackButton3D';
+import { LuckyCat } from '@/components/Props/LuckyCat';
 // Helper for interaction zone is baked now
 
 // PRELOAD ASSETS (Optimization)
@@ -37,6 +37,9 @@ export default function TVScene() {
     const [cameraZ, setCameraZ] = useState(5);
     const [viewState, setViewState] = useState<'default' | 'shelf_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus'>('default');
     const [startHovered, setStartHovered] = useState(false);
+
+    // Interaction Lock (Zoom Animation)
+    const [isCameraSettled, setCameraSettled] = useState(true);
 
     // PERFORMANCE OPTIMIZATION
     const [dpr, setDpr] = useState(1.0); // Start at 1.0 (Safe default)
@@ -62,6 +65,15 @@ export default function TVScene() {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    const handleShelfZoom = (e: any) => {
+        e.stopPropagation();
+        document.body.style.cursor = 'auto';
+        setViewState('shelf_focus');
+        setCameraSettled(false);
+        // Lock interaction during zoom (approx 1.5s for lerp to settle)
+        setTimeout(() => setCameraSettled(true), 1500);
+    };
 
     // --- CONFIGURACIÓN DE COLLIDERS (HARDCODED) ---
     const colliders = {
@@ -302,6 +314,13 @@ export default function TVScene() {
                                     onBackClick={() => setViewState('default')}
                                     showMenuButton={true}
                                     onMenuClick={() => setViewState('shelf_focus')}
+                                    enableStoryMode={true}
+                                    storyContent={[
+                                        "Hi! My name is Alex, and I am a web programmer passionate about building modern digital experiences. I enjoy working with cutting-edge tools and frameworks that allow me to bring creative ideas to life.",
+                                        "I use technologies like Three.js for interactive 3D graphics and Next.js for powerful, scalable web applications. These tools help me create projects that feel dynamic, innovative, and future-ready.",
+                                        "As a full stack developer, I work across both frontend and backend, making sure every part of a project connects smoothly. My goal is always to deliver clean, efficient, and modern solutions that stand out."
+                                    ]}
+                                    storyFigures={['circles', 'cube', 'dna']}
                                 />
                             </RigidBody>
 
@@ -437,7 +456,7 @@ export default function TVScene() {
                                     lineHeight: 1.0,
                                     color: '#ffffff'
                                 }}
-                                isInteractive={viewState === 'shelf_focus'}
+                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             />
                             <AdjustableModel
                                 modelPath="/models/b2.glb"
@@ -463,7 +482,7 @@ export default function TVScene() {
                                     lineHeight: 1.0,
                                     color: '#ffffff'
                                 }}
-                                isInteractive={viewState === 'shelf_focus'}
+                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             />
                             <AdjustableModel
                                 modelPath="/models/b3.glb"
@@ -489,7 +508,7 @@ export default function TVScene() {
                                     lineHeight: 1.0,
                                     color: '#ffffff'
                                 }}
-                                isInteractive={viewState === 'shelf_focus'}
+                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             />
                             <AdjustableModel
                                 modelPath="/models/b4.glb"
@@ -515,7 +534,7 @@ export default function TVScene() {
                                     lineHeight: 1.0,
                                     color: '#ffffff'
                                 }}
-                                isInteractive={viewState === 'shelf_focus'}
+                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             />
                             <AdjustableModel
                                 modelPath="/models/b5.glb"
@@ -541,7 +560,7 @@ export default function TVScene() {
                                     lineHeight: 1.0,
                                     color: '#ffffff'
                                 }}
-                                isInteractive={viewState === 'shelf_focus'}
+                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             />
 
                             {/* --- MOBILE (Baked Physics + Active Screen) --- */}
@@ -603,11 +622,7 @@ export default function TVScene() {
                     {viewState === 'default' && (
                         <mesh
                             position={[-1.3, -0.8, 0.95]}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                document.body.style.cursor = 'auto';
-                                setViewState('shelf_focus');
-                            }}
+                            onClick={handleShelfZoom}
                             onPointerEnter={() => document.body.style.cursor = 'pointer'}
                             onPointerLeave={() => document.body.style.cursor = 'auto'}
                         >

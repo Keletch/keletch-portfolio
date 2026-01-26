@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { RetroTextPlane } from './RetroTextPlane';
+import { RetroTextPlane } from '@/components/UI/RetroTextPlane';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
