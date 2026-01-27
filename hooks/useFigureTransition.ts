@@ -57,6 +57,7 @@ export function useFigureTransition(targetFigure: string | null) {
 
     return {
         renderedFigure,
+        linearOpacity: opacityRef,
         transitionOpacity: effectiveOpacityRef,
         isTransitioning: opacityRef.current < 1.0
     };

@@ -148,7 +148,8 @@ export function drawButtonShockwave(
     x: number,
     y: number,
     hoverProgress: number,
-    time: number
+    time: number,
+    color: string = '#ffffff'
 ) {
     const fps = 8;
     const steppedTime = Math.floor(time * fps) / fps;
@@ -161,119 +162,26 @@ export function drawButtonShockwave(
     const rippleAlpha = Math.max(0, 1.0 - waveProgress) * interactionAlpha;
 
     if (rippleAlpha > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = rippleAlpha;
         ctx.beginPath();
         ctx.arc(x, y, rippleRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 255, 255, ${rippleAlpha})`;
+        ctx.strokeStyle = color;
         ctx.lineWidth = 2;
         ctx.stroke();
+        ctx.restore();
     }
 }
 
-export function drawPlayButton(
-    ctx: CanvasRenderingContext2D,
-    btnX: number,
-    btnY: number,
-    hoverProgress: number
-) {
-    const p = hoverProgress;
-    const r = 8 + (5 * p);
 
-    ctx.globalAlpha = 0.8;
-
-    const startK = 0.77;
-    const endK = 0.25;
-    const k = startK * (1 - p) + endK * p;
-
-    let jx = 0;
-    let jy = 0;
-    if (p > 0.8) {
-        jx = (Math.random() - 0.5) * 3 * p;
-        jy = (Math.random() - 0.5) * 3 * p;
-    }
-    const cx = btnX + jx;
-    const cy = btnY + jy;
-
-    const v0 = { x: r, y: 0 };
-    const v1 = { x: -0.5 * r, y: -0.866 * r };
-    const v2 = { x: -0.5 * r, y: 0.866 * r };
-
-    const t0 = { x: 0, y: -r * k };
-    const t1 = { x: -0.866 * r * k, y: 0.5 * r * k };
-    const t2 = { x: 0.866 * r * k, y: 0.5 * r * k };
-
-    ctx.fillStyle = '#ffffff';
-    ctx.globalCompositeOperation = 'source-over';
-
-    ctx.beginPath();
-    ctx.moveTo(cx + v0.x, cy + v0.y);
-
-    ctx.bezierCurveTo(
-        cx + v0.x + t0.x, cy + v0.y + t0.y,
-        cx + v1.x - t1.x, cy + v1.y - t1.y,
-        cx + v1.x, cy + v1.y
-    );
-
-    ctx.bezierCurveTo(
-        cx + v1.x + t1.x, cy + v1.y + t1.y,
-        cx + v2.x - t2.x, cy + v2.y - t2.y,
-        cx + v2.x, cy + v2.y
-    );
-
-    ctx.bezierCurveTo(
-        cx + v2.x + t2.x, cy + v2.y + t2.y,
-        cx + v0.x - t0.x, cy + v0.y - t0.y,
-        cx + v0.x, cy + v0.y
-    );
-
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-}
-
-export function drawStopButton(
-    ctx: CanvasRenderingContext2D,
-    btnX: number,
-    btnY: number,
-    hoverProgress: number
-) {
-    const p = hoverProgress;
-    const baseSize = 16;
-    const size = baseSize + (p * 5);
-
-    ctx.globalAlpha = 0.8;
-
-    let jx = 0;
-    let jy = 0;
-    if (p > 0.8) {
-        jx = (Math.random() - 0.5) * 3 * p;
-        jy = (Math.random() - 0.5) * 3 * p;
-    }
-    const cx = btnX + jx;
-    const cy = btnY + jy;
-
-    const cornerRadius = 4;
-
-    ctx.fillStyle = '#ffffff';
-    ctx.globalCompositeOperation = 'source-over';
-
-    ctx.beginPath();
-    ctx.moveTo(cx - size / 2 + cornerRadius, cy - size / 2);
-    ctx.arcTo(cx + size / 2, cy - size / 2, cx + size / 2, cy + size / 2, cornerRadius);
-    ctx.arcTo(cx + size / 2, cy + size / 2, cx - size / 2, cy + size / 2, cornerRadius);
-    ctx.arcTo(cx - size / 2, cy + size / 2, cx - size / 2, cy - size / 2, cornerRadius);
-    ctx.arcTo(cx - size / 2, cy - size / 2, cx + size / 2, cy - size / 2, cornerRadius);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.globalAlpha = 1.0;
-}
 
 export function drawPlayStopButton(
     ctx: CanvasRenderingContext2D,
     btnX: number,
     btnY: number,
     hoverProgress: number,
-    morphProgress: number
+    morphProgress: number,
+    color: string = '#ffffff'
 ) {
     const p = hoverProgress;
     const m = morphProgress; // 0 = triangle, 1 = rounded square
@@ -334,7 +242,7 @@ export function drawPlayStopButton(
     // Corner radius for square (only applies when m > 0)
     const cornerRadius = 4 * m;
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = color;
     ctx.globalCompositeOperation = 'source-over';
 
     ctx.beginPath();
@@ -379,7 +287,8 @@ export function drawBackButton(
     ctx: CanvasRenderingContext2D,
     btnX: number,
     btnY: number,
-    hoverProgress: number
+    hoverProgress: number,
+    color: string = '#ffffff'
 ) {
     const pBack = hoverProgress;
 
@@ -410,7 +319,7 @@ export function drawBackButton(
     const cxBack = btnX + jxBack;
     const cyBack = btnY + jyBack;
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = color;
 
     const rotationAngleBack1 = -0.5;
     ctx.save();
@@ -438,11 +347,14 @@ export function drawBackButton(
     ctx.globalAlpha = 1.0;
 }
 
+
+
 export function drawMenuButton(
     ctx: CanvasRenderingContext2D,
     btnX: number,
     btnY: number,
-    hoverProgress: number
+    hoverProgress: number,
+    color: string = '#ffffff'
 ) {
     const pMenu = hoverProgress;
 
@@ -474,7 +386,7 @@ export function drawMenuButton(
     const cxMenu = btnX + jxMenu;
     const cyMenu = btnY + jyMenu;
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = color;
 
     if (phase2Progress > 0) {
         const barSpacing = 6 * phase2Progress;
@@ -699,57 +611,3 @@ export function drawDNAHelix(
     ctx.restore();
 }
 
-export function paginateStory(
-    content: string[] | undefined,
-    maxWidth: number,
-    maxLines: number,
-    font: string
-): { pages: string[], paragraphMap: number[] } {
-    if (!content || typeof document === 'undefined') {
-        return { pages: content || [], paragraphMap: [] };
-    }
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return { pages: content, paragraphMap: content.map((_, i) => i) };
-
-    ctx.font = font;
-
-    const pages: string[] = [];
-    const paragraphMap: number[] = [];
-
-    content.forEach((paragraph, paragraphIndex) => {
-        const words = paragraph.split(' ');
-        let currentLine = '';
-        let currentHeightLines = 1;
-        let currentPageText = '';
-
-        words.forEach((word) => {
-            const testLine = currentLine + word + ' ';
-            const metrics = ctx.measureText(testLine);
-
-            if (metrics.width > maxWidth) {
-                if (currentHeightLines < maxLines) {
-                    currentPageText += currentLine;
-                    currentLine = word + ' ';
-                    currentHeightLines++;
-                } else {
-                    pages.push(currentPageText + currentLine.trim());
-                    paragraphMap.push(paragraphIndex);
-                    currentPageText = '';
-                    currentLine = word + ' ';
-                    currentHeightLines = 1;
-                }
-            } else {
-                currentLine = testLine;
-            }
-        });
-
-        if (currentPageText || currentLine) {
-            pages.push(currentPageText + currentLine.trim());
-            paragraphMap.push(paragraphIndex);
-        }
-    });
-
-    return { pages, paragraphMap };
-}

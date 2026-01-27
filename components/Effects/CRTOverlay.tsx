@@ -273,65 +273,9 @@ export function CRTOverlay() {
 
         // C. Render the Screen Quad to the actual Canvas
         gl.setRenderTarget(null);
-        // We only render our special screen scene here
-        // We need to disable auto-clearing if R3F was handling it, but R3F clears before useFrame usually.
-        // But since we rendered to FBO first, 'null' target is legally cleanish for us to draw on top or clear.
-
-        // Actually, R3F's useFrame runs BEFORE render by default regarding state updates? 
-        // No, R3F renders AUTOMATICALLY unless we take over.
-        // Taking over:
-        // We can't easily cancel R3F's default render from inside a component without `useFrame(({gl, scene, camera}) => { gl.render(...) }, 1)` (priority 1).
-        // Let's use priority 1 to OVERRIDE default render.
     }, 1);
 
-    // We need to render the quad using a portal or just managing it manually.
-    // The "priority 1" frame loop will confusingly coexist with R3F's default render if we don't return null and disable default render.
-    // BUT, a cleaner way in R3F v8:
-    // Simply render the screen quad MANUALLY in the priority 1 loop to the NULL target.
-    // AND we must ensure R3F doesn't render the main scene to the screen again.
-
-    // TRICK: Put this component inside the Canvas.
-    // AND detach the main scene from R3F's auto-render?
-    // Actually, R3F allows `gl.autoRender = false` but that's global.
-
-    // SIMPLER METHOD: "HUD" approach.
-    // We already rendered Scene -> FBO.
-    // Now we must render FBO -> Screen.
-    // Since we are inside `useFrame(..., 1)`, we are effectively the last step.
-    // If we just draw a fullscreen quad here using `gl.render(screenScene, orthoCamera)`, it will paint over whatever R3F painted.
-    // Since R3F painted the scene to the screen *already* (priority 0 loop), we would be double rendering.
-
-    // SOLUTION:
-    // In `useFrame(..., 1)`, we do:
-    // 1. CLEAR the screen (optional, if we draw full opaque).
-    // 2. Draw our quad.
-    // WAIT. If R3F draws priority 0, it draws the scene to the default buffer.
-    // We want the scene in our FBO, NOT on the screen yet.
-    // So we need to PREVENT R3F from drawing priority 0 to the screen.
-    // We can't easily.
-
-    // ALTERNATIVE: Use `createPortal` to render the main scene logic? No.
-    // STANDARD SOLUTION without postprocessing-lib:
-    // Just let R3F draw to FBO?
-    // How? `useFrame` logic:
-    // gl.setRenderTarget(renderTarget);
-    // gl.render(scene, camera);
-    // gl.setRenderTarget(null);
-    // gl.render(screenScene, screenCamera);
-    // return null;
-
-    // BUT we need `gl.autoClear = false` or similar? 
-    // Wait, if we use `useFrame(..., 1)`, R3F has *already* called its internal render?
-    // No, R3F's render loop is just a subscriber to the ticker.
-    // Actually R3F's default render has a priority.
-
-    // Let's blindly implement the "render override" pattern:
-    // We update the frame loop to take control.
     useEffect(() => {
-        // Disable R3F auto-render
-        // But we can't easily access the internal loop controller.
-        // Actually we can just do:
-        // gl.autoClear = false;
     }, [gl]);
 
     // ORTHOGRAPHIC CAMERA FOR QUAD

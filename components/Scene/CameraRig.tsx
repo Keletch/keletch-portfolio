@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useRef } from 'react';
 
 interface CameraRigProps {
-    viewState: 'default' | 'shelf_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus';
+    viewState: 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus';
 }
 
 export function CameraRig({ viewState }: CameraRigProps) {
@@ -42,6 +42,10 @@ export function CameraRig({ viewState }: CameraRigProps) {
     const lowPolyTVPos = new THREE.Vector3(1.6, 0.8, 3.2);
     const lowPolyTVLookAt = new THREE.Vector3(1.6, 0.55, 0);
 
+    // Radio Focus (Finalized)
+    const radioPos = new THREE.Vector3(1.40, -0.60, 1.30);
+    const radioLookAt = new THREE.Vector3(1.48, -0.70, 0.00);
+
 
     // State for smoothed LookAt
     const currentLookAt = useRef(defaultLookAt.clone());
@@ -69,6 +73,9 @@ export function CameraRig({ viewState }: CameraRigProps) {
         } else if (viewState === 'tv_lowpoly_focus') {
             targetPos = lowPolyTVPos;
             targetLookAt = lowPolyTVLookAt;
+        } else if (viewState === 'radio_focus') {
+            targetPos = radioPos;
+            targetLookAt = radioLookAt;
         } else {
             // Default Mode: Add Scale Parallax based on mouse pointer
             // Pointer x/y are normalized (-1 to 1)

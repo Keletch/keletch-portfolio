@@ -59,11 +59,13 @@ export function AdjustableModel({
         if (!isInteractive) return;
         e.stopPropagation();
         setHovered(true);
+        document.body.style.cursor = 'pointer';
         if (onPointerEnter) onPointerEnter(e);
     };
 
     const handlePointerLeave = (e: any) => {
         setHovered(false);
+        document.body.style.cursor = 'auto';
         if (onPointerLeave) onPointerLeave(e);
     };
 

@@ -6,7 +6,7 @@ export interface TelevisionProps {
     rotation?: [number, number, number];
     scale?: number;
     rotationX?: number;
-    theme?: 'classic' | 'toxic' | 'blood' | 'void' | 'sulfur' | 'toon' | 'sonar' | 'mobile'; // 'mobile' is Nokia Blue
+    theme?: 'classic' | 'toxic' | 'blood' | 'sulfur' | 'toon' | 'mobile'; // 'mobile' is Nokia Blue
     invertY?: boolean; // Invertir eje Y si el modelo tiene UVs invertidas
     gazeOffset?: { x: number; y: number }; // Offset manual para calibración
     uvRotation?: number; // Rotación de la textura en radianes (ej: Math.PI/4 para 45°)
@@ -15,15 +15,14 @@ export interface TelevisionProps {
     isFocused?: boolean;
     textYOffset?: number;
     showStartButton?: boolean;
+    startButtonPosition?: { x: number, y: number };
     onStartClick?: () => void;
     showBackButton?: boolean;
+    backButtonPosition?: { x: number, y: number };
     onBackClick?: () => void;
     showMenuButton?: boolean;
+    menuButtonPosition?: { x: number, y: number };
     onMenuClick?: () => void;
-    // Story Mode
-    storyContent?: string[]; // Array of dialogue paragraphs
-    storyFigures?: string[]; // Array of figure types (e.g., 'waving-hand', 'computer')
-    enableStoryMode?: boolean; // Enable story mode on Play button click
 }
 
 export const THEMES = {
@@ -60,17 +59,6 @@ export const THEMES = {
         lookRange: 26,
         scleraColor: '#ffffff'
     },
-    void: {
-        bgColor: '#150020',
-        baseColor: 'rgba(30, 0, 40, 0.3)', // Added missing baseColor for void
-        glowCenter: 'rgba(100, 0, 255, 0.1)',
-        irisColor: '#9900ff',
-        lightColor: '#a000ff',
-        lightIntensity: 7.0,
-        vignetteColor: 'rgba(10, 0, 20, 0.95)',
-        lookRange: 26,
-        scleraColor: '#ffffff'
-    },
     sulfur: {
         bgColor: '#1a1a00',
         baseColor: 'rgba(60, 60, 0, 0.3)',
@@ -93,17 +81,6 @@ export const THEMES = {
         lookRange: 26,
         scleraColor: '#ffffff'
     },
-    sonar: {
-        bgColor: '#001a05',
-        baseColor: 'rgba(0, 60, 10, 0.3)',
-        glowCenter: 'rgba(0, 255, 50, 0.15)',
-        irisColor: '#00ff44',
-        lightColor: '#00ff33',
-        lightIntensity: 7.0,
-        vignetteColor: 'rgba(0, 20, 0, 0.95)',
-        lookRange: 15,
-        scleraColor: 'rgba(0, 255, 50, 0.4)'
-    },
     mobile: {
         bgColor: '#00051a', // Dark Blue
         baseColor: 'rgba(0, 20, 60, 0.3)', // Deep Blue Base
@@ -117,9 +94,5 @@ export const THEMES = {
     }
 };
 
-export const BUTTON_CONFIG = {
-    PLAY: { x: -200, y: 190, radius: 40, width: 140, height: 45 },
-    BACK: { x: 200, y: 190, radius: 40 },
-    MENU: { x: 0, y: 190, radius: 40 }
-};
+
 

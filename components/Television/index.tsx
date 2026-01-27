@@ -1,16 +1,24 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { TelevisionProps, THEMES, BUTTON_CONFIG } from './Types';
-import { drawPixelEye, drawConcentricCircles, draw3DCube, drawDNAHelix, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave, paginateStory } from './Helpers';
-import { useTypewriter } from '@/hooks/useTypewriter';
+import { useGLTF } from '@react-three/drei';
+import { TelevisionProps, THEMES } from './Types';
+import { drawPixelEye, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave } from './Helpers';
+
+const BUTTON_CONFIG = {
+    PLAY: { x: -200, y: 190, radius: 40, width: 140, height: 45 },
+    BACK: { x: 200, y: 190, radius: 40 },
+    MENU: { x: 0, y: 190, radius: 40 }
+};
+
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
-import { useGLTF } from '@react-three/drei';
+
+const DEFAULT_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'monitor', 'glass', 'vidrio', 'cristal', 'tube', 'lcdscreen', 'lcd_screen', 'redtvscreen', 'dirtytvscreen', 'tipicaltvscreen', 'toontvscreen', 'toontv_screen'];
 
 export default function Television({
     modelPath,
-    screenNames = ['screen', 'pantalla', 'display', 'monitor', 'glass', 'vidrio', 'cristal', 'tube', 'lcdscreen', 'lcd_screen', 'redtvscreen', 'dirtytvscreen', 'tipicaltvscreen', 'toontvscreen', 'toontv_screen'],
+    screenNames = DEFAULT_SCREEN_NAMES,
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
@@ -24,60 +32,41 @@ export default function Television({
     isFocused = false,
     textYOffset = 60,
     showStartButton = false,
+    startButtonPosition,
     onStartClick,
     showBackButton = false,
     onBackClick,
+    backButtonPosition,
     showMenuButton = false,
-    onMenuClick,
-    storyContent,
-    storyFigures,
-    enableStoryMode = false
+    menuButtonPosition,
+    onMenuClick
 }: TelevisionProps) {
     const groupRef = useRef<THREE.Group>(null);
-    const { size } = useThree();
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });
     const [startButtonHovered, setStartButtonHovered] = useState(false);
     const [backButtonHovered, setBackButtonHovered] = useState(false);
     const [menuButtonHovered, setMenuButtonHovered] = useState(false);
 
-    const paginationResult = useMemo(() => {
-        if (!enableStoryMode || !storyContent) {
-            return { pages: [], paragraphMap: [] };
+    // Reset hover states and cursor when losing focus to prevent stuck visuals on re-entry
+    useEffect(() => {
+        if (!isFocused) {
+            setStartButtonHovered(false);
+            setBackButtonHovered(false);
+            setMenuButtonHovered(false);
+            document.body.style.cursor = 'auto'; // Reset global cursor
         }
-        return paginateStory(
-            storyContent,
-            380,
-            2,
-            '20px "Courier New", monospace'
-        );
-    }, [storyContent, enableStoryMode]);
+    }, [isFocused]);
 
-    const {
-        storyMode,
-        displayedText,
-        waitingForInput,
-        currentParagraph,
-        startStory,
-        stopStory,
-        handleInteraction
-    } = useTypewriter({
-        storyContent: paginationResult.pages,
-        enableStoryMode
-    });
-
-    const actualParagraphIndex = paginationResult.paragraphMap[currentParagraph] ?? 0;
-    const currentFigureProp = (storyMode && storyFigures && storyFigures[actualParagraphIndex]) ? storyFigures[actualParagraphIndex] : null;
-
+    // Generic Figure Transition (Always null for generic TV essentially, unless updated later)
+    // We keep it to support basic transitions if we add generic figures back, or for eyes if we wanted to transition eyes (but eyes are currently background)
+    // But currently currentFigureProp is effectively null.
+    // For now, we can remove useFigureTransition if we only draw Eyes directly.
+    // But let's keep it minimal if we decide to add "Channel Changing" static later.
     const {
         renderedFigure,
         transitionOpacity: transitionOpacityRef
-    } = useFigureTransition(currentFigureProp);
-
-    const {
-        renderedFigure: renderedStoryFigure,
-        transitionOpacity: storyOpacityRef
-    } = useFigureTransition(storyMode ? 'story' : null);
+    } = useFigureTransition(null);
 
     const {
         clonedModel,
@@ -104,18 +93,9 @@ export default function Television({
 
     const activeTheme = THEMES[theme] || THEMES.classic;
 
-    useEffect(() => {
-        if (groupRef.current && clonedModel) {
-            groupRef.current.add(clonedModel);
-        }
-        return () => {
-            if (groupRef.current && clonedModel) {
-                groupRef.current.remove(clonedModel);
-            }
-        };
-    }, [clonedModel]);
+    const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | null => {
+        if (!isFocused) return null;
 
-    const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | 'story_text' | null => {
         let px = uv.x * 512;
         let py = (1 - uv.y) * 512;
 
@@ -127,32 +107,24 @@ export default function Television({
         }
 
         if (showStartButton) {
-            const distPlay = Math.sqrt((dx - BUTTON_CONFIG.PLAY.x) * (dx - BUTTON_CONFIG.PLAY.x) + (dy - BUTTON_CONFIG.PLAY.y) * (dy - BUTTON_CONFIG.PLAY.y));
+            const btnX = startButtonPosition ? startButtonPosition.x : BUTTON_CONFIG.PLAY.x;
+            const btnY = startButtonPosition ? startButtonPosition.y : BUTTON_CONFIG.PLAY.y;
+            const distPlay = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
             if (distPlay < BUTTON_CONFIG.PLAY.radius) return 'play';
         }
 
         if (showBackButton) {
-            const distBack = Math.sqrt((dx - BUTTON_CONFIG.BACK.x) * (dx - BUTTON_CONFIG.BACK.x) + (dy - BUTTON_CONFIG.BACK.y) * (dy - BUTTON_CONFIG.BACK.y));
+            const btnX = backButtonPosition ? backButtonPosition.x : BUTTON_CONFIG.BACK.x;
+            const btnY = backButtonPosition ? backButtonPosition.y : BUTTON_CONFIG.BACK.y;
+            const distBack = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
             if (distBack < BUTTON_CONFIG.BACK.radius) return 'back';
         }
 
         if (showMenuButton) {
-            const distMenu = Math.sqrt((dx - BUTTON_CONFIG.MENU.x) * (dx - BUTTON_CONFIG.MENU.x) + (dy - BUTTON_CONFIG.MENU.y) * (dy - BUTTON_CONFIG.MENU.y));
+            const btnX = menuButtonPosition ? menuButtonPosition.x : BUTTON_CONFIG.MENU.x;
+            const btnY = menuButtonPosition ? menuButtonPosition.y : BUTTON_CONFIG.MENU.y;
+            const distMenu = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
             if (distMenu < BUTTON_CONFIG.MENU.radius) return 'menu';
-        }
-
-        if (storyMode) {
-            const boxW = 410;
-            const boxH = 86;
-            const boxTopY = 55;
-
-            const halfW = boxW / 2;
-
-            if (dx >= -halfW && dx <= halfW) {
-                if (dy >= boxTopY && dy <= boxTopY + boxH) {
-                    return 'story_text';
-                }
-            }
         }
 
         return null;
@@ -265,7 +237,6 @@ export default function Television({
             if (ctx) {
                 const w = canvas.width;
                 const h = canvas.height;
-                const time = state.clock.elapsedTime;
 
                 ctx.fillStyle = activeTheme.bgColor;
                 ctx.fillRect(0, 0, w, h);
@@ -280,75 +251,55 @@ export default function Television({
                 ctx.fillRect(0, 0, w, h);
 
 
-                const drawContent = (type: string | null, alpha: number) => {
+                const drawContent = () => {
                     ctx.save();
-                    ctx.globalAlpha = alpha;
 
-                    if (type === 'circles') {
-                        ctx.translate(w / 2, h / 2);
-                        drawConcentricCircles(ctx, time);
-                    } else if (type === 'cube') {
-                        ctx.translate(w / 2, h / 2);
-                        draw3DCube(ctx, time);
-                    } else if (type === 'dna') {
-                        ctx.translate(w / 2, h / 2);
-                        drawDNAHelix(ctx, time);
-                    } else {
-                        const isLCD = theme === 'toxic';
-                        const scleraMaxOffsetX = isLCD ? 150 : 100;
-                        const scleraMaxOffsetY = 100;
+                    const isLCD = theme === 'toxic';
+                    const scleraMaxOffsetX = isLCD ? 150 : 100;
+                    const scleraMaxOffsetY = 100;
 
-                        const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
-                        const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
+                    const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
+                    const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
 
-                        ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
+                    ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
 
-                        let scaleEye = 1.0;
-                        if (theme === 'sonar') scaleEye = 0.6;
-                        if (theme === 'mobile') scaleEye = 0.6;
+                    let scaleEye = 1.0;
+                    if (theme === 'mobile') scaleEye = 0.6;
 
-                        let geoCorrectionX = 1.0;
-                        if (theme === 'toxic' && screenAspect.current > 1.2) {
-                            geoCorrectionX = 1 / (screenAspect.current * 0.85);
-                        }
-
-                        ctx.scale(geoCorrectionX * scaleEye, blink.openness * scaleEye);
-
-                        let irisColor = '#5090ff';
-                        if (theme === 'toxic') irisColor = '#00bb33';
-                        if (theme === 'blood') irisColor = '#cc0000';
-                        if (theme === 'void') irisColor = '#9900ff';
-                        if (theme === 'sulfur') irisColor = '#d4c264';
-                        if (theme === 'toon') irisColor = '#dcdcdc';
-                        if (theme === 'sonar') irisColor = '#00ff44';
-                        if (theme === 'mobile') irisColor = '#0088ff';
-
-                        const customLookRange = storyMode ? 8 :
-                            (theme === 'toxic') ? 32
-                                : (theme === 'sonar' || theme === 'mobile') ? 15
-                                    : 26;
-                        const isHologram = theme === 'sonar' || theme === 'mobile';
-                        const scleraColor = (theme === 'sonar' || theme === 'mobile') ? activeTheme.scleraColor : '#ffffff';
-
-                        drawPixelEye(
-                            ctx,
-                            normalizedMouse.current,
-                            irisColor,
-                            customLookRange,
-                            scleraColor,
-                            isHologram
-                        );
+                    let geoCorrectionX = 1.0;
+                    if (theme === 'toxic' && screenAspect.current > 1.2) {
+                        geoCorrectionX = 1 / (screenAspect.current * 0.85);
                     }
+
+                    ctx.scale(geoCorrectionX * scaleEye, blink.openness * scaleEye);
+
+                    let irisColor = '#5090ff';
+                    if (theme === 'toxic') irisColor = '#00bb33';
+                    if (theme === 'blood') irisColor = '#cc0000';
+                    if (theme === 'sulfur') irisColor = '#d4c264';
+                    if (theme === 'toon') irisColor = '#dcdcdc';
+                    if (theme === 'mobile') irisColor = '#0088ff';
+
+                    // Generic lookup range
+                    const customLookRange = (theme === 'toxic') ? 32
+                        : (theme === 'mobile') ? 15
+                            : 26;
+                    const isHologram = theme === 'mobile';
+                    const scleraColor = (theme === 'mobile') ? activeTheme.scleraColor : '#ffffff';
+
+                    drawPixelEye(
+                        ctx,
+                        normalizedMouse.current,
+                        irisColor,
+                        customLookRange,
+                        scleraColor,
+                        isHologram
+                    );
+
                     ctx.restore();
                 };
 
-                const steps = 5;
-                const transitionOpacity = transitionOpacityRef.current;
-                const steppedOpacity = Math.floor(transitionOpacity * steps) / steps;
-
-                if (steppedOpacity > 0.05) {
-                    drawContent(renderedFigure, steppedOpacity);
-                }
+                drawContent();
 
                 const gradient = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
                 gradient.addColorStop(0, 'rgba(0,0,0,0)');
@@ -357,10 +308,8 @@ export default function Television({
                 let vignetteColor = 'rgba(0,0,0,1.0)';
                 if (theme === 'toxic') vignetteColor = 'rgba(0, 10, 0, 0.95)';
                 if (theme === 'blood') vignetteColor = 'rgba(20, 0, 0, 0.95)';
-                if (theme === 'void') vignetteColor = 'rgba(10, 0, 20, 0.95)';
                 if (theme === 'sulfur') vignetteColor = 'rgba(20, 20, 0, 0.95)';
                 if (theme === 'toon') vignetteColor = 'rgba(5, 5, 5, 0.98)';
-                if (theme === 'sonar') vignetteColor = 'rgba(0, 20, 0, 0.95)';
                 if (theme === 'classic') vignetteColor = 'rgba(0, 5, 20, 0.95)';
 
                 gradient.addColorStop(1, vignetteColor);
@@ -371,10 +320,7 @@ export default function Television({
 
                 let glowColor = 'rgba(20, 40, 100, 0.1)';
                 if (theme === 'blood') glowColor = 'rgba(150, 0, 0, 0.15)';
-                if (theme === 'void') glowColor = 'rgba(100, 0, 255, 0.15)';
                 if (theme === 'sulfur') glowColor = 'rgba(200, 200, 50, 0.12)';
-                if (theme === 'sulfur') glowColor = 'rgba(200, 200, 50, 0.12)';
-                if (theme === 'sonar') glowColor = 'rgba(0, 255, 50, 0.15)';
                 if (theme === 'mobile') glowColor = 'rgba(0, 100, 255, 0.2)';
 
                 glow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -414,76 +360,7 @@ export default function Television({
                     ctx.restore();
                 }
 
-                const storySteps = 5;
-                const storyOpacity = storyOpacityRef.current;
-                const storyStepped = Math.floor(storyOpacity * storySteps) / storySteps;
-
-                if (renderedStoryFigure === 'story' && storyStepped > 0.01) {
-                    ctx.save();
-                    ctx.translate(w / 2, h / 2);
-
-                    if (invertY) {
-                        ctx.rotate(Math.PI);
-                        ctx.scale(-1, 1);
-                    }
-
-                    const textBoxY = 70;
-                    const maxWidth = 380;
-                    const lineHeight = 28;
-                    const maxLines = 2;
-                    const padding = 15;
-                    const totalWidth = maxWidth + (padding * 2);
-                    const totalHeight = (maxLines * lineHeight) + (padding * 2);
-
-                    ctx.globalAlpha = storyStepped;
-
-                    ctx.strokeStyle = `rgba(255, 255, 255, ${storyStepped})`;
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, totalHeight);
-
-                    if (displayedText) {
-                        ctx.font = '20px "Courier New", monospace';
-                        ctx.fillStyle = '#ffffff';
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'top';
-
-                        const words = displayedText.split(' ');
-                        let line = '';
-                        const lines: string[] = [];
-
-                        for (let i = 0; i < words.length; i++) {
-                            const testLine = line + words[i] + ' ';
-                            const metrics = ctx.measureText(testLine);
-
-                            if (metrics.width > maxWidth && i > 0) {
-                                lines.push(line);
-                                line = words[i] + ' ';
-                            } else {
-                                line = testLine;
-                            }
-                        }
-                        lines.push(line);
-
-                        const visibleLines = lines.slice(0, maxLines);
-
-                        visibleLines.forEach((txt, i) => {
-                            ctx.fillStyle = `rgba(255, 255, 255, ${storyStepped})`;
-                            ctx.fillText(txt, -maxWidth / 2, textBoxY + (i * lineHeight));
-                        });
-                    }
-
-                    if (waitingForInput && displayedText) {
-                        if (Math.floor(state.clock.elapsedTime * 2) % 2 === 0) {
-                            ctx.font = '20px "Courier New", monospace';
-                            ctx.fillStyle = `rgba(255, 255, 255, ${storyStepped})`;
-                            ctx.fillText('▼', (maxWidth / 2) - 15, textBoxY + (lineHeight * 1.5));
-                        }
-                    }
-
-                    ctx.restore();
-                }
-
-                if (isFocused && focusedText) {
+                if (isFocused) {
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
@@ -492,8 +369,8 @@ export default function Television({
                     }
 
                     if (showStartButton) {
-                        const btnX = BUTTON_CONFIG.PLAY.x;
-                        const btnY = BUTTON_CONFIG.PLAY.y;
+                        const btnX = startButtonPosition ? startButtonPosition.x : BUTTON_CONFIG.PLAY.x;
+                        const btnY = startButtonPosition ? startButtonPosition.y : BUTTON_CONFIG.PLAY.y;
                         const isHover = startButtonHovered;
 
                         let hoverProgress = 0;
@@ -507,65 +384,62 @@ export default function Television({
                             hoverProgress = screenTextureRef.current.userData.hoverAnim;
                         }
 
-                        const morphTarget = storyMode ? 1 : 0;
-                        morphProgressRef.current += (morphTarget - morphProgressRef.current) * 0.15;
-                        if (Math.abs(morphProgressRef.current - morphTarget) < 0.001) morphProgressRef.current = morphTarget;
-
-                        if (!storyMode) {
-                            drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime);
-                        }
-                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current);
-
-                        if (showBackButton) {
-                            const btnBackX = BUTTON_CONFIG.BACK.x;
-                            const btnBackY = BUTTON_CONFIG.BACK.y;
-                            const isBackHover = backButtonHovered;
-
-                            let hoverProgressBack = 0;
-                            if (screenTextureRef.current) {
-                                if (typeof screenTextureRef.current.userData.hoverAnimBack === 'undefined') {
-                                    screenTextureRef.current.userData.hoverAnimBack = 0;
-                                }
-
-                                const targetBack = isBackHover ? 1 : 0;
-                                screenTextureRef.current.userData.hoverAnimBack += (targetBack - screenTextureRef.current.userData.hoverAnimBack) * 0.1;
-
-                                if (Math.abs(screenTextureRef.current.userData.hoverAnimBack) < 0.001) {
-                                    screenTextureRef.current.userData.hoverAnimBack = 0;
-                                }
-
-                                hoverProgressBack = screenTextureRef.current.userData.hoverAnimBack;
-                            }
-
-                            drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack);
-                        }
-
-                        if (showMenuButton) {
-                            const btnMenuX = BUTTON_CONFIG.MENU.x;
-                            const btnMenuY = BUTTON_CONFIG.MENU.y;
-                            const isMenuHover = menuButtonHovered;
-
-                            let hoverProgressMenu = 0;
-                            if (screenTextureRef.current) {
-                                if (typeof screenTextureRef.current.userData.hoverAnimMenu === 'undefined') {
-                                    screenTextureRef.current.userData.hoverAnimMenu = 0;
-                                }
-
-                                const targetMenu = isMenuHover ? 1 : 0;
-                                screenTextureRef.current.userData.hoverAnimMenu += (targetMenu - screenTextureRef.current.userData.hoverAnimMenu) * 0.1;
-
-                                if (Math.abs(screenTextureRef.current.userData.hoverAnimMenu) < 0.001) {
-                                    screenTextureRef.current.userData.hoverAnimMenu = 0;
-                                }
-
-                                hoverProgressMenu = screenTextureRef.current.userData.hoverAnimMenu;
-                            }
-
-                            drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu);
-                        }
-
-                        ctx.globalCompositeOperation = 'source-over';
+                        // Always playing/stopped (no morphed square)
+                        drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, '#ffffff');
+                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, 0, '#ffffff');
                     }
+
+                    if (showBackButton) {
+                        const btnBackX = backButtonPosition ? backButtonPosition.x : BUTTON_CONFIG.BACK.x;
+                        const btnBackY = backButtonPosition ? backButtonPosition.y : BUTTON_CONFIG.BACK.y;
+                        const isBackHover = backButtonHovered;
+
+                        let hoverProgressBack = 0;
+                        if (screenTextureRef.current) {
+                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
+                            if (typeof screenTextureRef.current.userData.hoverAnimBack === 'undefined') {
+                                screenTextureRef.current.userData.hoverAnimBack = 0;
+                            }
+
+                            const targetBack = isBackHover ? 1 : 0;
+                            screenTextureRef.current.userData.hoverAnimBack += (targetBack - screenTextureRef.current.userData.hoverAnimBack) * 0.1;
+
+                            if (Math.abs(screenTextureRef.current.userData.hoverAnimBack) < 0.001) {
+                                screenTextureRef.current.userData.hoverAnimBack = 0;
+                            }
+
+                            hoverProgressBack = screenTextureRef.current.userData.hoverAnimBack;
+                        }
+
+                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, '#ffffff');
+                    }
+
+                    if (showMenuButton) {
+                        const btnMenuX = menuButtonPosition ? menuButtonPosition.x : BUTTON_CONFIG.MENU.x;
+                        const btnMenuY = menuButtonPosition ? menuButtonPosition.y : BUTTON_CONFIG.MENU.y;
+                        const isMenuHover = menuButtonHovered;
+
+                        let hoverProgressMenu = 0;
+                        if (screenTextureRef.current) {
+                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
+                            if (typeof screenTextureRef.current.userData.hoverAnimMenu === 'undefined') {
+                                screenTextureRef.current.userData.hoverAnimMenu = 0;
+                            }
+
+                            const targetMenu = isMenuHover ? 1 : 0;
+                            screenTextureRef.current.userData.hoverAnimMenu += (targetMenu - screenTextureRef.current.userData.hoverAnimMenu) * 0.1;
+
+                            if (Math.abs(screenTextureRef.current.userData.hoverAnimMenu) < 0.001) {
+                                screenTextureRef.current.userData.hoverAnimMenu = 0;
+                            }
+
+                            hoverProgressMenu = screenTextureRef.current.userData.hoverAnimMenu;
+                        }
+
+                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, '#ffffff');
+                    }
+
+                    ctx.globalCompositeOperation = 'source-over';
 
                     ctx.restore();
                 }
@@ -581,14 +455,15 @@ export default function Television({
                 <primitive
                     object={clonedModel}
                     onPointerMove={(e: any) => {
+                        if (!isFocused) return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
+
                             const buttonHit = checkButtonHover(e.uv);
 
                             const newPlayHover = buttonHit === 'play';
                             const newBackHover = buttonHit === 'back';
                             const newMenuHover = buttonHit === 'menu';
-                            const newTextHover = buttonHit === 'story_text';
 
                             if (newPlayHover !== startButtonHovered) {
                                 setStartButtonHovered(newPlayHover);
@@ -600,10 +475,11 @@ export default function Television({
                                 setMenuButtonHovered(newMenuHover);
                             }
 
-                            document.body.style.cursor = (newPlayHover || newBackHover || newMenuHover || newTextHover) ? 'pointer' : 'auto';
+                            document.body.style.cursor = (newPlayHover || newBackHover || newMenuHover) ? 'pointer' : 'auto';
                         }
                     }}
                     onPointerLeave={() => {
+                        if (!isFocused) return;
                         if (startButtonHovered) setStartButtonHovered(false);
                         if (backButtonHovered) setBackButtonHovered(false);
                         if (menuButtonHovered) setMenuButtonHovered(false);
@@ -614,25 +490,15 @@ export default function Television({
                             const buttonHit = checkButtonHover(e.uv);
                             if (buttonHit === 'play') {
                                 e.stopPropagation();
-                                if (storyMode) {
-                                    stopStory();
-                                } else {
-                                    startStory();
-                                    if (onStartClick) {
-                                        onStartClick();
-                                    }
+                                if (onStartClick) {
+                                    onStartClick();
                                 }
                             } else if (buttonHit === 'back' && onBackClick) {
                                 e.stopPropagation();
-                                stopStory();
                                 onBackClick();
                             } else if (buttonHit === 'menu' && onMenuClick) {
                                 e.stopPropagation();
-                                stopStory();
                                 onMenuClick();
-                            } else if (buttonHit === 'story_text') {
-                                e.stopPropagation();
-                                handleInteraction();
                             }
                         }
                     }}
@@ -642,5 +508,4 @@ export default function Television({
     );
 }
 
-useGLTF.preload('/models/LowPolyTV.glb');
-useGLTF.preload('/models/LCDTVFixed.glb');
+

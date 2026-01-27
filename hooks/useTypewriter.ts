@@ -20,7 +20,7 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
     useEffect(() => {
         if (enableStoryMode && typeof window !== 'undefined') {
             const audio = new Audio('/sounds/space.wav');
-            audio.volume = 0.006;
+            audio.volume = 0.05;
             typingAudioRef.current = audio;
         }
     }, [enableStoryMode]);
