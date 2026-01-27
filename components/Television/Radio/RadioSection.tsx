@@ -10,10 +10,10 @@ interface RadioSectionProps {
 }
 
 const RADIO_TRACKS = [
-    '/music/Chai Tea 84.mp3',
+    '/music/Chai Tea 84.m4a',
     '/music/Mashwina.m4a',
     '/music/Mystery_Tape_01.m4a',
-    '/music/Spore (GoldTrue).mp3',
+    '/music/Spore (GoldTrue).m4a',
     '/music/Thombstone_of_a_Ghost_Garden.m4a'
 ];
 
