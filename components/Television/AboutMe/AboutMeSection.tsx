@@ -39,10 +39,13 @@ export default function AboutMeSection({ viewState, onNavigate }: AboutMeSection
                 isFocused={viewState === 'tv_red_focus'}
                 textYOffset={40}
                 showStartButton={true}
-                onStartClick={() => console.log("Start Clicked")}
+                startButtonPosition={{ x: 0, y: 190 }}
+                onStartClick={() => { }}
                 showBackButton={true}
+                backButtonPosition={{ x: 200, y: -190 }}
                 onBackClick={() => onNavigate('default')}
                 showMenuButton={true}
+                menuButtonPosition={{ x: -200, y: -190 }}
                 onMenuClick={() => onNavigate('shelf_focus')}
                 enableStoryMode={true}
                 storyContent={ABOUT_STORY}

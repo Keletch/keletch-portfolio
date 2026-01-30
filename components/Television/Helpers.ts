@@ -173,18 +173,17 @@ export function drawButtonShockwave(
     }
 }
 
-
-
 export function drawPlayStopButton(
     ctx: CanvasRenderingContext2D,
     btnX: number,
     btnY: number,
     hoverProgress: number,
     morphProgress: number,
-    color: string = '#ffffff'
+    color: string = '#ffffff',
+    angle: number = 0
 ) {
     const p = hoverProgress;
-    const m = morphProgress; // 0 = triangle, 1 = rounded square
+    const m = morphProgress;
 
     const r = 8 + (5 * p);
 
@@ -203,19 +202,20 @@ export function drawPlayStopButton(
     const cx = btnX + jx;
     const cy = btnY + jy;
 
-    // Triangle vertices (play button)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+
     const triV0 = { x: r, y: 0 };
     const triV1 = { x: -0.5 * r, y: -0.866 * r };
     const triV2 = { x: -0.5 * r, y: 0.866 * r };
 
-    // Square vertices (stop button) - slightly larger to match visual size
     const sqSize = r * 1.8;
-    const sqV0 = { x: sqSize / 2, y: -sqSize / 2 };    // top-right
-    const sqV1 = { x: -sqSize / 2, y: -sqSize / 2 };   // top-left
-    const sqV2 = { x: -sqSize / 2, y: sqSize / 2 };    // bottom-left
-    const sqV3 = { x: sqSize / 2, y: sqSize / 2 };     // bottom-right
+    const sqV0 = { x: sqSize / 2, y: -sqSize / 2 };
+    const sqV1 = { x: -sqSize / 2, y: -sqSize / 2 };
+    const sqV2 = { x: -sqSize / 2, y: sqSize / 2 };
+    const sqV3 = { x: sqSize / 2, y: sqSize / 2 };
 
-    // Interpolate vertices
     const v0 = {
         x: triV0.x * (1 - m) + sqV0.x * m,
         y: triV0.y * (1 - m) + sqV0.y * m
@@ -228,18 +228,15 @@ export function drawPlayStopButton(
         x: triV2.x * (1 - m) + sqV2.x * m,
         y: triV2.y * (1 - m) + sqV2.y * m
     };
-    // v3 only exists for square (interpolate from v0)
     const v3 = {
         x: triV0.x * (1 - m) + sqV3.x * m,
         y: triV0.y * (1 - m) + sqV3.y * m
     };
 
-    // Bezier control points (for triangle smoothing)
     const t0 = { x: 0, y: -r * k };
     const t1 = { x: -0.866 * r * k, y: 0.5 * r * k };
     const t2 = { x: 0.866 * r * k, y: 0.5 * r * k };
 
-    // Corner radius for square (only applies when m > 0)
     const cornerRadius = 4 * m;
 
     ctx.fillStyle = color;
@@ -248,38 +245,37 @@ export function drawPlayStopButton(
     ctx.beginPath();
 
     if (m < 0.5) {
-        // Triangle-like shape (use bezier curves)
-        ctx.moveTo(cx + v0.x, cy + v0.y);
+        ctx.moveTo(v0.x, v0.y);
 
         ctx.bezierCurveTo(
-            cx + v0.x + t0.x * (1 - m * 2), cy + v0.y + t0.y * (1 - m * 2),
-            cx + v1.x - t1.x * (1 - m * 2), cy + v1.y - t1.y * (1 - m * 2),
-            cx + v1.x, cy + v1.y
+            v0.x + t0.x * (1 - m * 2), v0.y + t0.y * (1 - m * 2),
+            v1.x - t1.x * (1 - m * 2), v1.y - t1.y * (1 - m * 2),
+            v1.x, v1.y
         );
 
         ctx.bezierCurveTo(
-            cx + v1.x + t1.x * (1 - m * 2), cy + v1.y + t1.y * (1 - m * 2),
-            cx + v2.x - t2.x * (1 - m * 2), cy + v2.y - t2.y * (1 - m * 2),
-            cx + v2.x, cy + v2.y
+            v1.x + t1.x * (1 - m * 2), v1.y + t1.y * (1 - m * 2),
+            v2.x - t2.x * (1 - m * 2), v2.y - t2.y * (1 - m * 2),
+            v2.x, v2.y
         );
 
         ctx.bezierCurveTo(
-            cx + v2.x + t2.x * (1 - m * 2), cy + v2.y + t2.y * (1 - m * 2),
-            cx + v0.x - t0.x * (1 - m * 2), cy + v0.y - t0.y * (1 - m * 2),
-            cx + v0.x, cy + v0.y
+            v2.x + t2.x * (1 - m * 2), v2.y + t2.y * (1 - m * 2),
+            v0.x - t0.x * (1 - m * 2), v0.y - t0.y * (1 - m * 2),
+            v0.x, v0.y
         );
     } else {
-        // Square-like shape (use arcTo for rounded corners)
-        ctx.moveTo(cx + v0.x - cornerRadius, cy + v0.y);
-        ctx.arcTo(cx + v0.x, cy + v0.y, cx + v0.x, cy + v3.y, cornerRadius);
-        ctx.arcTo(cx + v0.x, cy + v3.y, cx + v3.x, cy + v3.y, cornerRadius);
-        ctx.arcTo(cx + v3.x, cy + v3.y, cx + v2.x, cy + v2.y, cornerRadius);
-        ctx.arcTo(cx + v2.x, cy + v2.y, cx + v1.x, cy + v1.y, cornerRadius);
-        ctx.arcTo(cx + v1.x, cy + v1.y, cx + v0.x, cy + v0.y, cornerRadius);
+        ctx.moveTo(v0.x - cornerRadius, v0.y);
+        ctx.arcTo(v0.x, v0.y, v0.x, v3.y, cornerRadius);
+        ctx.arcTo(v0.x, v3.y, v3.x, v3.y, cornerRadius);
+        ctx.arcTo(v3.x, v3.y, v2.x, v2.y, cornerRadius);
+        ctx.arcTo(v2.x, v2.y, v1.x, v1.y, cornerRadius);
+        ctx.arcTo(v1.x, v1.y, v0.x, v0.y, cornerRadius);
     }
 
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
     ctx.globalAlpha = 1.0;
 }
 
@@ -295,16 +291,15 @@ export function drawBackButton(
     ctx.globalAlpha = 0.8;
 
     const rBack = 8;
-
-    let phase1ProgressBack = Math.min(pBack * 2, 1.0);
-    let phase2ProgressBack = Math.max((pBack - 0.5) * 2, 0);
-
     const startWidthBack = rBack * 2;
     const endWidthBack = 4;
     const startHeightBack = rBack * 2;
     const endHeightBack = 18;
     const startRadiusBack = rBack;
     const endRadiusBack = 2;
+
+    let phase1ProgressBack = Math.min(pBack * 2, 1.0);
+    let phase2ProgressBack = Math.max((pBack - 0.5) * 2, 0);
 
     const widthBack = startWidthBack * (1 - phase1ProgressBack) + endWidthBack * phase1ProgressBack;
     const heightBack = startHeightBack * (1 - phase1ProgressBack) + endHeightBack * phase1ProgressBack;
@@ -347,8 +342,6 @@ export function drawBackButton(
     ctx.globalAlpha = 1.0;
 }
 
-
-
 export function drawMenuButton(
     ctx: CanvasRenderingContext2D,
     btnX: number,
@@ -361,16 +354,15 @@ export function drawMenuButton(
     ctx.globalAlpha = 0.8;
 
     const rMenu = 8;
-
-    let phase1Progress = Math.min(pMenu * 2, 1.0);
-    let phase2Progress = Math.max((pMenu - 0.5) * 2, 0);
-
     const startWidth = rMenu * 2;
     const endWidth = 4;
     const startHeight = rMenu * 2;
     const endHeight = 18;
     const startRadius = rMenu;
     const endRadius = 2;
+
+    let phase1Progress = Math.min(pMenu * 2, 1.0);
+    let phase2Progress = Math.max((pMenu - 0.5) * 2, 0);
 
     const width = startWidth * (1 - phase1Progress) + endWidth * phase1Progress;
     const height = startHeight * (1 - phase1Progress) + endHeight * phase1Progress;
@@ -416,198 +408,82 @@ export function drawMenuButton(
     ctx.globalAlpha = 1.0;
 }
 
-export function draw3DCube(
+export function drawStaticNoise(
     ctx: CanvasRenderingContext2D,
-    time: number
+    width: number,
+    height: number,
+    time: number,
+    alpha: number = 1.0
 ) {
-    const jitterX = (Math.random() - 0.5) * 1.5;
-    const jitterY = (Math.random() - 0.5) * 1.5;
+    if (alpha <= 0.01) return;
 
     ctx.save();
-    ctx.translate(jitterX, 40 + jitterY);
+    ctx.globalAlpha = alpha;
 
-    const size = 12;
-    const angleY = time * 0.5;
-    const angleX = time * 0.35 + 0.3;
+    const noiseSize = 5;
+    const cols = Math.ceil(width / noiseSize);
+    const rows = Math.ceil(height / noiseSize);
 
-    const cosY = Math.cos(angleY);
-    const sinY = Math.sin(angleY);
-    const cosX = Math.cos(angleX);
-    const sinX = Math.sin(angleX);
+    if (Math.random() > 0.95) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.2})`;
+        ctx.fillRect(0, 0, width, height);
+    }
 
-    const project = (x: number, y: number, z: number): [number, number] => {
-        let rotY_x = x * cosY + z * sinY;
-        let rotY_y = y;
-        let rotY_z = -x * sinY + z * cosY;
+    for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+            if (Math.random() > 0.4) {
+                const gray = Math.floor(Math.random() * 255);
+                const r = gray + (Math.random() > 0.9 ? 50 : 0);
+                const g = gray + (Math.random() > 0.9 ? 50 : 0);
+                const b = gray;
+                ctx.fillStyle = `rgba(${r},${g},${b}, ${Math.random() * 0.8})`;
+                ctx.fillRect(i * noiseSize, j * noiseSize, noiseSize, noiseSize);
+            }
+        }
+    }
 
-        let rotX_x = rotY_x;
-        let rotX_y = rotY_y * cosX - rotY_z * sinX;
-        let rotX_z = rotY_y * sinX + rotY_z * cosX;
+    const shiftAmplitude = 10;
+    const numShifts = 5;
+    for (let i = 0; i < numShifts; i++) {
+        const y = Math.random() * height;
+        const h = Math.random() * 50 + 10;
+        const shiftX = (Math.random() - 0.5) * shiftAmplitude;
 
-        const scale = 80 / (rotX_z + 3);
-        return [rotX_x * scale, rotX_y * scale];
-    };
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        ctx.fillRect(shiftX, y, width, h);
 
-    const vertices: [number, number][] = [
-        project(-1, -1, -1), project(1, -1, -1), project(1, 1, -1), project(-1, 1, -1),
-        project(-1, -1, 1), project(1, -1, 1), project(1, 1, 1), project(-1, 1, 1)
-    ].map(([x, y]) => [x * size, y * size]);
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+        ctx.fillRect(-shiftX, y, width, h);
+    }
 
-    const edges = [
-        [0, 1], [1, 2], [2, 3], [3, 0],
-        [4, 5], [5, 6], [6, 7], [7, 4],
-        [0, 4], [1, 5], [2, 6], [3, 7]
-    ];
+    if (Math.random() > 0.7) {
+        const blockX = Math.random() * width;
+        const blockY = Math.random() * height;
+        const blockW = Math.random() * 200 + 50;
+        const blockH = Math.random() * 40 + 5;
 
-    const innerSize = 2.5;
+        ctx.fillStyle = Math.random() > 0.5 ? '#000000' : '#ffffff';
+        ctx.fillRect(blockX, blockY, blockW, blockH);
+    }
 
-    const projectInner = (x: number, y: number, z: number): [number, number, number] => {
-        const innerAngleY = -angleY;
-        const innerAngleX = -angleX;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    for (let y = 0; y < height; y += 3) {
+        if (y % 6 === 0) {
+            ctx.fillRect(0, y, width, 1);
+        }
+    }
 
-        const cosYInner = Math.cos(innerAngleY);
-        const sinYInner = Math.sin(innerAngleY);
-        const cosXInner = Math.cos(innerAngleX);
-        const sinXInner = Math.sin(innerAngleX);
+    const barY = (time * 150) % (height + 200) - 100;
+    const barHeight = 8;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, barY, width, barHeight);
 
-        let rotY_x = x * cosYInner + z * sinYInner;
-        let rotY_y = y;
-        let rotY_z = -x * sinYInner + z * cosYInner;
-
-        let rotX_x = rotY_x;
-        let rotX_y = rotY_y * cosXInner - rotY_z * sinXInner;
-        let rotX_z = rotY_y * sinXInner + rotY_z * cosXInner;
-
-        const scale = 80 / (rotX_z + 3);
-        return [rotX_x * scale, rotX_y * scale, rotX_z];
-    };
-
-    const innerVertices: [number, number, number][] = [
-        projectInner(-1, -1, -1), projectInner(1, -1, -1), projectInner(1, 1, -1), projectInner(-1, 1, -1),
-        projectInner(-1, -1, 1), projectInner(1, -1, 1), projectInner(1, 1, 1), projectInner(-1, 1, 1)
-    ].map(([x, y, z]) => [x * innerSize, y * innerSize, z]);
-
-    const faces = [
-        [0, 1, 2, 3], [4, 5, 6, 7],
-        [0, 1, 5, 4], [2, 3, 7, 6],
-        [0, 3, 7, 4], [1, 2, 6, 5]
-    ];
-
-    const facesWithDepth = faces.map((face, idx) => {
-        const avgZ = face.reduce((sum, i) => sum + innerVertices[i][2], 0) / face.length;
-        return { face, avgZ };
-    }).sort((a, b) => a.avgZ - b.avgZ);
-
-    facesWithDepth.forEach(({ face }) => {
-        ctx.fillStyle = '#ffcc99';
-        ctx.globalAlpha = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(innerVertices[face[0]][0], innerVertices[face[0]][1]);
-        face.forEach((i) => ctx.lineTo(innerVertices[i][0], innerVertices[i][1]));
-        ctx.closePath();
-        ctx.fill();
-    });
-
-    ctx.globalAlpha = 1.0;
-
-    const drawEdges = (offsetX: number, style: string, alpha: number) => {
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = style;
-        ctx.lineWidth = 2;
-        edges.forEach(([i, j]) => {
-            ctx.beginPath();
-            ctx.moveTo(vertices[i][0] + offsetX, vertices[i][1]);
-            ctx.lineTo(vertices[j][0] + offsetX, vertices[j][1]);
-            ctx.stroke();
-        });
-    };
-
-    ctx.globalCompositeOperation = 'screen';
-    drawEdges(2, 'rgba(255, 0, 0, 1)', 0.4);
-    drawEdges(-2, 'rgba(0, 255, 255, 1)', 0.4);
-
-    ctx.globalCompositeOperation = 'source-over';
-    drawEdges(0, '#ffcc99', 1.0);
+    if (Math.random() > 0.8) {
+        ctx.fillRect(0, barY + (Math.random() * 50 - 25), width, barHeight / 2);
+    }
 
     ctx.restore();
 }
 
-export function drawDNAHelix(
-    ctx: CanvasRenderingContext2D,
-    time: number
-) {
-    const jitterX = (Math.random() - 0.5) * 1.5;
-    const jitterY = (Math.random() - 0.5) * 1.5;
 
-    ctx.save();
-    ctx.translate(jitterX, jitterY);
-
-    const helixHeight = 500;
-    const helixRadius = 90;
-    const segments = 50;
-    const rotation = time * 0.5;
-
-    const drawHelix = (colorOffset: number, style: string, alpha: number) => {
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = style;
-        ctx.lineWidth = 4;
-
-        const strand1: [number, number][] = [];
-        const strand2: [number, number][] = [];
-
-        for (let i = 0; i <= segments; i++) {
-            const t = (i / segments) * Math.PI * 4 + rotation;
-            const y = (i / segments) * helixHeight - helixHeight / 2;
-
-            const x1 = Math.cos(t) * helixRadius;
-            const x2 = Math.cos(t + Math.PI) * helixRadius;
-
-            strand1.push([x1 + colorOffset, y]);
-            strand2.push([x2 + colorOffset, y]);
-        }
-
-        ctx.beginPath();
-        strand1.forEach(([x, y], i) => {
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-
-        ctx.beginPath();
-        strand2.forEach(([x, y], i) => {
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-
-        for (let i = 0; i < segments; i += 4) {
-            const t = (i / segments) * Math.PI * 4 + rotation;
-            const y = (i / segments) * helixHeight - helixHeight / 2;
-            const x1 = Math.cos(t) * helixRadius;
-            const x2 = Math.cos(t + Math.PI) * helixRadius;
-
-            ctx.beginPath();
-            ctx.moveTo(x1 + colorOffset, y);
-            ctx.lineTo(x2 + colorOffset, y);
-            ctx.stroke();
-
-            ctx.fillStyle = style;
-            ctx.beginPath();
-            ctx.arc(x1 + colorOffset, y, 3, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(x2 + colorOffset, y, 3, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    };
-
-    ctx.globalCompositeOperation = 'screen';
-    drawHelix(2, 'rgba(255, 0, 0, 1)', 0.4);
-    drawHelix(-2, 'rgba(0, 255, 255, 1)', 0.4);
-
-    ctx.globalCompositeOperation = 'source-over';
-    drawHelix(0, '#ffcc99', 1.0);
-
-    ctx.restore();
-}
 

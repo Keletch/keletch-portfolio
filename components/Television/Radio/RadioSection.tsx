@@ -193,6 +193,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
                     showBackButton={viewState === 'radio_focus'}
                     onBackClick={() => onNavigate('default')}
                     showStartButton={true}
+                    startButtonPosition={{ x: -200, y: 190 }}
                     onStartClick={handlePlayPause}
                     onStopClick={handleStop}
                     status={radioStatus}
@@ -200,6 +201,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
                     currentProgress={radioProgress}
                     onSeek={handleSeek}
                     showMenuButton={true}
+                    menuButtonPosition={{ x: -200, y: -190 }}
                     showNextButton={true}
                     onNextClick={handleNext}
                     tracks={RADIO_TRACKS}

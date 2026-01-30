@@ -1,5 +1,5 @@
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RadioProps, RADIO_THEME, RADIO_BUTTON_CONFIG } from './RadioTypes';
@@ -63,6 +63,14 @@ export default function RadioTV({
     const [dragStartY, setDragStartY] = useState(0);
     const [dragStartScroll, setDragStartScroll] = useState(0);
 
+    // Optimization: Pre-calculate track names
+    const formattedTracks = useMemo(() => {
+        return tracks.map(path => ({
+            path,
+            displayName: path.split('/').pop()?.replace(/\.(mp3|m4a)$/, '') || 'Unknown'
+        }));
+    }, [tracks]);
+
     // Reset hover states and cursor when losing focus to prevent stuck visuals on re-entry
     useEffect(() => {
         if (!isFocused) {
@@ -75,11 +83,6 @@ export default function RadioTV({
     }, [isFocused]);
 
     // Figure Transitions
-    // For Radio, "Story" figures are not used. Just generic eyes or specific UI.
-    // We might want a default visual if not playing?
-    // The original code had `currentFigureProp` based on story.
-    // For Radio, we can just pass null or handled by `drawPixelEye` default.
-
     // Determines what to show: 
     // 'menu': Playlist
     // 'player_[song]': Music Mode (Playing or Paused) - Eye Hidden, Visuals Visible
@@ -163,16 +166,15 @@ export default function RadioTV({
         if (showMenuButton) {
             const btnX = menuButtonPosition ? menuButtonPosition.x : RADIO_BUTTON_CONFIG.MENU.x;
             const btnY = menuButtonPosition ? menuButtonPosition.y : RADIO_BUTTON_CONFIG.MENU.y;
-            // Slightly larger hit area for menu if list is open? No, button is button.
             const distMenu = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
             if (distMenu < RADIO_BUTTON_CONFIG.MENU.radius) return 'menu';
         }
 
         if (showNextButton) {
-            const btnX = nextButtonPosition ? nextButtonPosition.x : 200;
-            const btnY = nextButtonPosition ? nextButtonPosition.y : 190;
+            const btnX = nextButtonPosition ? nextButtonPosition.x : RADIO_BUTTON_CONFIG.NEXT.x;
+            const btnY = nextButtonPosition ? nextButtonPosition.y : RADIO_BUTTON_CONFIG.NEXT.y;
             const distNext = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distNext < 40) return 'next';
+            if (distNext < RADIO_BUTTON_CONFIG.NEXT.radius) return 'next';
         }
 
         return null;
@@ -469,7 +471,7 @@ export default function RadioTV({
                         const jY = (Math.random() - 0.5) * jitterAmount;
 
                         const barX = -150 + jX;
-                        const barY = -190 + jY;
+                        const barY = 190 + jY;
                         const barWidth = 300;
                         drawProgressBar(
                             ctx,
@@ -487,7 +489,7 @@ export default function RadioTV({
                 if (renderedFigure === 'menu' && figureStepped > 0.01 && isFocused) {
                     drawTrackList(
                         ctx,
-                        tracks,
+                        formattedTracks,
                         scrollTop,
                         hoveredTrackIndex,
                         currentSongName,
@@ -546,7 +548,7 @@ export default function RadioTV({
                             const buttonHit = checkButtonHover(e.uv);
 
                             const barX = -150;
-                            const barY = -190;
+                            const barY = 190;
                             const barWidth = 300;
                             const tolerance = 20;
 
@@ -589,7 +591,7 @@ export default function RadioTV({
                             if (invertY) dy = -dy;
 
                             // Seek Bar Click/Drag
-                            const barX = -150; const barY = -190; const barWidth = 300; const tolerance = 20;
+                            const barX = -150; const barY = 190; const barWidth = 300; const tolerance = 20;
                             if (!isMenuOpen && status !== 'stopped' && dx >= barX && dx <= barX + barWidth && Math.abs(dy - barY) <= tolerance) {
                                 e.stopPropagation();
                                 const progress = Math.max(0, Math.min(1, (dx - barX) / barWidth));
@@ -668,7 +670,6 @@ export default function RadioTV({
                             } else if (buttonHit === 'menu') {
                                 e.stopPropagation();
                                 setIsMenuOpen(!isMenuOpen);
-                                // if (onMenuClick) onMenuClick(); // Optional, but internal state handles generic menu.
                             } else if (buttonHit === 'next' && onNextClick) {
                                 e.stopPropagation();
                                 onNextClick();

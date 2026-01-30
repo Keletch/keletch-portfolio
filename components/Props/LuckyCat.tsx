@@ -25,11 +25,9 @@ export function LuckyCat({
 
         const clonedScene = scene.clone();
 
-        // Find the right arm mesh
         clonedScene.traverse((child) => {
             if (child.name === '4-RightArm_RightArm_0') {
                 armRef.current = child;
-                console.log('✅ Lucky Cat arm found:', child.name);
             }
         });
 
@@ -48,16 +46,10 @@ export function LuckyCat({
         };
     }, [scene]);
 
-    // Animate the arm waving
     useFrame((state) => {
         if (armRef.current) {
-            // Typical Lucky Cat waving motion
-            // Frequency: 2 (speed of wave)
-            // Amplitude: 0.4 radians (~23 degrees)
             const time = state.clock.elapsedTime;
             const wave = Math.sin(time * 2) * 0.4;
-
-            // Rotate on X axis (forward and back motion)
             armRef.current.rotation.x = wave;
         }
     });

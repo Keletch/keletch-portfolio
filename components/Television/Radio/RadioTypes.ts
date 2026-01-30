@@ -39,7 +39,8 @@ export interface RadioProps {
 export const RADIO_BUTTON_CONFIG = {
     PLAY: { x: -200, y: -190, radius: 40 },
     BACK: { x: 200, y: -190, radius: 40 },
-    MENU: { x: -200, y: 190, radius: 40 }
+    MENU: { x: -200, y: 190, radius: 40 },
+    NEXT: { x: 200, y: 190, radius: 40 }
 };
 
 export const RADIO_THEME = {

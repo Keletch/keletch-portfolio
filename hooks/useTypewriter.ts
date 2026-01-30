@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface UseTypewriterProps {
     storyContent?: string[];
@@ -9,12 +9,14 @@ interface UseTypewriterProps {
 export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: UseTypewriterProps) {
     const [storyMode, setStoryMode] = useState(false);
     const [currentParagraph, setCurrentParagraph] = useState(0);
-    const [displayedText, setDisplayedText] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
     const [waitingForInput, setWaitingForInput] = useState(false);
-    const typingAudioRef = useRef<HTMLAudioElement | null>(null);
 
-    const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+    // Time-based approach for Canvas (no re-renders on every char)
+    const [typingStartTime, setTypingStartTime] = useState(0);
+    const isTypingRef = useRef(false);
+
+    // Audio Ref
+    const typingAudioRef = useRef<HTMLAudioElement | null>(null);
 
     // 1. Load typing sound
     useEffect(() => {
@@ -26,73 +28,60 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
     }, [enableStoryMode]);
 
     // 2. Start Story Mode trigger
-    const startStory = () => {
+    const startStory = useCallback(() => {
         if (enableStoryMode && storyContent && storyContent.length > 0) {
             setStoryMode(true);
             setCurrentParagraph(0);
-            setDisplayedText('');
-            setIsTyping(true);
             setWaitingForInput(false);
+            setTypingStartTime(Date.now());
+            isTypingRef.current = true;
         }
-    };
+    }, [enableStoryMode, storyContent]);
 
-    // 3. Typewriter Effect Logic
-    useEffect(() => {
-        if (!storyMode || !isTyping || !storyContent) return;
+    // 3. Stop Story
+    const stopStory = useCallback(() => {
+        setStoryMode(false);
+        setWaitingForInput(false);
+        isTypingRef.current = false;
+    }, []);
 
-        const currentText = storyContent[currentParagraph] || '';
-        if (displayedText.length >= currentText.length) {
-            setIsTyping(false);
+    // 4. Signal from Consumer (Canvas) that typing is finished
+    const signalTypingFinished = useCallback(() => {
+        if (isTypingRef.current) {
+            isTypingRef.current = false;
             setWaitingForInput(true);
-            return;
         }
+    }, []);
 
-        typingTimerRef.current = setTimeout(() => {
-            setDisplayedText(currentText.slice(0, displayedText.length + 1));
-
-            if (typingAudioRef.current) {
-                typingAudioRef.current.playbackRate = 0.9 + Math.random() * 0.3;
-                typingAudioRef.current.currentTime = 0;
-                typingAudioRef.current.play().catch(e => console.warn('Audio play failed', e));
-            }
-        }, 50);
-
-        return () => {
-            if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-        };
-    }, [storyMode, isTyping, displayedText, currentParagraph, storyContent]);
-
-    // Unified Interaction Handler
-    const handleInteraction = () => {
+    // 5. Interaction Handler (Next Paragraph)
+    const handleInteraction = useCallback(() => {
         if (!storyMode || !storyContent) return;
 
-        if (isTyping) {
-            if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-
-            const currentText = storyContent[currentParagraph] || '';
-            setDisplayedText(currentText);
-            setIsTyping(false);
-            setWaitingForInput(true);
+        // If currently typing, skip to end
+        if (isTypingRef.current) {
+            // Consumer checks `waitingForInput`. If false but `storyMode` true, check `isTypingRef`.
+            // We force finish.
+            signalTypingFinished();
             return;
         }
 
+        // If waiting for input (arrow visible), go next
         if (waitingForInput) {
             if (currentParagraph < storyContent.length - 1) {
                 setCurrentParagraph(prev => prev + 1);
-                setDisplayedText('');
-                setIsTyping(true);
                 setWaitingForInput(false);
+                setTypingStartTime(Date.now());
+                isTypingRef.current = true;
             } else {
-                setStoryMode(false);
-                setCurrentParagraph(0);
-                setDisplayedText('');
-                setIsTyping(false);
-                setWaitingForInput(false);
+                // End of story
+                stopStory();
                 if (onStoryEnd) onStoryEnd();
             }
         }
-    };
+    }, [storyMode, storyContent, currentParagraph, waitingForInput, onStoryEnd, stopStory, signalTypingFinished]);
 
+
+    // Keyboard Listener
     useEffect(() => {
         if (!storyMode) return;
 
@@ -104,28 +93,18 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
         };
 
         window.addEventListener('keydown', onKeyDown);
-
-        return () => {
-            window.removeEventListener('keydown', onKeyDown);
-        };
-    }, [storyMode, isTyping, waitingForInput, storyContent, currentParagraph]);
-
-    const stopStory = () => {
-        setStoryMode(false);
-        setCurrentParagraph(0);
-        setDisplayedText('');
-        setIsTyping(false);
-        setWaitingForInput(false);
-    };
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [storyMode, handleInteraction]);
 
     return {
         storyMode,
-        displayedText,
-        waitingForInput,
-        isTyping, // Export this so we know if we can skip
         currentParagraph,
+        waitingForInput,
+        typingStartTime,
         startStory,
         stopStory,
-        handleInteraction // NEW export
+        handleInteraction,
+        signalTypingFinished,
+        typingAudioRef
     };
 }

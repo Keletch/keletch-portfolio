@@ -11,7 +11,6 @@ interface InteractiveBookProps {
     isActive: boolean; // Only interactive if camera is focused on shelf
     onNavigate?: () => void;
 
-    // Physics/Position Props (Passed through)
     pos: [number, number, number];
     rot: [number, number, number];
     scale: number;
@@ -80,7 +79,7 @@ export function InteractiveBook({
                         fontFamily: 'monospace',
                         whiteSpace: 'nowrap',
                         border: '1px solid #ffffffaa',
-                        pointerEvents: 'none' // Let clicks pass through if needed
+                        pointerEvents: 'none'
                     }}>
                         {label}
                     </div>

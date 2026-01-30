@@ -8,7 +8,7 @@ import { drawBackButton, drawPlayStopButton, drawMenuButton } from '@/components
 interface PixelButtonProps {
     onClick: () => void;
     visible: boolean;
-    type: 'play' | 'back' | 'menu'; // Generic type prop
+    type: 'play' | 'back' | 'menu';
     position?: [number, number, number];
     rotation?: [number, number, number];
     scale?: number;
@@ -26,12 +26,10 @@ export function PixelButton({
     const textureRef = useRef<THREE.CanvasTexture | null>(null);
     const [hovered, setHovered] = useState(false);
 
-    // Animation state
     const targetHover = useRef(0);
     const currentHover = useRef(0);
-    const morphProgress = useRef(0); // For play/stop toggle if we add it later, currently static 'play'
+    const morphProgress = useRef(0);
 
-    // Initial setup of the canvas texture
     useEffect(() => {
         if (!meshRef.current) return;
 
@@ -45,7 +43,6 @@ export function PixelButton({
 
         textureRef.current = texture;
 
-        // Apply material
         meshRef.current.material = new THREE.MeshBasicMaterial({
             map: texture,
             transparent: true,
@@ -53,17 +50,14 @@ export function PixelButton({
             side: THREE.DoubleSide
         });
 
-        // Cleanup
         return () => {
             texture.dispose();
         };
     }, []);
 
-    // Render loop
     useFrame((state, delta) => {
         if (!visible || !textureRef.current || !meshRef.current) return;
 
-        // Animate hover state
         targetHover.current = hovered ? 1 : 0;
         currentHover.current += (targetHover.current - currentHover.current) * 10 * delta;
 
@@ -71,29 +65,20 @@ export function PixelButton({
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Clear
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         ctx.save();
         ctx.translate(64, 64);
-        ctx.scale(4, 4); // Scale up pixel art (buttons are usually drawn small)
-
-        // Draw based on type
-        // Helpers usually draw centered at (x, y) = (0,0) if we passed offsets. 
-        // But let's check Helpers.ts... yes, they take x, y. 
-        // So passing 0,0 draws at the current origin (which is 64,64 due to translate).
+        ctx.scale(4, 4);
 
         if (type === 'back') {
             drawBackButton(ctx, 0, 0, currentHover.current);
         } else if (type === 'play') {
-            // drawPlayStopButton(ctx, x, y, hoverProgress, morphProgress)
-            drawPlayStopButton(ctx, 0, 0, currentHover.current, 0); // Always 'play' icon (morph 0) for now
+            drawPlayStopButton(ctx, 0, 0, currentHover.current, 0);
         } else if (type === 'menu') {
             drawMenuButton(ctx, 0, 0, currentHover.current);
         }
 
         ctx.restore();
-
         textureRef.current.needsUpdate = true;
     });
 

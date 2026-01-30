@@ -70,16 +70,25 @@ export default function AboutMeTV({
 
     const {
         storyMode,
-        displayedText,
-        waitingForInput,
         currentParagraph,
+        waitingForInput,
+        typingStartTime,
         startStory,
         stopStory,
-        handleInteraction
+        handleInteraction,
+        signalTypingFinished,
+        typingAudioRef
     } = useTypewriter({
         storyContent: paginationResult.pages,
         enableStoryMode
     });
+
+    const lastCharCountRef = useRef(0);
+
+    // Reset char count when paragraph changes or story stops
+    useEffect(() => {
+        lastCharCountRef.current = 0;
+    }, [currentParagraph, storyMode, typingStartTime]);
 
     const actualParagraphIndex = paginationResult.paragraphMap[currentParagraph] ?? 0;
     const currentFigureProp = (storyMode && storyFigures && storyFigures[actualParagraphIndex]) ? storyFigures[actualParagraphIndex] : null;
@@ -214,7 +223,6 @@ export default function AboutMeTV({
 
             const sensitivity = 5.0;
             let aspectCompensation = 1.0;
-            // Simplified aspect logic for AboutMe (usually standard screen)
 
             const finalX = (gazeX * sensitivity) + gazeOffset.x;
             const finalY = (invertY ? -gazeY : gazeY) * sensitivity * aspectCompensation + gazeOffset.y;
@@ -318,7 +326,6 @@ export default function AboutMeTV({
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, 0, w, h);
 
-                // Story Rendering
                 const storyOpacity = storyOpacityRef.current;
                 const storyStepped = Math.floor(storyOpacity * steps) / steps;
 
@@ -332,43 +339,67 @@ export default function AboutMeTV({
                     const textBoxY = 70;
                     const maxWidth = 380;
                     const lineHeight = 28;
-                    const maxLines = 2;
                     const padding = 15;
+                    const boxHeight = 86; // Fixed height in helper
                     const totalWidth = maxWidth + (padding * 2);
-                    const totalHeight = (maxLines * lineHeight) + (padding * 2);
 
                     ctx.globalAlpha = storyStepped;
                     ctx.strokeStyle = `rgba(255, 255, 255, ${storyStepped})`;
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, totalHeight);
+                    ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
 
-                    if (displayedText) {
+                    // --- Text Rendering Logic (Time-based) ---
+                    const fullText = paginationResult.pages[currentParagraph] || '';
+                    if (fullText) {
+                        // Calculate characters to show based on time
+                        let charsToShow = 0;
+                        if (waitingForInput) {
+                            // If user skipped or paragraph finished, show all
+                            charsToShow = fullText.length;
+                        } else {
+                            // Calculate characters to show based on time
+                            const charSpeed = 0.05; // Seconds per char
+                            const timeSinceStart = (Date.now() - typingStartTime) / 1000;
+                            charsToShow = Math.floor(timeSinceStart / charSpeed);
+
+                            // Signal specific to hook if done
+                            if (charsToShow >= fullText.length) {
+                                signalTypingFinished();
+                            }
+                        }
+
+                        // Cap charsToShow to length
+                        charsToShow = Math.min(charsToShow, fullText.length);
+
+                        // Sound Logic
+                        if (charsToShow > lastCharCountRef.current) {
+                            if (typingAudioRef.current) {
+                                typingAudioRef.current.playbackRate = 0.9 + Math.random() * 0.3;
+                                typingAudioRef.current.currentTime = 0;
+                                typingAudioRef.current.play().catch(() => { });
+                            }
+                            lastCharCountRef.current = charsToShow;
+                        }
+
+                        const currentVisibleText = fullText.slice(0, charsToShow);
+
                         ctx.font = '20px "Courier New", monospace';
                         ctx.fillStyle = '#ffffff';
                         ctx.textAlign = 'left';
                         ctx.textBaseline = 'top';
 
-                        const words = displayedText.split(' ');
-                        let line = '';
-                        const lines: string[] = [];
-                        for (let i = 0; i < words.length; i++) {
-                            const testLine = line + words[i] + ' ';
-                            const metrics = ctx.measureText(testLine);
-                            if (metrics.width > maxWidth && i > 0) {
-                                lines.push(line);
-                                line = words[i] + ' ';
-                            } else {
-                                line = testLine;
-                            }
-                        }
-                        lines.push(line);
-                        const visibleLines = lines.slice(0, maxLines);
+                        // Split by pre-calculated newlines
+                        // We need to be careful: slicing the full string might cut a line mid-way.
+                        // But since we preserve newlines in fullText, slicing it preserves the structure up to that point.
+                        const visibleLines = currentVisibleText.split('\n');
+
                         visibleLines.forEach((txt, i) => {
                             ctx.fillStyle = `rgba(255, 255, 255, ${storyStepped})`;
                             ctx.fillText(txt, -maxWidth / 2, textBoxY + (i * lineHeight));
                         });
                     }
-                    if (waitingForInput && displayedText) {
+
+                    if (waitingForInput) {
                         if (Math.floor(state.clock.elapsedTime * 2) % 2 === 0) {
                             ctx.font = '20px "Courier New", monospace';
                             ctx.fillStyle = `rgba(255, 255, 255, ${storyStepped})`;

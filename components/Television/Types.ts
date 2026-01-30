@@ -1,4 +1,3 @@
-
 export interface TelevisionProps {
     modelPath: string;
     screenNames?: string[];
@@ -6,23 +5,14 @@ export interface TelevisionProps {
     rotation?: [number, number, number];
     scale?: number;
     rotationX?: number;
-    theme?: 'classic' | 'toxic' | 'blood' | 'sulfur' | 'toon' | 'mobile'; // 'mobile' is Nokia Blue
-    invertY?: boolean; // Invertir eje Y si el modelo tiene UVs invertidas
-    gazeOffset?: { x: number; y: number }; // Offset manual para calibración
-    uvRotation?: number; // Rotación de la textura en radianes (ej: Math.PI/4 para 45°)
-    modelYOffset?: number; // Offset vertical del modelo dentro del grupo
+    theme?: 'classic' | 'toxic' | 'blood' | 'sulfur' | 'toon' | 'mobile';
+    invertY?: boolean;
+    gazeOffset?: { x: number; y: number };
+    uvRotation?: number;
+    modelYOffset?: number;
     focusedText?: string;
     isFocused?: boolean;
     textYOffset?: number;
-    showStartButton?: boolean;
-    startButtonPosition?: { x: number, y: number };
-    onStartClick?: () => void;
-    showBackButton?: boolean;
-    backButtonPosition?: { x: number, y: number };
-    onBackClick?: () => void;
-    showMenuButton?: boolean;
-    menuButtonPosition?: { x: number, y: number };
-    onMenuClick?: () => void;
 }
 
 export const THEMES = {
@@ -82,17 +72,14 @@ export const THEMES = {
         scleraColor: '#ffffff'
     },
     mobile: {
-        bgColor: '#00051a', // Dark Blue
-        baseColor: 'rgba(0, 20, 60, 0.3)', // Deep Blue Base
-        glowCenter: 'rgba(0, 100, 255, 0.2)', // Nokia Blue Glow
-        irisColor: '#0088ff', // Electric Blue Iris
+        bgColor: '#00051a',
+        baseColor: 'rgba(0, 20, 60, 0.3)',
+        glowCenter: 'rgba(0, 100, 255, 0.2)',
+        irisColor: '#0088ff',
         lightColor: '#00aaff',
         lightIntensity: 6.0,
         vignetteColor: 'rgba(0, 0, 20, 0.95)',
-        lookRange: 15, // Small screen range
-        scleraColor: 'rgba(0, 100, 255, 0.4)' // Digital Blue Sclera
+        lookRange: 15,
+        scleraColor: 'rgba(0, 100, 255, 0.4)'
     }
 };
-
-
-

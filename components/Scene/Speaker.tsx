@@ -34,20 +34,15 @@ export default function Speaker({
         if (isPlaying && analyser && dataArray) {
             analyser.getByteFrequencyData(dataArray);
 
-            // Calculate Bass Average (Indices 0-10)
             let bassSum = 0;
             const bassEnd = 10;
             for (let i = 0; i < bassEnd; i++) {
                 bassSum += dataArray[i];
             }
             const bassAvg = (bassSum / bassEnd) / 255;
-
-            // Clean Kick Pulse (Subtle for speakers)
-            // Using same power curve as Radio for sync, but lower intensity
             pulse = 1.0 + Math.pow(bassAvg, 2.2) * 0.15;
         }
 
-        // Apply scale to the whole group (Model + Collider)
         groupRef.current.scale.set(pulse, pulse, pulse);
     });
 

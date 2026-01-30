@@ -7,6 +7,7 @@ import { useGLTF } from '@react-three/drei';
 
 import Television from '@/components/Television';
 import RadioSection from '@/components/Television/Radio/RadioSection';
+import MyWorksSection from '@/components/Television/MyWorks/MyWorksSection';
 import AboutMeSection from '@/components/Television/AboutMe/AboutMeSection';
 import { CRTOverlay } from '@/components/Effects/CRTOverlay';
 import { CameraRig } from '@/components/Scene/CameraRig';
@@ -19,7 +20,6 @@ import { LuckyCat } from '@/components/Props/LuckyCat';
 import { RoomFloor } from '@/components/Scene/RoomFloor';
 import { TVCluster } from '@/components/Scene/TVCluster';
 
-// Inicializar luces de área
 RectAreaLightUniformsLib.init();
 
 export type ViewState = 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus';
@@ -61,7 +61,7 @@ export default function TVScene() {
 
     // Props Config
     const dvdCtrl = { pos: [0, -0.45, 0.30] as [number, number, number], size: [0.43, 0.08, 0.29] as [number, number, number], offset: [0, 0.08, -0.19] as [number, number, number] };
-    const mobileCtrl = { pos: [3.0, 3.0, 0.30] as [number, number, number], rot: [-2.0, 0, -0.30] as [number, number, number], size: [0.09, 0.20, 0.03] as [number, number, number], offset: [0.01, 0.23, 0.00] as [number, number, number] };
+    const mobileCtrl = { pos: [3.0, 4.0, 0.30] as [number, number, number], rot: [-1.5, 0, -0.30] as [number, number, number], size: [0.09, 0.20, 0.03] as [number, number, number], offset: [0.01, 0.23, 0.00] as [number, number, number] };
     const rubiksGoldCtrl = { pos: [2.00, 6.00, 0.40] as [number, number, number], rot: [0, 0.5, 0] as [number, number, number], scale: 2.45, size: [0.20, 0.20, 0.20] as [number, number, number], offset: [-0.01, 0.20, -0.01] as [number, number, number] };
     const luckyCatCtrl = { pos: [-0.75, -1.0, 0.0] as [number, number, number], scale: 1.0, size: [0.18, 0.20, 0.14] as [number, number, number], offset: [0.01, 0.18, 0.00] as [number, number, number] };
 
@@ -102,8 +102,8 @@ export default function TVScene() {
                             <TVCluster viewState={viewState} onNavigate={(st: ViewState) => setViewState(st)} />
                             <RadioSection viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} />
                             <AboutMeSection viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} />
+                            <MyWorksSection viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} />
 
-                            {/* OTHER PROPS */}
                             <RigidBody colliders={false} position={dvdCtrl.pos}>
                                 <CuboidCollider args={dvdCtrl.size} position={dvdCtrl.offset} friction={0.5} restitution={0.1} />
                                 <primitive object={dvdModel.clone()} />
@@ -121,7 +121,6 @@ export default function TVScene() {
 
                             <AdjustableModel modelPath="/models/rubiksGold.glb" initialPos={rubiksGoldCtrl.pos} initialRot={rubiksGoldCtrl.rot} initialScale={rubiksGoldCtrl.scale} initialColliderSize={rubiksGoldCtrl.size} initialColliderOffset={rubiksGoldCtrl.offset} isInteractive={false} />
 
-                            {/* BOOKS */}
                             <AdjustableModel
                                 modelPath="/models/b1.glb" initialPos={book1Ctrl.pos} initialRot={book1Ctrl.rot} initialScale={book1Ctrl.scale} initialColliderSize={book1Ctrl.size} initialColliderOffset={book1Ctrl.offset}
                                 onClick={(e) => handleZoom(e, 'tv_red_focus')} label="About me"

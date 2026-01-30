@@ -3,14 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
 import { TelevisionProps, THEMES } from './Types';
-import { drawPixelEye, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave } from './Helpers';
-
-const BUTTON_CONFIG = {
-    PLAY: { x: -200, y: 190, radius: 40, width: 140, height: 45 },
-    BACK: { x: 200, y: 190, radius: 40 },
-    MENU: { x: 0, y: 190, radius: 40 }
-};
-
+import { drawPixelEye } from './Helpers';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 
@@ -30,39 +23,12 @@ export default function Television({
     modelYOffset = -0.3,
     focusedText,
     isFocused = false,
-    textYOffset = 60,
-    showStartButton = false,
-    startButtonPosition,
-    onStartClick,
-    showBackButton = false,
-    onBackClick,
-    backButtonPosition,
-    showMenuButton = false,
-    menuButtonPosition,
-    onMenuClick
+    textYOffset = 60
 }: TelevisionProps) {
     const groupRef = useRef<THREE.Group>(null);
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });
-    const [startButtonHovered, setStartButtonHovered] = useState(false);
-    const [backButtonHovered, setBackButtonHovered] = useState(false);
-    const [menuButtonHovered, setMenuButtonHovered] = useState(false);
 
-    // Reset hover states and cursor when losing focus to prevent stuck visuals on re-entry
-    useEffect(() => {
-        if (!isFocused) {
-            setStartButtonHovered(false);
-            setBackButtonHovered(false);
-            setMenuButtonHovered(false);
-            document.body.style.cursor = 'auto'; // Reset global cursor
-        }
-    }, [isFocused]);
-
-    // Generic Figure Transition (Always null for generic TV essentially, unless updated later)
-    // We keep it to support basic transitions if we add generic figures back, or for eyes if we wanted to transition eyes (but eyes are currently background)
-    // But currently currentFigureProp is effectively null.
-    // For now, we can remove useFigureTransition if we only draw Eyes directly.
-    // But let's keep it minimal if we decide to add "Channel Changing" static later.
     const {
         renderedFigure,
         transitionOpacity: transitionOpacityRef
@@ -93,42 +59,7 @@ export default function Television({
 
     const activeTheme = THEMES[theme] || THEMES.classic;
 
-    const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | null => {
-        if (!isFocused) return null;
 
-        let px = uv.x * 512;
-        let py = (1 - uv.y) * 512;
-
-        let dx = px - 256;
-        let dy = py - 256;
-
-        if (invertY) {
-            dy = -dy;
-        }
-
-        if (showStartButton) {
-            const btnX = startButtonPosition ? startButtonPosition.x : BUTTON_CONFIG.PLAY.x;
-            const btnY = startButtonPosition ? startButtonPosition.y : BUTTON_CONFIG.PLAY.y;
-            const distPlay = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distPlay < BUTTON_CONFIG.PLAY.radius) return 'play';
-        }
-
-        if (showBackButton) {
-            const btnX = backButtonPosition ? backButtonPosition.x : BUTTON_CONFIG.BACK.x;
-            const btnY = backButtonPosition ? backButtonPosition.y : BUTTON_CONFIG.BACK.y;
-            const distBack = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distBack < BUTTON_CONFIG.BACK.radius) return 'back';
-        }
-
-        if (showMenuButton) {
-            const btnX = menuButtonPosition ? menuButtonPosition.x : BUTTON_CONFIG.MENU.x;
-            const btnY = menuButtonPosition ? menuButtonPosition.y : BUTTON_CONFIG.MENU.y;
-            const distMenu = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distMenu < BUTTON_CONFIG.MENU.radius) return 'menu';
-        }
-
-        return null;
-    };
 
     const renderAccumulator = useRef(0);
     const FPS_LIMIT = 24;
@@ -368,76 +299,7 @@ export default function Television({
                         ctx.scale(-1, 1);
                     }
 
-                    if (showStartButton) {
-                        const btnX = startButtonPosition ? startButtonPosition.x : BUTTON_CONFIG.PLAY.x;
-                        const btnY = startButtonPosition ? startButtonPosition.y : BUTTON_CONFIG.PLAY.y;
-                        const isHover = startButtonHovered;
 
-                        let hoverProgress = 0;
-                        if (screenTextureRef.current) {
-                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
-                            if (typeof screenTextureRef.current.userData.hoverAnim === 'undefined') screenTextureRef.current.userData.hoverAnim = 0;
-
-                            const target = isHover ? 1 : 0;
-                            screenTextureRef.current.userData.hoverAnim += (target - screenTextureRef.current.userData.hoverAnim) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnim) < 0.001) screenTextureRef.current.userData.hoverAnim = 0;
-                            hoverProgress = screenTextureRef.current.userData.hoverAnim;
-                        }
-
-                        // Always playing/stopped (no morphed square)
-                        drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, '#ffffff');
-                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, 0, '#ffffff');
-                    }
-
-                    if (showBackButton) {
-                        const btnBackX = backButtonPosition ? backButtonPosition.x : BUTTON_CONFIG.BACK.x;
-                        const btnBackY = backButtonPosition ? backButtonPosition.y : BUTTON_CONFIG.BACK.y;
-                        const isBackHover = backButtonHovered;
-
-                        let hoverProgressBack = 0;
-                        if (screenTextureRef.current) {
-                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
-                            if (typeof screenTextureRef.current.userData.hoverAnimBack === 'undefined') {
-                                screenTextureRef.current.userData.hoverAnimBack = 0;
-                            }
-
-                            const targetBack = isBackHover ? 1 : 0;
-                            screenTextureRef.current.userData.hoverAnimBack += (targetBack - screenTextureRef.current.userData.hoverAnimBack) * 0.1;
-
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnimBack) < 0.001) {
-                                screenTextureRef.current.userData.hoverAnimBack = 0;
-                            }
-
-                            hoverProgressBack = screenTextureRef.current.userData.hoverAnimBack;
-                        }
-
-                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, '#ffffff');
-                    }
-
-                    if (showMenuButton) {
-                        const btnMenuX = menuButtonPosition ? menuButtonPosition.x : BUTTON_CONFIG.MENU.x;
-                        const btnMenuY = menuButtonPosition ? menuButtonPosition.y : BUTTON_CONFIG.MENU.y;
-                        const isMenuHover = menuButtonHovered;
-
-                        let hoverProgressMenu = 0;
-                        if (screenTextureRef.current) {
-                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
-                            if (typeof screenTextureRef.current.userData.hoverAnimMenu === 'undefined') {
-                                screenTextureRef.current.userData.hoverAnimMenu = 0;
-                            }
-
-                            const targetMenu = isMenuHover ? 1 : 0;
-                            screenTextureRef.current.userData.hoverAnimMenu += (targetMenu - screenTextureRef.current.userData.hoverAnimMenu) * 0.1;
-
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnimMenu) < 0.001) {
-                                screenTextureRef.current.userData.hoverAnimMenu = 0;
-                            }
-
-                            hoverProgressMenu = screenTextureRef.current.userData.hoverAnimMenu;
-                        }
-
-                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, '#ffffff');
-                    }
 
                     ctx.globalCompositeOperation = 'source-over';
 
@@ -452,57 +314,7 @@ export default function Television({
     return (
         <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
             {clonedModel && (
-                <primitive
-                    object={clonedModel}
-                    onPointerMove={(e: any) => {
-                        if (!isFocused) return;
-                        if (e.object.userData.isScreen && e.uv) {
-                            e.stopPropagation();
-
-                            const buttonHit = checkButtonHover(e.uv);
-
-                            const newPlayHover = buttonHit === 'play';
-                            const newBackHover = buttonHit === 'back';
-                            const newMenuHover = buttonHit === 'menu';
-
-                            if (newPlayHover !== startButtonHovered) {
-                                setStartButtonHovered(newPlayHover);
-                            }
-                            if (newBackHover !== backButtonHovered) {
-                                setBackButtonHovered(newBackHover);
-                            }
-                            if (newMenuHover !== menuButtonHovered) {
-                                setMenuButtonHovered(newMenuHover);
-                            }
-
-                            document.body.style.cursor = (newPlayHover || newBackHover || newMenuHover) ? 'pointer' : 'auto';
-                        }
-                    }}
-                    onPointerLeave={() => {
-                        if (!isFocused) return;
-                        if (startButtonHovered) setStartButtonHovered(false);
-                        if (backButtonHovered) setBackButtonHovered(false);
-                        if (menuButtonHovered) setMenuButtonHovered(false);
-                        document.body.style.cursor = 'auto';
-                    }}
-                    onClick={(e: any) => {
-                        if (e.object.userData.isScreen && e.uv) {
-                            const buttonHit = checkButtonHover(e.uv);
-                            if (buttonHit === 'play') {
-                                e.stopPropagation();
-                                if (onStartClick) {
-                                    onStartClick();
-                                }
-                            } else if (buttonHit === 'back' && onBackClick) {
-                                e.stopPropagation();
-                                onBackClick();
-                            } else if (buttonHit === 'menu' && onMenuClick) {
-                                e.stopPropagation();
-                                onMenuClick();
-                            }
-                        }
-                    }}
-                />
+                <primitive object={clonedModel} />
             )}
         </group>
     );

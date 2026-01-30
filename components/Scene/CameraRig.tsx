@@ -11,43 +11,32 @@ interface CameraRigProps {
 export function CameraRig({ viewState }: CameraRigProps) {
     const { camera, pointer } = useThree();
 
-    // Configurable Positions
-    // Default: Room View
     const defaultPos = new THREE.Vector3(-3.5, 2.5, 14);
     const defaultLookAt = new THREE.Vector3(-0.2, 1.2, 0);
 
-    // Shelf Focus (Finalized Values)
-    // Values derived from user calibration
     const shelfPos = new THREE.Vector3(-0.15, -0.66, 3.05);
     const shelfLookAt = new THREE.Vector3(-2.4, -1.76, -5.0);
 
-    // Red TV Focus (About Me)
     const redTVPos = new THREE.Vector3(-3.0, 1.1, 2.9);
     const redTVLookAt = new THREE.Vector3(-3.02, 0.7, 0.45);
 
-    // LCD TV Focus (My Works)
-    // Centered on LCD TV position (-1.9, 2.5, 0.40)
     const lcdTVPos = new THREE.Vector3(-1.9, 2.5, 2.5);
     const lcdTVLookAt = new THREE.Vector3(-1.94, 2.1, 0.45);
 
-    // Dirty TV Focus (Vision) - Pos: -0.5, 1.5, 0
     const dirtyTVPos = new THREE.Vector3(-0.5, 1.0, 3.4);
     const dirtyTVLookAt = new THREE.Vector3(-0.55, 0.6, 0);
 
-    // Typical TV Focus (Lifestyle) - Pos: 0.75, 2.1, 0
     const typicalTVPos = new THREE.Vector3(0.75, 2.1, 2.8);
     const typicalTVLookAt = new THREE.Vector3(0.75, 2.2, 0);
 
-    // LowPoly TV Focus (Extras) - Pos: 1.6, 1.1, 0
     const lowPolyTVPos = new THREE.Vector3(1.6, 0.8, 3.2);
     const lowPolyTVLookAt = new THREE.Vector3(1.6, 0.55, 0);
 
-    // Radio Focus (Finalized)
     const radioPos = new THREE.Vector3(1.40, -0.60, 1.30);
     const radioLookAt = new THREE.Vector3(1.48, -0.70, 0.00);
 
 
-    // State for smoothed LookAt
+
     const currentLookAt = useRef(defaultLookAt.clone());
 
     useFrame((state, delta) => {
@@ -77,15 +66,12 @@ export function CameraRig({ viewState }: CameraRigProps) {
             targetPos = radioPos;
             targetLookAt = radioLookAt;
         } else {
-            // Default Mode: Add Scale Parallax based on mouse pointer
-            // Pointer x/y are normalized (-1 to 1)
             targetPos = new THREE.Vector3(
                 defaultPos.x + pointer.x * 0.5, // Move X slightly
                 defaultPos.y + pointer.y * 0.5, // Move Y slightly
                 defaultPos.z
             );
 
-            // Also apply parallax to the LookAt for consistency
             targetLookAt = new THREE.Vector3(
                 defaultLookAt.x + pointer.x * 0.2,
                 defaultLookAt.y + pointer.y * 0.2,
@@ -93,11 +79,8 @@ export function CameraRig({ viewState }: CameraRigProps) {
             );
         }
 
-        // 2. Smoothly Lerp Camera Position
         const step = 0.05;
         camera.position.lerp(targetPos, step);
-
-        // 3. Smoothly Lerp LookAt Target
         currentLookAt.current.lerp(targetLookAt, step);
         camera.lookAt(currentLookAt.current);
     });
