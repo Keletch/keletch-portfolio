@@ -22,7 +22,7 @@ const PROJECTS = [
         title: "Infinite Gallery 2025",
         stack: "Next.js / React Three Fiber / Supabase",
         desc: "Interactive 3D Gallery",
-        videoSrc: "/works/infiniteGallery.webm",
+        videoSrc: "/works/InfiniteGallery.webm",
         link: "https://galeria.chu.mx/gallery"
     },
     {
