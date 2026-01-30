@@ -20,7 +20,7 @@ import {
 const PROJECTS = [
     {
         title: "Infinite Gallery 2025",
-        stack: "Next.js / React Three / Supabase",
+        stack: "Next.js / React Three Fiber / Supabase",
         desc: "Interactive 3D Gallery",
         videoSrc: "/works/infiniteGallery.webm",
         link: "https://galeria.chu.mx/gallery"
