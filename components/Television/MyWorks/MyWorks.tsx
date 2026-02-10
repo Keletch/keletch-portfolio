@@ -1,8 +1,13 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
+import { useTypewriter } from '@/hooks/useTypewriter';
+import { useBlink } from '@/hooks/useBlink';
+import { useScreenInteraction } from '@/hooks/useScreenInteraction';
+import { updateButtonHoverAnimation } from '@/components/Television/SharedHelpers';
+
 import { THEMES } from '@/components/Television/Types';
 import { MyWorksProps, MYWORKS_BUTTON_CONFIG } from './MyWorksTypes';
 import { drawPixelEye } from '@/components/Television/Helpers';
@@ -11,34 +16,12 @@ import {
     drawBackButton,
     drawMenuButton,
     drawButtonShockwave,
-    drawStaticNoise,
-    drawOSD,
     drawEyeButton,
-    calculateOSDLayout
+    drawProjectInfo,
+    checkButtonHover
 } from './MyWorksHelpers';
-
-const PROJECTS = [
-    {
-        title: "Infinite Gallery 2025",
-        stack: "Next.js / React Three Fiber / Supabase",
-        desc: "Interactive 3D Gallery",
-        videoSrc: "/works/InfiniteGallery.webm",
-        link: "https://galeria.chu.mx/gallery"
-    },
-    {
-        title: "Food landing 2025",
-        stack: "Wordpress / GLSL / HTML",
-        desc: "Made with Elementor and animated with GLSL",
-        videoSrc: "/works/parrillita.webm",
-        link: "https://laredosparrillita.com/"
-    }
-];
-
-const DEFAULT_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'screen_lcd'];
-
-// Standard transition timings
-const ZOOM_DURATION = 1000; // Time to wait for zoom
-const STATIC_DURATION = 500; // Duration of static noise
+import { drawChaoticIcosahedronVideo, initIcoDeepState, updateIcoDeepState, IcoDeepState } from './MyWorksIcosahedron';
+import { PROJECTS, DEFAULT_SCREEN_NAMES, ZOOM_DURATION, STATIC_DURATION } from './MyWorksData';
 
 export default function MyWorks({
     modelPath,
@@ -73,8 +56,6 @@ export default function MyWorks({
     disableStartPulse = false
 }: MyWorksProps) {
     const groupRef = useRef<THREE.Group>(null);
-    const normalizedMouse = useRef({ x: 0, y: 0 });
-    const currentLookAt = useRef({ x: 0, y: 0 });
     const [startButtonHovered, setStartButtonHovered] = useState(false);
     const [backButtonHovered, setBackButtonHovered] = useState(false);
     const [menuButtonHovered, setMenuButtonHovered] = useState(false);
@@ -87,82 +68,96 @@ export default function MyWorks({
     const [galleryState, setGalleryState] = useState<'idle' | 'zooming' | 'static' | 'gallery' | 'exiting'>('idle');
     const [isProjectTransition, setIsProjectTransition] = useState(false);
 
-    const galleryVideoRef = useRef<HTMLVideoElement | null>(null);
+    const galleryVideosRef = useRef<HTMLVideoElement[]>([]);
     const galleryEnterTime = useRef(0);
+    const icoDeepStateRef = useRef<IcoDeepState>(initIcoDeepState());
 
-    // Audio Refs
-    const typingAudioRef = useRef<HTMLAudioElement | null>(null);
+    // Typewriter system (like AboutMe)
+    const {
+        storyMode: typingMode,
+        waitingForInput,
+        typingStartTime,
+        startStory: startTyping,
+        handleInteraction: handleOSDClick,
+        signalTypingFinished,
+        typingAudioRef
+    } = useTypewriter({
+        storyContent: ['dummy'], // We'll manage text manually but use the hook's logic
+        enableStoryMode: true
+    });
+
     const lastTypedCharCount = useRef(0);
+    const hasStartedTyping = useRef(false);
 
-    // Skip Typing State
-    const [skipTyping, setSkipTyping] = useState(false);
-
-    // Optimization: Memoize OSD Layout
-    const osdLayout = useMemo(() => {
-        return calculateOSDLayout(PROJECTS[currentProjectIndex]);
-    }, [currentProjectIndex]);
-
-    // Init Audio
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const audio = new Audio('/sounds/Bip.wav');
-            audio.volume = 0.05; // Increased volume
-            typingAudioRef.current = audio;
-        }
-    }, []);
-
-    // Spacebar Listener for Skip
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (isFocused && e.code === 'Space') {
-                e.preventDefault(); // Prevent page scroll
-                setSkipTyping(true);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isFocused]);
-
+    // Initialize gallery and start typing when entering gallery
     useEffect(() => {
         if (galleryState === 'gallery') {
             galleryEnterTime.current = performance.now() / 1000;
             lastTypedCharCount.current = 0;
+
+            // Only start typing once per project
+            if (!hasStartedTyping.current) {
+                startTyping();
+                hasStartedTyping.current = true;
+            }
+        } else {
+            // Reset when leaving gallery
+            hasStartedTyping.current = false;
         }
-    }, [galleryState, currentProjectIndex]); // Reset when project changes too
+    }, [galleryState, currentProjectIndex]);
 
-    // Reset Skip on Project Change
+
+    const exitStartTime = useRef(0);
+    const prevLookAtRef = useRef({ x: 0, y: 0 });
+    const mouseVelRef = useRef({ x: 0, y: 0 });
+
+    // Track exit time to sequence animation (User requested: "wait for flicker... then grow eye")
     useEffect(() => {
-        setSkipTyping(false);
-    }, [currentProjectIndex]);
+        if (galleryState === 'exiting') {
+            exitStartTime.current = performance.now() / 1000;
+        }
+    }, [galleryState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
 
-    // Video Loading Effect
+
+    // Video Loading Effect (Optimized Staggered multi-video initialization)
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const currentSrc = PROJECTS[currentProjectIndex].videoSrc;
+            const NUM_VIDEOS = 6; // Reduced from 10 for performance
 
-            // Check if we already have a video element
-            let vid = galleryVideoRef.current;
-            if (!vid) {
-                vid = document.createElement('video');
-                vid.loop = true;
-                vid.muted = true;
-                vid.playsInline = true;
-                vid.crossOrigin = 'anonymous';
-                galleryVideoRef.current = vid;
+            // Initialize video array if empty
+            if (galleryVideosRef.current.length === 0) {
+                for (let i = 0; i < NUM_VIDEOS; i++) {
+                    const vid = document.createElement('video');
+                    vid.loop = true;
+                    vid.muted = true;
+                    vid.playsInline = true;
+                    vid.crossOrigin = 'anonymous';
+                    galleryVideosRef.current.push(vid);
+                }
             }
 
-            // Update source if changed
-            // Note: simple src check might need full URL comparison in some browsers, 
-            // but for relative paths this usually works if we keep it consistent.
-            // To be safe, we just set it.
-            if (vid.getAttribute('src') !== currentSrc) {
-                vid.src = currentSrc;
-                vid.load();
-                vid.play().catch(() => { });
-            } else {
-                // Ensure playing
-                if (vid.paused) vid.play().catch(() => { });
-            }
+            // Staggered "Slice Loading" to prevent main-thread freeze
+            galleryVideosRef.current.forEach((vid, i) => {
+                // Use a short delay per video to let the UI breathe
+                setTimeout(() => {
+                    if (vid.getAttribute('src') !== currentSrc) {
+                        vid.src = currentSrc;
+                        vid.load();
+
+                        vid.onloadedmetadata = () => {
+                            const duration = vid.duration;
+                            if (duration > 0) {
+                                vid.currentTime = (duration / NUM_VIDEOS) * i;
+                            }
+                            vid.play().catch(() => { });
+                        };
+                    } else {
+                        if (vid.paused) vid.play().catch(() => { });
+                    }
+                }, i * 50); // 50ms stagger per video
+            });
         }
     }, [currentProjectIndex]);
 
@@ -174,7 +169,7 @@ export default function MyWorks({
             setCurrentProjectIndex(prev => (prev + 1) % PROJECTS.length);
             setGalleryState('gallery');
             setIsProjectTransition(false);
-        }, 300);
+        }, STATIC_DURATION);
     };
 
     const handlePrevProject = () => {
@@ -184,7 +179,7 @@ export default function MyWorks({
             setCurrentProjectIndex(prev => (prev - 1 + PROJECTS.length) % PROJECTS.length);
             setGalleryState('gallery');
             setIsProjectTransition(false);
-        }, 300);
+        }, STATIC_DURATION);
     };
 
 
@@ -196,9 +191,6 @@ export default function MyWorks({
         if (isFocused) {
             // Start sequence
             setGalleryState('zooming');
-
-            // We want static to END when zoom ENDS.
-            // So start static at (ZOOM - STATIC)
             const startStaticDelay = Math.max(0, ZOOM_DURATION - STATIC_DURATION);
 
             zoomTimer = setTimeout(() => {
@@ -213,10 +205,6 @@ export default function MyWorks({
         } else {
             // Reset immediately on blur
             setGalleryState('idle');
-            // Reset to first project on exit? Or keep state?
-            // Keeping state feels more natural for "pausing". 
-            // If user wants reset, we can do it here. 
-            // Let's keep it for now.
         }
 
         return () => {
@@ -255,82 +243,49 @@ export default function MyWorks({
         uvRotation
     });
 
-    const morphProgressRef = useRef(0);
-
-    const blinkState = useRef({
-        isBlinking: false,
-        openness: 1.0,
-        nextBlinkTime: 0,
-        blinkDuration: 0.15,
-        blinkTimer: 0
+    // --- SHARED HOOKS ---
+    const {
+        normalizedMouse,
+        currentLookAt,
+        updateScreenGaze
+    } = useScreenInteraction({
+        groupRef,
+        screenNames,
+        gazeOffset,
+        invertY
     });
 
-    // OSD Transition Opacity
+    const {
+        blinkState,
+        updateBlink
+    } = useBlink();
+
+    // --- FIGURE TRANSITIONS ---
+
+    // OSD Transition Opacity (with flicker effect)
     const {
         transitionOpacity: osdOpacityRef
-    } = useFigureTransition(galleryState === 'gallery' ? 'osd' : null);
+    } = useFigureTransition(galleryState === 'gallery' ? 'osd' : null, 0);
+
+    // Video Transition Opacity (same smooth flicker as OSD)
+    const {
+        transitionOpacity: videoOpacityRef
+    } = useFigureTransition(galleryState === 'gallery' ? 'video' : null, 0);
+
+    // Eye Transition Opacity (visible in idle/zooming, fades out in static/gallery/exiting)
+    const eyeTarget = (galleryState === 'idle' || galleryState === 'zooming') ? 'eye' : null;
+    const {
+        transitionOpacity: eyeOpacityRef
+    } = useFigureTransition(eyeTarget, 0); // timeOffset 0 to match About Me
+
 
     const activeTheme = THEMES[theme] || THEMES.classic;
-
-    const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | 'prev' | 'eye' | 'text_box' | null => {
-        if (!isFocused) return null;
-
-        let px = uv.x * 512;
-        let py = (1 - uv.y) * 512;
-        let dx = px - 256;
-        let dy = py - 256;
-
-        if (invertY) dy = -dy;
-
-        if (showStartButton) {
-            const btnX = startButtonPosition ? startButtonPosition.x : MYWORKS_BUTTON_CONFIG.PLAY.x;
-            const btnY = startButtonPosition ? startButtonPosition.y : MYWORKS_BUTTON_CONFIG.PLAY.y;
-            const distPlay = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distPlay < MYWORKS_BUTTON_CONFIG.PLAY.radius) return 'play';
-        }
-
-        if (showBackButton) {
-            const btnX = backButtonPosition ? backButtonPosition.x : MYWORKS_BUTTON_CONFIG.BACK.x;
-            const btnY = backButtonPosition ? backButtonPosition.y : MYWORKS_BUTTON_CONFIG.BACK.y;
-            const distBack = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distBack < MYWORKS_BUTTON_CONFIG.BACK.radius) return 'back';
-        }
-
-        if (showMenuButton) {
-            const btnX = menuButtonPosition ? menuButtonPosition.x : MYWORKS_BUTTON_CONFIG.MENU.x;
-            const btnY = menuButtonPosition ? menuButtonPosition.y : MYWORKS_BUTTON_CONFIG.MENU.y;
-            const distMenu = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distMenu < MYWORKS_BUTTON_CONFIG.MENU.radius) return 'menu';
-        }
-
-        if (showPrevButton) {
-            const btnX = prevButtonPosition ? prevButtonPosition.x : MYWORKS_BUTTON_CONFIG.PREV.x;
-            const btnY = prevButtonPosition ? prevButtonPosition.y : MYWORKS_BUTTON_CONFIG.PREV.y;
-            const distPrev = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distPrev < MYWORKS_BUTTON_CONFIG.PREV.radius) return 'prev';
-        }
-
-        if (showEyeButton) {
-            const btnX = eyeButtonPosition ? eyeButtonPosition.x : MYWORKS_BUTTON_CONFIG.EYE.x;
-            const btnY = eyeButtonPosition ? eyeButtonPosition.y : MYWORKS_BUTTON_CONFIG.EYE.y;
-            const distEye = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distEye < MYWORKS_BUTTON_CONFIG.EYE.radius) return 'eye';
-        }
-
-        // Check Text Box Hit (Optimized)
-        if (galleryState === 'gallery') {
-            const { minX, maxX, minY, maxY } = osdLayout.hitArea;
-            if (dx > minX && dx < maxX && dy > minY && dy < maxY) {
-                return 'text_box';
-            }
-        }
-
-        return null;
-    };
 
     const renderAccumulator = useRef(0);
     const FPS_LIMIT = 24;
     const FRAME_DURATION = 1 / FPS_LIMIT;
+
+    const eyeMorphProgress = useRef(0);
 
     useFrame((state, delta) => {
         if (groupRef.current) {
@@ -338,79 +293,63 @@ export default function MyWorks({
             if (dist > 15) return;
         }
 
-        renderAccumulator.current += delta;
-        if (renderAccumulator.current < FRAME_DURATION) return;
+        // 1. Physics update (Native Refresh Rate)
+        updateIcoDeepState(icoDeepStateRef.current, delta);
 
-        const dt = renderAccumulator.current;
-        renderAccumulator.current %= FRAME_DURATION;
+        // 2. OSD Logic Gate (24fps)
+        renderAccumulator.current += delta;
+        const shouldUpdateLogic = renderAccumulator.current >= FRAME_DURATION;
+        const dt = shouldUpdateLogic ? renderAccumulator.current : 0;
+        if (shouldUpdateLogic) {
+            renderAccumulator.current %= FRAME_DURATION;
+        }
 
         if (screenTextureRef.current && groupRef.current) {
+            // --- Update Loop (Native 60fps for Icosahedron Physics) ---
+            if (galleryState !== 'idle') {
+                const canvas = screenTextureRef.current.image as HTMLCanvasElement;
+                if (canvas) {
+                    const w = canvas.width;
+                    const h = canvas.height;
 
-            const targetPos = new THREE.Vector3();
-            if (!screenMeshRef.current) {
-                groupRef.current.traverse((child) => {
-                    if (child instanceof THREE.Mesh) {
-                        const childNameLower = child.name.toLowerCase();
-                        if (screenNames.some(name => childNameLower.includes(name.toLowerCase()))) {
-                            screenMeshRef.current = child;
-                        }
-                    }
-                });
-            }
+                    // Calculate mouse velocity for physics
+                    const curX = currentLookAt.current.x * (w / 2);
+                    const curY = (invertY ? currentLookAt.current.y : -currentLookAt.current.y) * (h / 2) + 20;
 
-            if (screenMeshRef.current) {
-                const mesh = screenMeshRef.current;
-                mesh.geometry.computeBoundingBox();
-                const box = mesh.geometry.boundingBox;
-                if (box) {
-                    box.getCenter(targetPos);
-                    mesh.localToWorld(targetPos);
+                    const dx = curX - prevLookAtRef.current.x;
+                    const dy = curY - prevLookAtRef.current.y;
+
+                    // Smooth the velocity a bit
+                    mouseVelRef.current.x = mouseVelRef.current.x * 0.5 + (dx / delta) * 0.5;
+                    mouseVelRef.current.y = mouseVelRef.current.y * 0.5 + (dy / delta) * 0.5;
+
+                    prevLookAtRef.current.x = curX;
+                    prevLookAtRef.current.y = curY;
+
+                    const mouseIco = { x: curX, y: curY };
+                    updateIcoDeepState(icoDeepStateRef.current, delta, mouseIco, mouseVelRef.current);
                 }
-            } else {
-                groupRef.current.getWorldPosition(targetPos);
             }
+            // Update 24fps logic ONLY when gate is open
+            if (shouldUpdateLogic) {
+                updateScreenGaze(state, dt);
+                updateBlink(dt, state.clock.elapsedTime);
 
-            const tvScreenPos = targetPos.project(state.camera);
-            const gazeX = state.mouse.x - tvScreenPos.x;
-            const gazeY = state.mouse.y - tvScreenPos.y;
-
-            const sensitivity = 5.0;
-            let aspectCompensation = 1.0;
-            if (theme === 'toxic' && screenAspect.current > 1.1) {
-                aspectCompensation = 1 / screenAspect.current;
+                // Update Morphing (Smooth lerp)
+                let targetMorph = (galleryState === 'gallery' || galleryState === 'static') ? 1.0 : 0.0;
+                if (galleryState === 'exiting') {
+                    const currentTime = performance.now() / 1000;
+                    if (currentTime - exitStartTime.current < 0.5) targetMorph = 1.0;
+                }
+                const morphSpeed = 2.0 * dt;
+                eyeMorphProgress.current += (targetMorph - eyeMorphProgress.current) * morphSpeed;
+                if (Math.abs(eyeMorphProgress.current - targetMorph) < 0.001) eyeMorphProgress.current = targetMorph;
             }
-
-            let finalX = (gazeX * sensitivity) + gazeOffset.x;
-            let finalY = (invertY ? -gazeY : gazeY) * sensitivity * aspectCompensation + gazeOffset.y;
-
-            normalizedMouse.current.x = Math.max(-1, Math.min(1, finalX));
-            normalizedMouse.current.y = Math.max(-1, Math.min(1, finalY));
 
             const canvas = screenTextureRef.current.image as HTMLCanvasElement;
             const ctx = canvas.getContext('2d');
+            const morph = eyeMorphProgress.current;
 
-            const speed = 2.0 * dt;
-            currentLookAt.current.x += (normalizedMouse.current.x - currentLookAt.current.x) * speed;
-            currentLookAt.current.y += (normalizedMouse.current.y - currentLookAt.current.y) * speed;
-
-            const blink = blinkState.current;
-            blink.blinkTimer += dt;
-            if (!blink.isBlinking) {
-                if (state.clock.elapsedTime > blink.nextBlinkTime) {
-                    blink.isBlinking = true;
-                    blink.blinkTimer = 0;
-                    blink.nextBlinkTime = state.clock.elapsedTime + Math.random() * 4 + 2;
-                }
-                blink.openness = 1.0;
-            } else {
-                const progress = blink.blinkTimer / blink.blinkDuration;
-                if (progress >= 1) {
-                    blink.isBlinking = false;
-                    blink.openness = 1.0;
-                } else {
-                    blink.openness = Math.abs(Math.cos(progress * Math.PI));
-                }
-            }
 
             if (ctx) {
                 const w = canvas.width;
@@ -419,121 +358,303 @@ export default function MyWorks({
 
                 // --- RENDERING PIPELINE START ---
 
-                // 1. BACKGROUND / BASE
-                // If in 'gallery' or 'exiting', we draw the image/video first.
-                // This keeps the video visible under the exit static.
+                // 1. BACKGROUND
+                // Use Standard Theme Background for ALL states to ensure consistent color
+                ctx.fillStyle = activeTheme.bgColor;
+                ctx.fillRect(0, 0, w, h);
 
-                if (galleryState === 'gallery' || galleryState === 'exiting' || galleryState === 'static') {
-                    let drawn = false;
-                    if (galleryVideoRef.current && galleryVideoRef.current.readyState >= 2) {
-                        try {
-                            const vid = galleryVideoRef.current;
-                            if (vid.paused) vid.play().catch(() => { });
+                const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
+                backlight.addColorStop(0, activeTheme.glowCenter);
+                backlight.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = backlight;
+                ctx.fillRect(0, 0, w, h);
 
-                            ctx.save();
+                ctx.fillStyle = activeTheme.baseColor;
+                ctx.fillRect(0, 0, w, h);
 
-                            const now = performance.now() / 1000;
-                            const timeSinceEntry = now - galleryEnterTime.current;
-                            let vHoldOffset = 0;
+                // Additional darkening for Gallery mode if needed, but keeping base vibrant for now
+                if (galleryState === 'gallery' || galleryState === 'exiting') {
+                    // Optional: slight dimming if text contrast is an issue, but user asked for SAME color
+                    // ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    // ctx.fillRect(0,0,w,h);
+                }
 
-                            if (galleryState === 'gallery' && timeSinceEntry < 1.0) {
-                                const t = timeSinceEntry;
-                                vHoldOffset = (h * 0.15) * Math.exp(-t * 5) * Math.cos(t * 10);
-                            }
 
-                            ctx.translate(0, h + vHoldOffset);
-                            ctx.scale(1, -1);
-                            ctx.drawImage(vid, 0, 0, w, h);
-                            ctx.restore();
-                            drawn = true;
-                        } catch (e) {
-                        }
-                    }
+                // 2. RENDER EYE (MORPHING)
+                // The eye is ALWAYS visible now, it just morphs between states.
+                // State 0 (Big): Center + Mouse Gaze, Scale ~1.0
+                // State 1 (Button): Fixed at `MYWORKS_BUTTON_CONFIG.EYE`, Scale ~0.3
 
-                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                    ctx.fillRect(0, 0, w, h);
+                // Opacity: Always 1.0 unless we want effects. Let's keep it solid.
+                // Or maybe slight flicker if we kept the old logic? User said "wuelva a crecer", implies continuous presence.
+                // We'll remove opacity fading logic for the eye entirely.
 
-                } else {
-                    // Standard Theme Background
-                    ctx.fillStyle = activeTheme.bgColor;
-                    ctx.fillRect(0, 0, w, h);
-
-                    const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
-                    backlight.addColorStop(0, activeTheme.glowCenter);
-                    backlight.addColorStop(1, 'rgba(0,0,0,0)');
-                    ctx.fillStyle = backlight;
-                    ctx.fillRect(0, 0, w, h);
-
-                    ctx.fillStyle = activeTheme.baseColor;
-                    ctx.fillRect(0, 0, w, h);
-
+                if (morph < 0.99 || galleryState === 'gallery' || galleryState === 'static' || galleryState === 'exiting') {
                     ctx.save();
+
+                    // --- Interpolate Position ---
+                    // Big Eye: Center (0,0 relative to translation) + Offset based on lookAt
+                    // Button Eye: Fixed position (MYWORKS_BUTTON_CONFIG.EYE)
+
                     const isLCD = theme === 'toxic';
                     const scleraMaxOffsetX = isLCD ? 150 : 100;
                     const scleraMaxOffsetY = 100;
-                    const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
-                    const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
 
-                    ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
+                    // Hover Animation Logic (User requested: "agrandan y tiemblan al hacer hover")
+                    // We calculate this regardless of morph state, but apply it fully only when morphed.
+                    const eyeHoverProgress = updateButtonHoverAnimation(
+                        screenTextureRef.current,
+                        'hoverAnimEye',
+                        eyeButtonHovered
+                    );
 
-                    let scaleEye = 1.0;
+                    // Big Eye Position Components
+                    const startX = currentLookAt.current.x * scleraMaxOffsetX;
+                    const startY = -currentLookAt.current.y * scleraMaxOffsetY;
+
+                    // Button Eye Position Components (Target)
+                    const targetX = eyeButtonPosition ? eyeButtonPosition.x : MYWORKS_BUTTON_CONFIG.EYE.x;
+                    let targetY = eyeButtonPosition ? eyeButtonPosition.y : MYWORKS_BUTTON_CONFIG.EYE.y;
+
+                    if (invertY) {
+                        targetY = -targetY;
+                    }
+
+                    // --- Jitter Effect (Shake) on Hover ---
+                    // Only apply when fully morphed to button (or mostly morphed)
+                    let jitterX = 0;
+                    let jitterY = 0;
+                    if (morph > 0.8 && eyeHoverProgress > 0.8) {
+                        jitterX = (Math.random() - 0.5) * 3 * eyeHoverProgress;
+                        jitterY = (Math.random() - 0.5) * 3 * eyeHoverProgress;
+                    }
+
+                    // Interpolate Position
+                    const currentX = startX * (1 - morph) + (targetX + jitterX) * morph;
+                    const currentY = startY * (1 - morph) + (targetY + jitterY) * morph;
+
+                    ctx.translate(w / 2 + currentX, h / 2 + currentY);
+
+                    // --- Interpolate Scale ---
+                    // Big Eye Scale: 1.0
+                    // Button Eye Scale: ~0.25
+                    // Hover Effect: Grow by 10-15% when hovered (in button mode)
+
                     let geoCorrectionX = 1.0;
-                    if (theme === 'toxic' && screenAspect.current > 1.2) {
+                    if (screenAspect.current > 1.2) {
                         geoCorrectionX = 1 / (screenAspect.current * 0.85);
                     }
-                    ctx.scale(geoCorrectionX * scaleEye, blink.openness * scaleEye);
 
+                    const startScale = 1.0;
+                    // Apply hover growth to target scale
+                    const baseTargetScale = 0.25;
+                    const hoverScaleBoost = 1.0 + (eyeHoverProgress * 0.15); // Grow 15%
+                    const targetScale = baseTargetScale * hoverScaleBoost;
+
+                    // Lerp base scale
+                    const currentBaseScale = startScale * (1 - morph) + targetScale * morph;
+
+                    // Apply blinking
+                    const blinkScaleY = blinkState.current.openness;
+
+                    ctx.scale(geoCorrectionX * currentBaseScale, currentBaseScale * blinkScaleY);
+
+                    // --- Render ---
                     let irisColor = '#5090ff';
                     if (theme === 'toxic') irisColor = '#00bb33';
+
+                    // --- Pupil Tracking Logic ---
+                    // "que realmente trackee el mouse... pero que solo funcione así cuando está en modo botón"
+                    // Big Mode: Use simple `normalizedMouse` (looks at mouse relative to screen center).
+                    // Button Mode: Calculate vector from Eye's new position to Mouse.
+
+                    let pupilPos = normalizedMouse.current;
+
+                    if (morph > 0.8) {
+                        try {
+                            // Convert normalized mouse to canvas coordinates (relative to center)
+                            // normalizedMouse is -1 to 1. Canvas is w x h.
+                            // normalizedMouse.x: +1 is right. So mx = normalizedMouse.x * (w/2).
+                            // normalizedMouse.y: +1 is UP (as expected by drawPixelEye).
+                            // Canvas Y is positive DOWN. So to convert normalizedMouse.y (Up-positive)
+                            // to canvas pixel Y (Down-positive), we negate it.
+                            const mx = normalizedMouse.current.x * (w / 2);
+                            const my = -normalizedMouse.current.y * (h / 2);
+
+                            // Eye position (currentX, currentY) in canvas pixels (relative to center)
+                            // These are already in canvas-like coordinates (positive right, positive down for Y if not inverted)
+                            // But currentY is already inverted if invertY is true, so it's consistent with canvas Y.
+                            const ex = currentX;
+                            const ey = currentY;
+
+                            // Vector from Eye to Mouse (in canvas pixel coordinates)
+                            const dx = mx - ex;
+                            const dy = my - ey;
+
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            const maxLookDistance = 200; // Distance at which eye looks fully in that direction
+                            const lookAmount = Math.min(1.0, dist / maxLookDistance);
+
+                            // Normalize the direction vector and convert back to drawPixelEye's expected format:
+                            // x: positive right, y: positive UP.
+                            if (dist > 1e-6) { // Avoid division by zero
+                                pupilPos = {
+                                    x: (dx / dist) * lookAmount,
+                                    y: -(dy / dist) * lookAmount // Negate dy to convert from canvas (Down-positive) to drawPixelEye (Up-positive)
+                                };
+                            } else {
+                                pupilPos = { x: 0, y: 0 }; // If mouse is exactly on eye, look straight
+                            }
+                        } catch (e) {
+                            // Fallback to default if any error occurs during calculation
+                            console.error("Error calculating pupil position:", e);
+                            pupilPos = normalizedMouse.current;
+                        }
+                    }
 
                     const customLookRange = 32;
                     const isHologram = false;
                     const scleraColor = '#ffffff';
 
-                    drawPixelEye(ctx, normalizedMouse.current, irisColor, customLookRange, scleraColor, isHologram);
+                    // Draw eye
+                    drawPixelEye(ctx, pupilPos, irisColor, customLookRange, scleraColor, isHologram);
+
+                    // Button Pulse Effect (ALWAYS active when in Button Mode, i.e., morph > 0.8)
+                    if (morph > 0.8) {
+                        const time = state.clock.elapsedTime;
+
+                        // Emulate `drawButtonShockwave` logic
+                        const fps = 8;
+                        const steppedTime = Math.floor(time * fps) / fps;
+                        const waveProgress = (steppedTime % 2.0) / 2.0;
+
+                        const baseRx = 90;
+                        const baseRy = 70;
+                        const expansion = waveProgress * 40;
+
+                        // Alpha fade:
+                        // 1. Fade out over time (wave cycle)
+                        // 2. Fade out if hovered (User requested: "se desvanezca... cuando hago hover")
+                        const hoverFade = 1.0 - eyeHoverProgress; // 1.0 -> 0.0
+                        const waveAlpha = Math.max(0, 1.0 - waveProgress) * hoverFade;
+
+                        if (waveAlpha > 0.01) {
+                            ctx.save();
+                            ctx.globalAlpha = waveAlpha;
+                            ctx.beginPath();
+                            ctx.ellipse(0, 0, baseRx + expansion, baseRy + (expansion * 0.8), 0, 0, Math.PI * 2);
+                            ctx.strokeStyle = '#ffffff';
+                            ctx.lineWidth = 3;
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    }
+
                     ctx.restore();
                 }
 
-                // 1.5 TITLE INTRO (Rendered before Static so it gets affected)
-                // Only show after static (Gallery/Exiting)
-                if (isFocused && focusedText && (galleryState === 'gallery' || (galleryState === 'static' && isProjectTransition))) {
+
+                // 3. VIDEO + PROJECT INFO 
+                // Show in 'gallery' always.
+                // Show in 'static' ONLY during project transitions (isProjectTransition=true).
+                // Show in 'exiting' to allow flicker OUT animation.
+                const shouldShowContent = galleryState === 'gallery' || (galleryState === 'static' && isProjectTransition) || galleryState === 'exiting';
+                if (shouldShowContent && isFocused) {
+                    const currentProject = PROJECTS[currentProjectIndex];
+
+                    // VIDEO: Multi-staggered loop icosahedron (Robust rendering)
+                    const hasVideos = galleryVideosRef.current.length > 0;
+                    if (hasVideos) {
+                        try {
+                            ctx.save();
+                            ctx.translate(w / 2, h / 2);
+
+                            if (invertY) {
+                                ctx.rotate(Math.PI);
+                                ctx.scale(-1, 1);
+                            }
+
+                            // 3D Chaotic Video Icosahedron (Staggered Looping + Interactive Deformation)
+                            const videoOpacity = videoOpacityRef.current;
+
+                            // Calculate local mouse position for the icosahedron
+                            // currentLookAt is -1 to 1 relative to screen center.
+                            const mouseIco = {
+                                x: currentLookAt.current.x * (w / 2),
+                                y: (invertY ? currentLookAt.current.y : -currentLookAt.current.y) * (h / 2) + 20
+                            };
+
+                            // Position slightly above center (lowered from -70 to -20 for better centring)
+                            ctx.translate(0, -20);
+
+                            // Draw chaotic icosahedron using the array of staggered videos and interactivity
+                            drawChaoticIcosahedronVideo(ctx, galleryVideosRef.current, videoOpacity, icoDeepStateRef.current, mouseIco);
+
+                            ctx.restore();
+                        } catch (e) {
+                        }
+                    }
+
+                    // OSD: Project info text box
+
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
-
                     if (invertY) {
                         ctx.rotate(Math.PI);
                         ctx.scale(-1, 1);
                     }
 
-                    const fontSize = '40px';
-                    const targetY = -190;
+                    const osdOpacity = osdOpacityRef.current;
+                    const typingState = drawProjectInfo(ctx, w, h, currentProject, typingStartTime, waitingForInput, osdOpacity);
 
+                    // Sound for typewriter (EXACT AboutMe logic)
+                    if (typingState && typingState.charsShown > lastTypedCharCount.current) {
+                        if (typingAudioRef.current && osdOpacity > 0.1) {
+                            typingAudioRef.current.playbackRate = 0.9 + Math.random() * 0.3;
+                            typingAudioRef.current.currentTime = 0;
+                            typingAudioRef.current.play().catch(() => { });
+                        }
+                        lastTypedCharCount.current = typingState.charsShown;
+                    }
+
+                    // Signal typing finished (like AboutMe)
+                    if (typingState && typingState.isComplete && !waitingForInput) {
+                        signalTypingFinished();
+                    }
+
+                    ctx.restore();
+                }
+
+                // Focused Text
+                // 3. TITLE (always visible in gallery or static)
+                if (isFocused && focusedText && (galleryState === 'gallery' || galleryState === 'static')) {
+                    ctx.save();
+                    ctx.translate(w / 2, h / 2);
+                    if (invertY) {
+                        ctx.rotate(Math.PI);
+                        ctx.scale(-1, 1);
+                    }
                     const jitterX = (Math.random() - 0.5) * 4;
                     const jitterY = (Math.random() - 0.5) * 4;
-
-                    ctx.font = `900 ${fontSize} "Courier New", monospace`;
+                    ctx.font = '900 50px "Courier New", monospace';
                     ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
+                    ctx.textBaseline = 'top';
+                    const textY = -h / 2 + textYOffset;
 
                     ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-                    ctx.fillText(focusedText, 0 + jitterX + 4, targetY + jitterY);
-
+                    ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
                     ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-                    ctx.fillText(focusedText, 0 + jitterX - 4, targetY + jitterY);
-
+                    ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
                     ctx.fillStyle = '#ffffff';
-
                     if (Math.random() > 0.1) {
-                        ctx.fillText(focusedText, 0 + jitterX, targetY + jitterY);
+                        ctx.fillText(focusedText, jitterX, textY + jitterY);
                     }
 
                     ctx.restore();
                 }
 
-                // 1.8 UI / BUTTONS (Rendered before Static)
-                // Show ONLY when in 'gallery' (after static) or 'exiting'.
-                // Hidden during 'zooming' and initial 'static'.
-                if (isFocused && (galleryState === 'gallery' || (galleryState === 'static' && isProjectTransition))) {
+                // 4. BUTTONS (always visible in gallery or static)
+                if (isFocused && (galleryState === 'gallery' || galleryState === 'static')) {
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
@@ -541,19 +662,15 @@ export default function MyWorks({
                         ctx.scale(-1, 1);
                     }
 
+                    // Use shared helper for hover animations
                     if (showStartButton) {
                         const btnX = startButtonPosition ? startButtonPosition.x : MYWORKS_BUTTON_CONFIG.PLAY.x;
                         const btnY = startButtonPosition ? startButtonPosition.y : MYWORKS_BUTTON_CONFIG.PLAY.y;
-                        const isHover = startButtonHovered;
-                        let hoverProgress = 0;
-                        if (screenTextureRef.current) {
-                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
-                            if (typeof screenTextureRef.current.userData.hoverAnim === 'undefined') screenTextureRef.current.userData.hoverAnim = 0;
-                            const target = isHover ? 1 : 0;
-                            screenTextureRef.current.userData.hoverAnim += (target - screenTextureRef.current.userData.hoverAnim) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnim) < 0.001) screenTextureRef.current.userData.hoverAnim = 0;
-                            hoverProgress = screenTextureRef.current.userData.hoverAnim;
-                        }
+
+                        const hoverProgress = updateButtonHoverAnimation(
+                            screenTextureRef.current, 'hoverAnim', startButtonHovered
+                        );
+
                         if (!disableStartPulse) {
                             drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, '#ffffff');
                         }
@@ -563,124 +680,46 @@ export default function MyWorks({
                     if (showPrevButton) {
                         const btnPrevX = prevButtonPosition ? prevButtonPosition.x : MYWORKS_BUTTON_CONFIG.PREV.x;
                         const btnPrevY = prevButtonPosition ? prevButtonPosition.y : MYWORKS_BUTTON_CONFIG.PREV.y;
-                        const isPrevHover = prevButtonHovered;
-                        let hoverProgressPrev = 0;
-                        if (screenTextureRef.current) {
-                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
-                            if (typeof screenTextureRef.current.userData.hoverAnimPrev === 'undefined') screenTextureRef.current.userData.hoverAnimPrev = 0;
-                            const targetPrev = isPrevHover ? 1 : 0;
-                            screenTextureRef.current.userData.hoverAnimPrev += (targetPrev - screenTextureRef.current.userData.hoverAnimPrev) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnimPrev) < 0.001) screenTextureRef.current.userData.hoverAnimPrev = 0;
-                            hoverProgressPrev = screenTextureRef.current.userData.hoverAnimPrev;
-                        }
+
+                        const hoverProgressPrev = updateButtonHoverAnimation(
+                            screenTextureRef.current, 'hoverAnimPrev', prevButtonHovered
+                        );
+
                         drawPlayStopButton(ctx, btnPrevX, btnPrevY, hoverProgressPrev, 0, '#ffffff', Math.PI);
                     }
 
                     if (showBackButton) {
                         const btnBackX = backButtonPosition ? backButtonPosition.x : MYWORKS_BUTTON_CONFIG.BACK.x;
                         const btnBackY = backButtonPosition ? backButtonPosition.y : MYWORKS_BUTTON_CONFIG.BACK.y;
-                        const isBackHover = backButtonHovered;
-                        let hoverProgressBack = 0;
-                        if (screenTextureRef.current) {
-                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
-                            if (typeof screenTextureRef.current.userData.hoverAnimBack === 'undefined') screenTextureRef.current.userData.hoverAnimBack = 0;
-                            const targetBack = isBackHover ? 1 : 0;
-                            screenTextureRef.current.userData.hoverAnimBack += (targetBack - screenTextureRef.current.userData.hoverAnimBack) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnimBack) < 0.001) screenTextureRef.current.userData.hoverAnimBack = 0;
-                            hoverProgressBack = screenTextureRef.current.userData.hoverAnimBack;
-                        }
+
+                        const hoverProgressBack = updateButtonHoverAnimation(
+                            screenTextureRef.current, 'hoverAnimBack', backButtonHovered
+                        );
+
                         drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, '#ffffff');
                     }
 
                     if (showMenuButton) {
                         const btnMenuX = menuButtonPosition ? menuButtonPosition.x : MYWORKS_BUTTON_CONFIG.MENU.x;
                         const btnMenuY = menuButtonPosition ? menuButtonPosition.y : MYWORKS_BUTTON_CONFIG.MENU.y;
-                        const isMenuHover = menuButtonHovered;
-                        let hoverProgressMenu = 0;
-                        if (screenTextureRef.current) {
-                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
-                            if (typeof screenTextureRef.current.userData.hoverAnimMenu === 'undefined') screenTextureRef.current.userData.hoverAnimMenu = 0;
-                            const targetMenu = isMenuHover ? 1 : 0;
-                            screenTextureRef.current.userData.hoverAnimMenu += (targetMenu - screenTextureRef.current.userData.hoverAnimMenu) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnimMenu) < 0.001) screenTextureRef.current.userData.hoverAnimMenu = 0;
-                            hoverProgressMenu = screenTextureRef.current.userData.hoverAnimMenu;
-                        }
+
+                        const hoverProgressMenu = updateButtonHoverAnimation(
+                            screenTextureRef.current, 'hoverAnimMenu', menuButtonHovered
+                        );
+
                         drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, '#ffffff');
                     }
 
-                    if (showEyeButton) {
-                        const btnX = eyeButtonPosition ? eyeButtonPosition.x : MYWORKS_BUTTON_CONFIG.EYE.x;
-                        const btnY = eyeButtonPosition ? eyeButtonPosition.y : MYWORKS_BUTTON_CONFIG.EYE.y;
-                        const isHover = eyeButtonHovered;
-                        let hoverProgress = 0;
-                        if (screenTextureRef.current) {
-                            if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
-                            if (typeof screenTextureRef.current.userData.hoverAnimEye === 'undefined') screenTextureRef.current.userData.hoverAnimEye = 0;
-                            const target = isHover ? 1 : 0;
-                            screenTextureRef.current.userData.hoverAnimEye += (target - screenTextureRef.current.userData.hoverAnimEye) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnimEye) < 0.001) screenTextureRef.current.userData.hoverAnimEye = 0;
-                            hoverProgress = screenTextureRef.current.userData.hoverAnimEye;
-                        }
-                        const eyeRadius = eyeButtonPosition && (eyeButtonPosition as any).radius ? (eyeButtonPosition as any).radius : MYWORKS_BUTTON_CONFIG.EYE.radius;
-                        drawEyeButton(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, '#ffffff', eyeRadius);
-                    }
+                    // Eye button: NO LONGER DRAWN SEPARATELY
+                    // The Main Eye morphs into this position.
+                    // We only need to handle the hover visual if you want extra effects (added above)
 
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.restore();
                 }
 
-                // 2. STATIC OVERLAY
-                if (galleryState === 'static' || galleryState === 'exiting') {
-                    // Full Static
-                    drawStaticNoise(ctx, w, h, time, 0.9);
-                } else if (galleryState === 'gallery') {
-                    // Subtle grain over gallery? (Optional, adds realism)
-                    drawStaticNoise(ctx, w, h, time, 0.05);
 
-                    // 2.1 OSD TEXT (Project Info)
-                    // We need to flip coordinate system so it draws correctly on the inverted screen.
-                    // Canvas Bottom = Screen Top. We want OSD at Screen Bottom (Canvas Top).
-                    // And we need text to be flipped relative to Canvas so it's upright on Screen.
-                    const osdOpacity = osdOpacityRef.current; // Get opacity from hook
-
-                    ctx.save();
-                    if (invertY) {
-                        ctx.translate(0, h);
-                        ctx.scale(1, -1);
-                    }
-                    // Use performance.now() to match galleryEnterTime basis
-                    const now = performance.now() / 1000;
-                    // USE CURRENT PROJECT
-                    const currentProject = PROJECTS[currentProjectIndex];
-                    const typingState = drawOSD(ctx, w, h, now, osdLayout, galleryEnterTime.current, osdOpacity, skipTyping);
-                    ctx.restore();
-
-                    // Sound Logic (New)
-                    if (typingState && typingState.isTyping && typingState.charsDrawn > lastTypedCharCount.current) {
-                        if (typingAudioRef.current && osdOpacity > 0.1) {
-                            typingAudioRef.current.playbackRate = 0.9 + Math.random() * 0.3;
-                            typingAudioRef.current.currentTime = 0;
-                            typingAudioRef.current.play().catch(() => { });
-                        }
-                        lastTypedCharCount.current = typingState.charsDrawn;
-                    } else if (typingState && !typingState.isTyping && lastTypedCharCount.current < typingState.charsDrawn) {
-                        // Catch up count if paused/done
-                        lastTypedCharCount.current = typingState.charsDrawn;
-                    }
-                }
-
-                // 3. VIGNETTE & GLOW (Standard TV Effects)
-                // Applied on top of everything
-                const gradient = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
-                gradient.addColorStop(0, 'rgba(0,0,0,0)');
-                gradient.addColorStop(0.5, 'rgba(0,0,0,0.1)');
-                let vignetteColor = 'rgba(0, 10, 0, 0.95)'; // Toxic default
-                if (galleryState === 'gallery') vignetteColor = 'rgba(0,0,0,0.8)'; // Darker vignette for gallery
-
-                gradient.addColorStop(1, vignetteColor);
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, w, h);
-
+                // --- RENDERING PIPELINE END ---
                 // --- RENDERING PIPELINE END ---
             }
 
@@ -699,7 +738,23 @@ export default function MyWorks({
                         if (!isFocused) return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
-                            const buttonHit = checkButtonHover(e.uv);
+                            const buttonHit = checkButtonHover(
+                                e.uv,
+                                isFocused,
+                                invertY,
+                                galleryState,
+                                currentProjectIndex,
+                                showStartButton,
+                                showBackButton,
+                                showMenuButton,
+                                showPrevButton,
+                                showEyeButton,
+                                startButtonPosition,
+                                backButtonPosition,
+                                menuButtonPosition,
+                                prevButtonPosition,
+                                eyeButtonPosition
+                            );
 
                             const newPlayHover = buttonHit === 'play';
                             const newBackHover = buttonHit === 'back';
@@ -729,7 +784,23 @@ export default function MyWorks({
                     onClick={(e: any) => {
                         if (e.object.userData.isScreen && e.uv) {
                             // Ensure click hits the button
-                            const buttonHit = checkButtonHover(e.uv);
+                            const buttonHit = checkButtonHover(
+                                e.uv,
+                                isFocused,
+                                invertY,
+                                galleryState,
+                                currentProjectIndex,
+                                showStartButton,
+                                showBackButton,
+                                showMenuButton,
+                                showPrevButton,
+                                showEyeButton,
+                                startButtonPosition,
+                                backButtonPosition,
+                                menuButtonPosition,
+                                prevButtonPosition,
+                                eyeButtonPosition
+                            );
                             if (buttonHit === 'play') {
                                 e.stopPropagation();
                                 handleNextProject(); // INTERNAL NAV
@@ -754,7 +825,7 @@ export default function MyWorks({
                                 window.open(PROJECTS[currentProjectIndex].link, '_blank');
                             } else if (buttonHit === 'text_box') {
                                 e.stopPropagation();
-                                setSkipTyping(true);
+                                handleOSDClick(); // Skip typing or advance like AboutMe
                             }
                         }
                     }}
@@ -763,3 +834,4 @@ export default function MyWorks({
         </group>
     );
 }
+

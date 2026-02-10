@@ -1,4 +1,3 @@
-
 export interface MyWorksProps {
     modelPath: string;
     screenNames?: string[];
@@ -39,27 +38,3 @@ export const MYWORKS_BUTTON_CONFIG = {
     PREV: { x: -200, y: 190, radius: 40 },
     EYE: { x: 0, y: 190, radius: 20 }
 };
-
-// Shared Layout Interface
-export interface OSDLayout {
-    allLines: string[];
-    t1: number;
-    t2: number;
-    totalChars: number;
-    boxX: number;
-    boxY: number;
-    boxW: number;
-    boxH: number;
-    hitArea: {
-        minX: number;
-        maxX: number;
-        minY: number;
-        maxY: number;
-    };
-    lineHeight: number;
-    groups: {
-        len1: number;
-        len2: number;
-        len3: number;
-    };
-}

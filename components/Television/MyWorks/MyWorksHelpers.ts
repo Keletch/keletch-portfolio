@@ -1,191 +1,207 @@
+// MyWorks Helper Functions
+import * as THREE from 'three';
+import { MYWORKS_BUTTON_CONFIG } from './MyWorksTypes';
+import { PROJECTS } from './MyWorksData';
+
+// Re-exporting shared button drawing functions from main Helpers
 export {
     drawButtonShockwave,
     drawPlayStopButton,
     drawBackButton,
-    drawMenuButton,
-    drawStaticNoise
+    drawMenuButton
 } from '../Helpers';
 
-import { OSDLayout } from './MyWorksTypes';
+// Check which button/area the user is hovering over
+export function checkButtonHover(
+    uv: THREE.Vector2,
+    isFocused: boolean,
+    invertY: boolean,
+    galleryState: string,
+    currentProjectIndex: number,
+    showStartButton: boolean,
+    showBackButton: boolean,
+    showMenuButton: boolean,
+    showPrevButton: boolean,
+    showEyeButton: boolean,
+    startButtonPosition?: { x: number; y: number },
+    backButtonPosition?: { x: number; y: number },
+    menuButtonPosition?: { x: number; y: number },
+    prevButtonPosition?: { x: number; y: number },
+    eyeButtonPosition?: { x: number; y: number }
+): 'play' | 'back' | 'menu' | 'prev' | 'eye' | 'text_box' | null {
+    if (!isFocused) return null;
 
-// Optimization: Calculate layout once per project
-export function calculateOSDLayout(project: { title: string; stack: string; desc: string }): OSDLayout {
-    const maxLineLength = 38;
-    const lineHeight = 25;
-    const boxX = 30;
-    const w = 512;
-    const h = 512;
-    const boxW = w - 60;
+    let px = uv.x * 512;
+    let py = (1 - uv.y) * 512;
+    let dx = px - 256;
+    let dy = py - 256;
 
-    // Config
-    const typeSpeed = 0.1;
-    const sectionPause = 0.2;
+    if (invertY) dy = -dy;
 
-    const wrapText = (prefix: string, text: string): string[] => {
-        const fullText = prefix + text;
-        if (fullText.length <= maxLineLength) return [fullText];
-        const lines: string[] = [];
-        let remaining = fullText;
-        while (remaining.length > 0) {
-            if (remaining.length <= maxLineLength) {
-                lines.push(remaining);
-                break;
-            }
-            let split = remaining.lastIndexOf(' ', maxLineLength);
-            if (split === -1 || split < 15) split = maxLineLength;
-            lines.push(remaining.substring(0, split));
-            remaining = "           " + remaining.substring(split + 1);
-        }
-        return lines;
-    };
+    if (showStartButton) {
+        const btnX = startButtonPosition ? startButtonPosition.x : MYWORKS_BUTTON_CONFIG.PLAY.x;
+        const btnY = startButtonPosition ? startButtonPosition.y : MYWORKS_BUTTON_CONFIG.PLAY.y;
+        const distPlay = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
+        if (distPlay < MYWORKS_BUTTON_CONFIG.PLAY.radius) return 'play';
+    }
 
-    const lines1 = wrapText("> PROJECT: ", project.title);
-    const lines2 = wrapText("> STACK:   ", project.stack);
-    const lines3 = wrapText("> INFO:    ", project.desc);
+    if (showBackButton) {
+        const btnX = backButtonPosition ? backButtonPosition.x : MYWORKS_BUTTON_CONFIG.BACK.x;
+        const btnY = backButtonPosition ? backButtonPosition.y : MYWORKS_BUTTON_CONFIG.BACK.y;
+        const distBack = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
+        if (distBack < MYWORKS_BUTTON_CONFIG.BACK.radius) return 'back';
+    }
 
-    const allLines = [...lines1, ...lines2, ...lines3];
-    const totalTextHeight = allLines.length * lineHeight;
-    const boxH = totalTextHeight + 35;
-    const boxY = h - boxH - 100;
+    if (showMenuButton) {
+        const btnX = menuButtonPosition ? menuButtonPosition.x : MYWORKS_BUTTON_CONFIG.MENU.x;
+        const btnY = menuButtonPosition ? menuButtonPosition.y : MYWORKS_BUTTON_CONFIG.MENU.y;
+        const distMenu = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
+        if (distMenu < MYWORKS_BUTTON_CONFIG.MENU.radius) return 'menu';
+    }
 
-    const len1 = lines1.join("").length;
-    const len2 = lines2.join("").length;
-    const len3 = lines3.join("").length;
-    const totalChars = len1 + len2 + len3;
+    if (showPrevButton) {
+        const btnX = prevButtonPosition ? prevButtonPosition.x : MYWORKS_BUTTON_CONFIG.PREV.x;
+        const btnY = prevButtonPosition ? prevButtonPosition.y : MYWORKS_BUTTON_CONFIG.PREV.y;
+        const distPrev = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
+        if (distPrev < MYWORKS_BUTTON_CONFIG.PREV.radius) return 'prev';
+    }
 
-    // Time milestones
-    const t1 = len1 * typeSpeed;
-    const t2 = t1 + sectionPause + (len2 * typeSpeed);
+    if (showEyeButton) {
+        const btnX = eyeButtonPosition ? eyeButtonPosition.x : MYWORKS_BUTTON_CONFIG.EYE.x;
+        const btnY = eyeButtonPosition ? eyeButtonPosition.y : MYWORKS_BUTTON_CONFIG.EYE.y;
+        const distEye = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
+        if (distEye < MYWORKS_BUTTON_CONFIG.EYE.radius) return 'eye';
+    }
 
-    // Hit Area (Centered relative)
-    const boxDrawY = boxY;
-    const minY = boxDrawY - 256;
-    const maxY = (boxDrawY + boxH) - 256;
-    const minX = -226; // 30 - 256
-    const maxX = 226;  // (30 + 452) - 256
+    // Text box hit detection
+    if (galleryState === 'gallery') {
+        const textBoxY = 80;
+        const maxWidth = 380;
+        const padding = 15;
+        const lineHeight = 22;
 
-    return {
-        allLines,
-        t1,
-        t2,
-        totalChars,
-        boxX,
-        boxY,
-        boxW,
-        boxH,
-        hitArea: { minX, maxX, minY, maxY },
-        lineHeight,
-        groups: { len1, len2, len3 }
-    };
-}
-
-export function drawOSD(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    time: number,
-    layout: OSDLayout,
-    entryTime: number,
-    opacity: number = 1.0,
-    skipTyping: boolean = false
-): { charsDrawn: number; isTyping: boolean } {
-    const elapsed = time - entryTime;
-
-    if (opacity < 0.01) return { charsDrawn: 0, isTyping: false };
-
-    ctx.save();
-    ctx.globalAlpha = opacity;
-
-    const { boxX, boxY, boxW, boxH, allLines, lineHeight } = layout;
-
-    // Draw Box
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(boxX, boxY, boxW, boxH);
-
-    // Border
-    ctx.strokeStyle = `rgba(0, 255, 0, ${0.3 * opacity})`;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(boxX, boxY, boxW, boxH);
-
-    // Text Settings
-    ctx.font = 'bold 16px "Courier New", monospace';
-
-    // Typewriter Logic
-    const typeSpeed = 0.1;
-    const sectionPause = 0.2;
-    const { len1, len2, len3 } = layout.groups;
-    const { t1, t2 } = layout;
-
-    // Using layout t1/t2 for consistency
-    const startDelay = 0.2;
-    const activeTime = Math.max(0, elapsed - startDelay);
-
-    let totalCharsToDraw = 0;
-    let isTyping = false;
-
-    if (skipTyping) {
-        totalCharsToDraw = layout.totalChars;
-        isTyping = false;
-    } else {
-        if (activeTime < t1) {
-            totalCharsToDraw = Math.floor(activeTime / typeSpeed);
-            isTyping = true;
-        } else if (activeTime < t1 + sectionPause) {
-            totalCharsToDraw = len1;
-            isTyping = false;
-        } else if (activeTime < t2) {
-            const localTime = activeTime - (t1 + sectionPause);
-            totalCharsToDraw = len1 + Math.floor(localTime / typeSpeed);
-            isTyping = true;
-        } else if (activeTime < t2 + sectionPause) {
-            totalCharsToDraw = len1 + len2;
-            isTyping = false;
-        } else {
-            const localTime = activeTime - (t2 + sectionPause);
-            const chars3 = Math.floor(localTime / typeSpeed);
-            totalCharsToDraw = len1 + len2 + chars3;
-            isTyping = chars3 < len3;
-            if (totalCharsToDraw > layout.totalChars) totalCharsToDraw = layout.totalChars;
+        const currentProject = PROJECTS[currentProjectIndex];
+        const fullText = `${currentProject.title}\n${currentProject.stack}\n\n${currentProject.desc}`;
+        const numLines = fullText.split('\n').length;
+        const boxHeight = (numLines * lineHeight) + (padding * 2);
+        const totalWidth = maxWidth + (padding * 2);
+        const minX = -totalWidth / 2;
+        const maxX = totalWidth / 2;
+        const minY = textBoxY - padding;
+        const maxY = textBoxY - padding + boxHeight;
+        if (dx > minX && dx < maxX && dy > minY && dy < maxY) {
+            return 'text_box';
         }
     }
 
-    let charsDrawn = 0;
+    return null;
+}
 
-    // Rendering loop
-    const textStartX = boxX + 15;
-    const textStartY = boxY + 30;
+// Helper function to wrap text to fit within maxWidth
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
 
-    let currentColor = '#cccccc';
+    for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const metrics = ctx.measureText(testLine);
 
-    allLines.forEach((line, idx) => {
-        const yPos = textStartY + (idx * lineHeight);
-        const lineLen = line.length;
-
-        if (charsDrawn < totalCharsToDraw) {
-            let count = lineLen;
-            if (charsDrawn + lineLen > totalCharsToDraw) {
-                count = totalCharsToDraw - charsDrawn;
-            }
-
-            if (count > 0) {
-                const str = line.substring(0, count);
-
-                if (line.startsWith("> PROJECT")) currentColor = '#aaffaa';
-                else if (line.startsWith("> STACK")) currentColor = '#00cccc';
-                else if (line.startsWith("> INFO")) currentColor = '#cccccc';
-
-                ctx.fillStyle = currentColor;
-                ctx.fillText(str, textStartX, yPos);
-            }
-            charsDrawn += lineLen;
+        if (metrics.width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+        } else {
+            currentLine = testLine;
         }
+    }
+
+    if (currentLine) {
+        lines.push(currentLine);
+    }
+
+    return lines;
+}
+
+// AboutMe-style project info display with text wrapping
+export function drawProjectInfo(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    project: { title: string; stack: string; desc: string },
+    typingStartTime: number,
+    waitingForInput: boolean,
+    opacity: number
+) {
+    ctx.save();
+
+    const textBoxY = 50;
+    const maxWidth = 380;
+    const lineHeight = 20;
+    const padding = 15;
+    const fontSize = 15;
+
+    ctx.font = `${fontSize}px "Courier New", monospace`;
+
+    const rawLines = [
+        project.title,
+        project.stack,
+        '',
+        project.desc
+    ];
+
+    const wrappedLines: string[] = [];
+    for (const line of rawLines) {
+        if (!line) {
+            wrappedLines.push('');
+        } else {
+            const wrapped = wrapText(ctx, line, maxWidth);
+            wrappedLines.push(...wrapped);
+        }
+    }
+
+    const fullText = wrappedLines.join('\n');
+    const numLines = wrappedLines.length;
+    const boxHeight = (numLines * lineHeight) + (padding * 2);
+    const totalWidth = maxWidth + (padding * 2);
+
+    ctx.globalAlpha = opacity;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
+
+    let charsToShow = 0;
+    if (waitingForInput) {
+        charsToShow = fullText.length;
+    } else {
+        const charSpeed = 0.05;
+        const timeSinceStart = (Date.now() - typingStartTime) / 1000;
+        charsToShow = Math.floor(timeSinceStart / charSpeed);
+    }
+
+    charsToShow = Math.min(charsToShow, fullText.length);
+    const currentVisibleText = fullText.slice(0, charsToShow);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    const visibleLines = currentVisibleText.split('\n');
+    visibleLines.forEach((txt, i) => {
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.fillText(txt, -maxWidth / 2, textBoxY + (i * lineHeight));
     });
 
     ctx.restore();
 
-    return { charsDrawn: totalCharsToDraw, isTyping };
+    return {
+        charsShown: charsToShow,
+        isComplete: charsToShow >= fullText.length,
+        boxHeight: boxHeight,
+        numLines: numLines
+    };
 }
 
+// Eye Button for MyWorks gallery
 export function drawEyeButton(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -193,25 +209,21 @@ export function drawEyeButton(
     hoverProgress: number,
     time: number,
     baseColor: string = '#ffffff',
-    radius: number = 40 // Default radius if not provided
+    radius: number = 40
 ) {
     ctx.save();
     ctx.translate(x, y);
 
-    // Dynamic Scale based on radius (Base design is approx 40px radius)
-    // If radius is 10, scale should be 10/40 = 0.25
     const baseDesignRadius = 40;
     const baseScale = radius / baseDesignRadius;
     ctx.scale(baseScale, baseScale);
 
-    // Hover scale & jitter
     const jx = (Math.random() - 0.5) * 2 * hoverProgress;
     const jy = (Math.random() - 0.5) * 2 * hoverProgress;
     const scale = 1 + hoverProgress * 0.1;
     ctx.translate(jx, jy);
     ctx.scale(scale, scale);
 
-    // Circle container (Outline)
     ctx.beginPath();
     ctx.arc(0, 0, 35, 0, Math.PI * 2);
     ctx.strokeStyle = baseColor;
@@ -220,7 +232,6 @@ export function drawEyeButton(
     ctx.fillStyle = `rgba(0,0,0,${0.5 + hoverProgress * 0.3})`;
     ctx.fill();
 
-    // Eye Icon
     const iconScale = 0.7;
     ctx.scale(iconScale, iconScale);
 
@@ -228,7 +239,6 @@ export function drawEyeButton(
     ctx.fillStyle = baseColor;
     ctx.lineWidth = 4;
 
-    // Sclera (Eye shape)
     ctx.beginPath();
     ctx.moveTo(-35, 0);
     ctx.quadraticCurveTo(0, -25, 35, 0);
@@ -239,23 +249,19 @@ export function drawEyeButton(
     ctx.quadraticCurveTo(0, 25, 35, 0);
     ctx.stroke();
 
-    // Pupil
     ctx.beginPath();
     ctx.arc(0, 0, 12, 0, Math.PI * 2);
     ctx.fill();
 
-    // Lashes
     const lashLength = 10;
     const lashStart = 28;
 
-    // Central Lash
     ctx.beginPath();
     ctx.moveTo(0, -lashStart);
     ctx.lineTo(0, -lashStart - lashLength);
     ctx.stroke();
 
     const lashAngle = 0.5;
-    // Side Lashes (Left/Right 1 & 2)
     const drawLash = (angle: number, heightOffset: number) => {
         ctx.save();
         ctx.rotate(angle);
@@ -271,8 +277,6 @@ export function drawEyeButton(
     drawLash(lashAngle, 2);
     drawLash(lashAngle * 2, 8);
 
-
-    // Hover Glow
     if (hoverProgress > 0) {
         ctx.shadowBlur = 15;
         ctx.shadowColor = baseColor;
@@ -286,3 +290,37 @@ export function drawEyeButton(
 
     ctx.restore();
 }
+
+// Draw focused text title (standard pattern for all TVs)
+export function drawFocusedText(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    focusedText: string,
+    invertY: boolean,
+    textYOffset: number
+) {
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    if (invertY) {
+        ctx.rotate(Math.PI);
+        ctx.scale(-1, 1);
+    }
+    const jitterX = (Math.random() - 0.5) * 4;
+    const jitterY = (Math.random() - 0.5) * 4;
+    ctx.font = '900 50px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const textY = -h / 2 + textYOffset;
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+    ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+    ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
+    ctx.fillStyle = '#ffffff';
+    if (Math.random() > 0.1) {
+        ctx.fillText(focusedText, jitterX, textY + jitterY);
+    }
+    ctx.restore();
+}
+
+// 3D Icosahedron logic moved to MyWorksIcosahedron.ts

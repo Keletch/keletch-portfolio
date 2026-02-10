@@ -91,7 +91,7 @@ export default function AboutMeTV({
     }, [currentParagraph, storyMode, typingStartTime]);
 
     const actualParagraphIndex = paginationResult.paragraphMap[currentParagraph] ?? 0;
-    const currentFigureProp = (storyMode && storyFigures && storyFigures[actualParagraphIndex]) ? storyFigures[actualParagraphIndex] : null;
+    const currentFigureProp = (storyMode && storyFigures && storyFigures[actualParagraphIndex]) ? storyFigures[actualParagraphIndex] : 'eye';
 
     const {
         renderedFigure,
