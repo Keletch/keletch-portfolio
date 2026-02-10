@@ -1,9 +1,9 @@
-// MyWorks Helper Functions
+// Helper functions for MyWorks screen rendering
 import * as THREE from 'three';
 import { MYWORKS_BUTTON_CONFIG } from './MyWorksTypes';
 import { PROJECTS } from './MyWorksData';
 
-// Re-exporting shared button drawing functions from main Helpers
+// Re-export drawing helpers
 export {
     drawButtonShockwave,
     drawPlayStopButton,
@@ -11,7 +11,7 @@ export {
     drawMenuButton
 } from '../Helpers';
 
-// Check which button/area the user is hovering over
+// Hover detection for OSD elements
 export function checkButtonHover(
     uv: THREE.Vector2,
     isFocused: boolean,
@@ -97,8 +97,8 @@ export function checkButtonHover(
     return null;
 }
 
-// Helper function to wrap text to fit within maxWidth
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+// Helper function to wrap text
+export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';
@@ -122,12 +122,13 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
     return lines;
 }
 
-// AboutMe-style project info display with text wrapping
+// Project info display with automatic wrapping
 export function drawProjectInfo(
     ctx: CanvasRenderingContext2D,
     w: number,
     h: number,
-    project: { title: string; stack: string; desc: string },
+    wrappedLines: string[],
+    fullText: string,
     typingStartTime: number,
     waitingForInput: boolean,
     opacity: number
@@ -142,24 +143,6 @@ export function drawProjectInfo(
 
     ctx.font = `${fontSize}px "Courier New", monospace`;
 
-    const rawLines = [
-        project.title,
-        project.stack,
-        '',
-        project.desc
-    ];
-
-    const wrappedLines: string[] = [];
-    for (const line of rawLines) {
-        if (!line) {
-            wrappedLines.push('');
-        } else {
-            const wrapped = wrapText(ctx, line, maxWidth);
-            wrappedLines.push(...wrapped);
-        }
-    }
-
-    const fullText = wrappedLines.join('\n');
     const numLines = wrappedLines.length;
     const boxHeight = (numLines * lineHeight) + (padding * 2);
     const totalWidth = maxWidth + (padding * 2);
@@ -201,7 +184,7 @@ export function drawProjectInfo(
     };
 }
 
-// Eye Button for MyWorks gallery
+// Eye-conic external link button
 export function drawEyeButton(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -291,7 +274,7 @@ export function drawEyeButton(
     ctx.restore();
 }
 
-// Draw focused text title (standard pattern for all TVs)
+// Display standard title text
 export function drawFocusedText(
     ctx: CanvasRenderingContext2D,
     w: number,
@@ -323,4 +306,3 @@ export function drawFocusedText(
     ctx.restore();
 }
 
-// 3D Icosahedron logic moved to MyWorksIcosahedron.ts

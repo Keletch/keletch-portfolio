@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
@@ -18,7 +18,8 @@ import {
     drawButtonShockwave,
     drawEyeButton,
     drawProjectInfo,
-    checkButtonHover
+    checkButtonHover,
+    wrapText
 } from './MyWorksHelpers';
 import { drawChaoticIcosahedronVideo, initIcoDeepState, updateIcoDeepState, IcoDeepState } from './MyWorksIcosahedron';
 import { PROJECTS, DEFAULT_SCREEN_NAMES, ZOOM_DURATION, STATIC_DURATION } from './MyWorksData';
@@ -30,7 +31,7 @@ export default function MyWorks({
     rotation = [0, 0, 0],
     scale = 1,
     rotationX = 0,
-    theme = 'toxic', // Default toxic (green) for MyWorks
+    theme = 'toxic',
     invertY = false,
     gazeOffset = { x: 0, y: 0 },
     uvRotation = 0,
@@ -64,6 +65,31 @@ export default function MyWorks({
 
     // Project Navigation State
     const [currentProjectIndex, setCurrentProjectIndex] = useState(0);
+    const currentProject = PROJECTS[currentProjectIndex];
+
+    const wrappedLines = useMemo(() => {
+        if (typeof document === 'undefined') return { lines: [], fullText: '' };
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return { lines: [], fullText: '' };
+        ctx.font = '15px "Courier New", monospace';
+        const maxWidth = 380;
+        const rawLines = [
+            currentProject.title,
+            currentProject.stack,
+            '',
+            currentProject.desc
+        ];
+        const result: string[] = [];
+        for (const line of rawLines) {
+            if (!line) result.push('');
+            else result.push(...wrapText(ctx, line, maxWidth));
+        }
+        return {
+            lines: result,
+            fullText: result.join('\n')
+        };
+    }, [currentProject]);
 
     const [galleryState, setGalleryState] = useState<'idle' | 'zooming' | 'static' | 'gallery' | 'exiting'>('idle');
     const [isProjectTransition, setIsProjectTransition] = useState(false);
@@ -72,7 +98,6 @@ export default function MyWorks({
     const galleryEnterTime = useRef(0);
     const icoDeepStateRef = useRef<IcoDeepState>(initIcoDeepState());
 
-    // Typewriter system (like AboutMe)
     const {
         storyMode: typingMode,
         waitingForInput,
@@ -82,7 +107,7 @@ export default function MyWorks({
         signalTypingFinished,
         typingAudioRef
     } = useTypewriter({
-        storyContent: ['dummy'], // We'll manage text manually but use the hook's logic
+        storyContent: ['dummy'],
         enableStoryMode: true
     });
 
@@ -111,7 +136,6 @@ export default function MyWorks({
     const prevLookAtRef = useRef({ x: 0, y: 0 });
     const mouseVelRef = useRef({ x: 0, y: 0 });
 
-    // Track exit time to sequence animation (User requested: "wait for flicker... then grow eye")
     useEffect(() => {
         if (galleryState === 'exiting') {
             exitStartTime.current = performance.now() / 1000;
@@ -120,7 +144,7 @@ export default function MyWorks({
     // eslint-disable-next-line react-hooks/exhaustive-deps
 
 
-    // Video Loading Effect (Optimized Staggered multi-video initialization)
+    // Video Loading Effect
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const currentSrc = PROJECTS[currentProjectIndex].videoSrc;
@@ -138,9 +162,8 @@ export default function MyWorks({
                 }
             }
 
-            // Staggered "Slice Loading" to prevent main-thread freeze
+            // Staggered loading to prevent main-thread freeze
             galleryVideosRef.current.forEach((vid, i) => {
-                // Use a short delay per video to let the UI breathe
                 setTimeout(() => {
                     if (vid.getAttribute('src') !== currentSrc) {
                         vid.src = currentSrc;
@@ -243,7 +266,7 @@ export default function MyWorks({
         uvRotation
     });
 
-    // --- SHARED HOOKS ---
+    // --- UI State & Physics ---
     const {
         normalizedMouse,
         currentLookAt,
@@ -260,7 +283,7 @@ export default function MyWorks({
         updateBlink
     } = useBlink();
 
-    // --- FIGURE TRANSITIONS ---
+    // --- TRANSITIONS ---
 
     // OSD Transition Opacity (with flicker effect)
     const {
@@ -272,11 +295,10 @@ export default function MyWorks({
         transitionOpacity: videoOpacityRef
     } = useFigureTransition(galleryState === 'gallery' ? 'video' : null, 0);
 
-    // Eye Transition Opacity (visible in idle/zooming, fades out in static/gallery/exiting)
     const eyeTarget = (galleryState === 'idle' || galleryState === 'zooming') ? 'eye' : null;
     const {
         transitionOpacity: eyeOpacityRef
-    } = useFigureTransition(eyeTarget, 0); // timeOffset 0 to match About Me
+    } = useFigureTransition(eyeTarget, 0);
 
 
     const activeTheme = THEMES[theme] || THEMES.classic;
@@ -296,7 +318,7 @@ export default function MyWorks({
         // 1. Physics update (Native Refresh Rate)
         updateIcoDeepState(icoDeepStateRef.current, delta);
 
-        // 2. OSD Logic Gate (24fps)
+        // 2. Logic Gate
         renderAccumulator.current += delta;
         const shouldUpdateLogic = renderAccumulator.current >= FRAME_DURATION;
         const dt = shouldUpdateLogic ? renderAccumulator.current : 0;
@@ -305,21 +327,18 @@ export default function MyWorks({
         }
 
         if (screenTextureRef.current && groupRef.current) {
-            // --- Update Loop (Native 60fps for Icosahedron Physics) ---
             if (galleryState !== 'idle') {
                 const canvas = screenTextureRef.current.image as HTMLCanvasElement;
                 if (canvas) {
                     const w = canvas.width;
                     const h = canvas.height;
 
-                    // Calculate mouse velocity for physics
                     const curX = currentLookAt.current.x * (w / 2);
                     const curY = (invertY ? currentLookAt.current.y : -currentLookAt.current.y) * (h / 2) + 20;
 
                     const dx = curX - prevLookAtRef.current.x;
                     const dy = curY - prevLookAtRef.current.y;
 
-                    // Smooth the velocity a bit
                     mouseVelRef.current.x = mouseVelRef.current.x * 0.5 + (dx / delta) * 0.5;
                     mouseVelRef.current.y = mouseVelRef.current.y * 0.5 + (dy / delta) * 0.5;
 
@@ -330,12 +349,11 @@ export default function MyWorks({
                     updateIcoDeepState(icoDeepStateRef.current, delta, mouseIco, mouseVelRef.current);
                 }
             }
-            // Update 24fps logic ONLY when gate is open
+
             if (shouldUpdateLogic) {
                 updateScreenGaze(state, dt);
                 updateBlink(dt, state.clock.elapsedTime);
 
-                // Update Morphing (Smooth lerp)
                 let targetMorph = (galleryState === 'gallery' || galleryState === 'static') ? 1.0 : 0.0;
                 if (galleryState === 'exiting') {
                     const currentTime = performance.now() / 1000;
@@ -350,7 +368,6 @@ export default function MyWorks({
             const ctx = canvas.getContext('2d');
             const morph = eyeMorphProgress.current;
 
-
             if (ctx) {
                 const w = canvas.width;
                 const h = canvas.height;
@@ -359,7 +376,6 @@ export default function MyWorks({
                 // --- RENDERING PIPELINE START ---
 
                 // 1. BACKGROUND
-                // Use Standard Theme Background for ALL states to ensure consistent color
                 ctx.fillStyle = activeTheme.bgColor;
                 ctx.fillRect(0, 0, w, h);
 
@@ -380,48 +396,30 @@ export default function MyWorks({
                 }
 
 
-                // 2. RENDER EYE (MORPHING)
-                // The eye is ALWAYS visible now, it just morphs between states.
-                // State 0 (Big): Center + Mouse Gaze, Scale ~1.0
-                // State 1 (Button): Fixed at `MYWORKS_BUTTON_CONFIG.EYE`, Scale ~0.3
+                // 2. RENDER EYE
 
-                // Opacity: Always 1.0 unless we want effects. Let's keep it solid.
-                // Or maybe slight flicker if we kept the old logic? User said "wuelva a crecer", implies continuous presence.
-                // We'll remove opacity fading logic for the eye entirely.
+                // Opacity: Always 1.0. 
 
                 if (morph < 0.99 || galleryState === 'gallery' || galleryState === 'static' || galleryState === 'exiting') {
                     ctx.save();
-
-                    // --- Interpolate Position ---
-                    // Big Eye: Center (0,0 relative to translation) + Offset based on lookAt
-                    // Button Eye: Fixed position (MYWORKS_BUTTON_CONFIG.EYE)
 
                     const isLCD = theme === 'toxic';
                     const scleraMaxOffsetX = isLCD ? 150 : 100;
                     const scleraMaxOffsetY = 100;
 
-                    // Hover Animation Logic (User requested: "agrandan y tiemblan al hacer hover")
-                    // We calculate this regardless of morph state, but apply it fully only when morphed.
                     const eyeHoverProgress = updateButtonHoverAnimation(
                         screenTextureRef.current,
                         'hoverAnimEye',
                         eyeButtonHovered
                     );
 
-                    // Big Eye Position Components
                     const startX = currentLookAt.current.x * scleraMaxOffsetX;
                     const startY = -currentLookAt.current.y * scleraMaxOffsetY;
 
-                    // Button Eye Position Components (Target)
                     const targetX = eyeButtonPosition ? eyeButtonPosition.x : MYWORKS_BUTTON_CONFIG.EYE.x;
                     let targetY = eyeButtonPosition ? eyeButtonPosition.y : MYWORKS_BUTTON_CONFIG.EYE.y;
+                    if (invertY) targetY = -targetY;
 
-                    if (invertY) {
-                        targetY = -targetY;
-                    }
-
-                    // --- Jitter Effect (Shake) on Hover ---
-                    // Only apply when fully morphed to button (or mostly morphed)
                     let jitterX = 0;
                     let jitterY = 0;
                     if (morph > 0.8 && eyeHoverProgress > 0.8) {
@@ -429,16 +427,10 @@ export default function MyWorks({
                         jitterY = (Math.random() - 0.5) * 3 * eyeHoverProgress;
                     }
 
-                    // Interpolate Position
                     const currentX = startX * (1 - morph) + (targetX + jitterX) * morph;
                     const currentY = startY * (1 - morph) + (targetY + jitterY) * morph;
 
                     ctx.translate(w / 2 + currentX, h / 2 + currentY);
-
-                    // --- Interpolate Scale ---
-                    // Big Eye Scale: 1.0
-                    // Button Eye Scale: ~0.25
-                    // Hover Effect: Grow by 10-15% when hovered (in button mode)
 
                     let geoCorrectionX = 1.0;
                     if (screenAspect.current > 1.2) {
@@ -446,84 +438,46 @@ export default function MyWorks({
                     }
 
                     const startScale = 1.0;
-                    // Apply hover growth to target scale
                     const baseTargetScale = 0.25;
-                    const hoverScaleBoost = 1.0 + (eyeHoverProgress * 0.15); // Grow 15%
+                    const hoverScaleBoost = 1.0 + (eyeHoverProgress * 0.15);
                     const targetScale = baseTargetScale * hoverScaleBoost;
-
-                    // Lerp base scale
                     const currentBaseScale = startScale * (1 - morph) + targetScale * morph;
 
-                    // Apply blinking
                     const blinkScaleY = blinkState.current.openness;
-
                     ctx.scale(geoCorrectionX * currentBaseScale, currentBaseScale * blinkScaleY);
 
-                    // --- Render ---
-                    let irisColor = '#5090ff';
-                    if (theme === 'toxic') irisColor = '#00bb33';
-
-                    // --- Pupil Tracking Logic ---
-                    // "que realmente trackee el mouse... pero que solo funcione así cuando está en modo botón"
-                    // Big Mode: Use simple `normalizedMouse` (looks at mouse relative to screen center).
-                    // Button Mode: Calculate vector from Eye's new position to Mouse.
+                    let irisColor = theme === 'toxic' ? '#00bb33' : '#5090ff';
 
                     let pupilPos = normalizedMouse.current;
-
                     if (morph > 0.8) {
                         try {
-                            // Convert normalized mouse to canvas coordinates (relative to center)
-                            // normalizedMouse is -1 to 1. Canvas is w x h.
-                            // normalizedMouse.x: +1 is right. So mx = normalizedMouse.x * (w/2).
-                            // normalizedMouse.y: +1 is UP (as expected by drawPixelEye).
-                            // Canvas Y is positive DOWN. So to convert normalizedMouse.y (Up-positive)
-                            // to canvas pixel Y (Down-positive), we negate it.
                             const mx = normalizedMouse.current.x * (w / 2);
                             const my = -normalizedMouse.current.y * (h / 2);
-
-                            // Eye position (currentX, currentY) in canvas pixels (relative to center)
-                            // These are already in canvas-like coordinates (positive right, positive down for Y if not inverted)
-                            // But currentY is already inverted if invertY is true, so it's consistent with canvas Y.
                             const ex = currentX;
                             const ey = currentY;
-
-                            // Vector from Eye to Mouse (in canvas pixel coordinates)
                             const dx = mx - ex;
                             const dy = my - ey;
-
                             const dist = Math.sqrt(dx * dx + dy * dy);
-                            const maxLookDistance = 200; // Distance at which eye looks fully in that direction
+                            const maxLookDistance = 200;
                             const lookAmount = Math.min(1.0, dist / maxLookDistance);
 
-                            // Normalize the direction vector and convert back to drawPixelEye's expected format:
-                            // x: positive right, y: positive UP.
-                            if (dist > 1e-6) { // Avoid division by zero
+                            if (dist > 1e-6) {
                                 pupilPos = {
                                     x: (dx / dist) * lookAmount,
-                                    y: -(dy / dist) * lookAmount // Negate dy to convert from canvas (Down-positive) to drawPixelEye (Up-positive)
+                                    y: -(dy / dist) * lookAmount
                                 };
                             } else {
-                                pupilPos = { x: 0, y: 0 }; // If mouse is exactly on eye, look straight
+                                pupilPos = { x: 0, y: 0 };
                             }
                         } catch (e) {
-                            // Fallback to default if any error occurs during calculation
-                            console.error("Error calculating pupil position:", e);
                             pupilPos = normalizedMouse.current;
                         }
                     }
 
-                    const customLookRange = 32;
-                    const isHologram = false;
-                    const scleraColor = '#ffffff';
+                    drawPixelEye(ctx, pupilPos, irisColor, 32, '#ffffff', false);
 
-                    // Draw eye
-                    drawPixelEye(ctx, pupilPos, irisColor, customLookRange, scleraColor, isHologram);
-
-                    // Button Pulse Effect (ALWAYS active when in Button Mode, i.e., morph > 0.8)
                     if (morph > 0.8) {
                         const time = state.clock.elapsedTime;
-
-                        // Emulate `drawButtonShockwave` logic
                         const fps = 8;
                         const steppedTime = Math.floor(time * fps) / fps;
                         const waveProgress = (steppedTime % 2.0) / 2.0;
@@ -532,10 +486,7 @@ export default function MyWorks({
                         const baseRy = 70;
                         const expansion = waveProgress * 40;
 
-                        // Alpha fade:
-                        // 1. Fade out over time (wave cycle)
-                        // 2. Fade out if hovered (User requested: "se desvanezca... cuando hago hover")
-                        const hoverFade = 1.0 - eyeHoverProgress; // 1.0 -> 0.0
+                        const hoverFade = 1.0 - eyeHoverProgress;
                         const waveAlpha = Math.max(0, 1.0 - waveProgress) * hoverFade;
 
                         if (waveAlpha > 0.01) {
@@ -560,9 +511,7 @@ export default function MyWorks({
                 // Show in 'exiting' to allow flicker OUT animation.
                 const shouldShowContent = galleryState === 'gallery' || (galleryState === 'static' && isProjectTransition) || galleryState === 'exiting';
                 if (shouldShowContent && isFocused) {
-                    const currentProject = PROJECTS[currentProjectIndex];
 
-                    // VIDEO: Multi-staggered loop icosahedron (Robust rendering)
                     const hasVideos = galleryVideosRef.current.length > 0;
                     if (hasVideos) {
                         try {
@@ -574,7 +523,7 @@ export default function MyWorks({
                                 ctx.scale(-1, 1);
                             }
 
-                            // 3D Chaotic Video Icosahedron (Staggered Looping + Interactive Deformation)
+                            // 3D Chaotic Video Icosahedron
                             const videoOpacity = videoOpacityRef.current;
 
                             // Calculate local mouse position for the icosahedron
@@ -605,9 +554,9 @@ export default function MyWorks({
                     }
 
                     const osdOpacity = osdOpacityRef.current;
-                    const typingState = drawProjectInfo(ctx, w, h, currentProject, typingStartTime, waitingForInput, osdOpacity);
+                    const typingState = drawProjectInfo(ctx, w, h, wrappedLines.lines, wrappedLines.fullText, typingStartTime, waitingForInput, osdOpacity);
 
-                    // Sound for typewriter (EXACT AboutMe logic)
+                    // Sound for typewriter
                     if (typingState && typingState.charsShown > lastTypedCharCount.current) {
                         if (typingAudioRef.current && osdOpacity > 0.1) {
                             typingAudioRef.current.playbackRate = 0.9 + Math.random() * 0.3;
@@ -617,7 +566,7 @@ export default function MyWorks({
                         lastTypedCharCount.current = typingState.charsShown;
                     }
 
-                    // Signal typing finished (like AboutMe)
+                    // Signal typing finished
                     if (typingState && typingState.isComplete && !waitingForInput) {
                         signalTypingFinished();
                     }
@@ -625,8 +574,7 @@ export default function MyWorks({
                     ctx.restore();
                 }
 
-                // Focused Text
-                // 3. TITLE (always visible in gallery or static)
+                // 3. TITLE
                 if (isFocused && focusedText && (galleryState === 'gallery' || galleryState === 'static')) {
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
@@ -653,7 +601,7 @@ export default function MyWorks({
                     ctx.restore();
                 }
 
-                // 4. BUTTONS (always visible in gallery or static)
+                // 4. BUTTONS
                 if (isFocused && (galleryState === 'gallery' || galleryState === 'static')) {
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
@@ -710,16 +658,13 @@ export default function MyWorks({
                         drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, '#ffffff');
                     }
 
-                    // Eye button: NO LONGER DRAWN SEPARATELY
-                    // The Main Eye morphs into this position.
-                    // We only need to handle the hover visual if you want extra effects (added above)
+                    // Eye button is now part of the morphing eye
 
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.restore();
                 }
 
 
-                // --- RENDERING PIPELINE END ---
                 // --- RENDERING PIPELINE END ---
             }
 

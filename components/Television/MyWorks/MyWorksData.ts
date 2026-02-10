@@ -1,4 +1,4 @@
-// MyWorks Project Data
+// Project data and configuration for the interactive gallery
 export const PROJECTS = [
     {
         title: "Infinite Gallery 2025",
@@ -18,6 +18,5 @@ export const PROJECTS = [
 
 export const DEFAULT_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'screen_lcd'];
 
-// Standard transition timings
 export const ZOOM_DURATION = 1000;
 export const STATIC_DURATION = 500;

@@ -8,7 +8,6 @@ interface MyWorksSectionProps {
 
 const LCD_SCREENS = ['LCDScreen', 'screen', 'LCD_Screen'];
 
-// Constants moved from TVCluster.tsx
 const tv3Position = { x: -1.9, y: 2.5, z: 0.40 }; // Toxic / MyWorks
 const toxicCollider = { size: [1.05, 0.60, 0.24] as [number, number, number], offset: [0.00, 0.26, -0.04] as [number, number, number] };
 

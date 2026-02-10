@@ -1,4 +1,4 @@
-// 3D Icosahedron Helper for Chaotic Video - STAGGERED LOOP ENGINE (Frame-Shatter v10)
+// Icosahedron logic for the interactive video gallery
 const PHI = (1 + Math.sqrt(5)) / 2;
 const ICO_VERTS = [
     [-1, PHI, 0], [1, PHI, 0], [-1, -PHI, 0], [1, -PHI, 0],
@@ -22,9 +22,8 @@ export interface IcoDeepState {
     angleX: number;
     angleY: number;
     faces: FaceParticle[];
-    // Stateful vertex physics (12 vertices of an icosahedron)
-    vOffsets: { x: number; y: number }[];
-    vVelocities: { x: number; y: number }[];
+    vOffsets: Float32Array;
+    vVelocities: Float32Array;
 }
 
 function hash(n: number): number {
@@ -44,7 +43,6 @@ export function initIcoDeepState(): IcoDeepState {
             vy: (hash(i + 6) - 0.5) * 0.02,
             vr: (hash(i + 7) - 0.5) * 0.05,
             vs: (hash(i + 8) - 0.5) * 0.005,
-            // Staggered video timeline index (0-5 for the 6-video shatter buffer)
             videoIndex: Math.floor(hash(i + 9) * 6)
         };
     });
@@ -53,8 +51,8 @@ export function initIcoDeepState(): IcoDeepState {
         angleX: Math.random() * Math.PI,
         angleY: Math.random() * Math.PI,
         faces,
-        vOffsets: ICO_VERTS.map(() => ({ x: 0, y: 0 })),
-        vVelocities: ICO_VERTS.map(() => ({ x: 0, y: 0 }))
+        vOffsets: new Float32Array(ICO_VERTS.length * 2),
+        vVelocities: new Float32Array(ICO_VERTS.length * 2)
     };
 }
 
@@ -67,20 +65,22 @@ export function updateIcoDeepState(
     state.angleX += delta * 0.05;
     state.angleY += delta * 0.04;
 
-    // --- Vertex Physics Simulation ---
-    const springK = 8.0;   // Spring constant (stiffness)
-    const damping = 0.92;  // Viscous damping (0-1)
-    const mouseRadius = 80;
+    const springK = 15.0;
+    const damping = 0.85;
     const mouseStrength = 0.8;
 
-    state.vOffsets.forEach((off, i) => {
-        const vel = state.vVelocities[i];
+    for (let i = 0; i < ICO_VERTS.length; i++) {
+        const i2 = i * 2;
+        const offX = state.vOffsets[i2];
+        const offY = state.vOffsets[i2 + 1];
+        let velX = state.vVelocities[i2];
+        let velY = state.vVelocities[i2 + 1];
 
-        // 1. Spring force towards center (elastic recovery)
-        const fx = -off.x * springK;
-        const fy = -off.y * springK;
+        // 1. Spring force
+        const fx = -offX * springK;
+        const fy = -offY * springK;
 
-        // 2. Mouse impulse (Global Interaction - speed-sensitive stretch)
+        // 2. Mouse impulse
         if (mouse && mouseVel) {
             const vBase = ICO_VERTS[i];
             const scale = 65;
@@ -91,37 +91,34 @@ export function updateIcoDeepState(
             const px = x1 * scale;
             const py = y2 * scale;
 
-            const dx = px + off.x - mouse.x;
-            const dy = py + off.y - mouse.y;
+            const dx = px + offX - mouse.x;
+            const dy = py + offY - mouse.y;
             const distSq = dx * dx + dy * dy;
 
-            // Sharper Global Falloff: smaller radius for tighter interaction
             const globalRadiusSq = 180 * 180;
-            const dist = Math.sqrt(distSq);
-            // Sharper exponent (0.2) for faster drop-off
             const falloff = Math.exp(-distSq / (globalRadiusSq * 0.2));
-
-            // Mouse speed impact (limited for stability)
             const speed = Math.sqrt(mouseVel.x * mouseVel.x + mouseVel.y * mouseVel.y);
             const impulse = Math.min(speed, 400) * mouseStrength * falloff;
 
+            const dist = Math.sqrt(distSq);
             if (dist > 1) {
-                vel.x += (dx / dist) * impulse;
-                vel.y += (dy / dist) * impulse;
+                velX += (dx / dist) * impulse;
+                velY += (dy / dist) * impulse;
             }
         }
 
         // 3. Integration
-        vel.x = (vel.x + fx * delta) * damping;
-        vel.y = (vel.y + fy * delta) * damping;
+        velX = (velX + fx * delta) * damping;
+        velY = (velY + fy * delta) * damping;
 
-        off.x += vel.x * delta;
-        off.y += vel.y * delta;
-    });
+        state.vOffsets[i2] = offX + velX * delta;
+        state.vOffsets[i2 + 1] = offY + velY * delta;
+        state.vVelocities[i2] = velX;
+        state.vVelocities[i2 + 1] = velY;
+    }
 
     state.faces.forEach((p, i) => {
         const localDelta = delta * (0.9 + hash(i + 10) * 0.2);
-
         p.cx += p.vx * localDelta;
         p.cy += p.vy * localDelta;
         p.rot += p.vr * localDelta;
@@ -131,7 +128,6 @@ export function updateIcoDeepState(
         if (p.cx < b || p.cx > 1 - b) { p.vx *= -1; p.cx = Math.max(b, Math.min(1 - b, p.cx)); }
         if (p.cy < b || p.cy > 1 - b) { p.vy *= -1; p.cy = Math.max(b, Math.min(1 - b, p.cy)); }
         if (p.size < 0.14 || p.size > 0.32) { p.vs *= -1; p.size = Math.max(0.14, Math.min(0.32, p.size)); }
-
         p.rot %= (Math.PI * 2);
     });
 }
@@ -160,7 +156,7 @@ function mapTriangle(
         return;
     }
 
-    // Stable affine transform formulas:
+    // Stable affine transform
     const dxa = dx1 - dx0;
     const dya = dy1 - dy0;
     const dxb = dx2 - dx0;
@@ -183,12 +179,16 @@ function mapTriangle(
     ctx.restore();
 }
 
+// Pre-allocate arrays for rendering to avoid GC pressure
+const projectedVerts = new Float32Array(ICO_VERTS.length * 3); // x, y, z
+const faceSortArray: { id: number, z: number }[] = ICO_FACES.map((_, i) => ({ id: i, z: 0 }));
+
 export function drawChaoticIcosahedronVideo(
     ctx: CanvasRenderingContext2D,
     videos: HTMLVideoElement[],
     opacity: number,
     state: IcoDeepState,
-    mouse?: { x: number; y: number } // Added mouse parameter
+    mouse?: { x: number; y: number }
 ) {
     if (opacity < 0.01 || !state || !videos || videos.length === 0) return;
 
@@ -196,39 +196,50 @@ export function drawChaoticIcosahedronVideo(
     const scale = 65;
     const { angleX, angleY } = state;
 
-    const projected = ICO_VERTS.map((v, i) => {
-        let x1 = v[0] * Math.cos(angleY) - v[2] * Math.sin(angleY);
-        let z1 = v[0] * Math.sin(angleY) + v[2] * Math.cos(angleY);
-        let y2 = v[1] * Math.cos(angleX) - z1 * Math.sin(angleX);
-        let z2 = v[1] * Math.sin(angleX) + z1 * Math.cos(angleX);
+    const cosY = Math.cos(angleY);
+    const sinY = Math.sin(angleY);
+    const cosX = Math.cos(angleX);
+    const sinX = Math.sin(angleX);
 
-        // Base projected coordinates
-        let px = x1 * scale;
-        let py = y2 * scale;
+    for (let i = 0; i < ICO_VERTS.length; i++) {
+        const v = ICO_VERTS[i];
+        const i3 = i * 3;
+        const i2 = i * 2;
 
-        // Apply interactive vertex offsets from physics engine
-        const off = state.vOffsets[i];
-        px += off.x;
-        py += off.y;
+        const x1 = v[0] * cosY - v[2] * sinY;
+        const z1 = v[0] * sinY + v[2] * cosY;
+        const y2 = v[1] * cosX - z1 * sinX;
+        const z2 = v[1] * sinX + z1 * cosX;
 
-        return { x: px, y: py, z: z2 };
-    });
+        projectedVerts[i3] = x1 * scale + state.vOffsets[i2];
+        projectedVerts[i3 + 1] = y2 * scale + state.vOffsets[i2 + 1];
+        projectedVerts[i3 + 2] = z2;
+    }
 
-    const faces = ICO_FACES.map((faceIndices, i) => {
-        const v0 = projected[faceIndices[0]];
-        const v1 = projected[faceIndices[1]];
-        const v2 = projected[faceIndices[2]];
-        const zAvg = (v0.z + v1.z + v2.z) / 3;
-        return { indices: faceIndices, z: zAvg, id: i, v0, v1, v2 };
-    }).sort((a, b) => a.z - b.z);
+    for (let i = 0; i < ICO_FACES.length; i++) {
+        const f = ICO_FACES[i];
+        const z0 = projectedVerts[f[0] * 3 + 2];
+        const z1 = projectedVerts[f[1] * 3 + 2];
+        const z2 = projectedVerts[f[2] * 3 + 2];
+        faceSortArray[i].id = i;
+        faceSortArray[i].z = (z0 + z1 + z2) / 3;
+    }
 
-    faces.forEach(face => {
-        const crossZ = (face.v1.x - face.v0.x) * (face.v2.y - face.v0.y) -
-            (face.v1.y - face.v0.y) * (face.v2.x - face.v0.x);
+    faceSortArray.sort((a, b) => a.z - b.z);
 
-        if (crossZ < 0) return;
+    for (let i = 0; i < faceSortArray.length; i++) {
+        const faceId = faceSortArray[i].id;
+        const indices = ICO_FACES[faceId];
+        const i0 = indices[0] * 3, i1 = indices[1] * 3, i2 = indices[2] * 3;
 
-        const p = state.faces[face.id];
+        const v0x = projectedVerts[i0], v0y = projectedVerts[i0 + 1];
+        const v1x = projectedVerts[i1], v1y = projectedVerts[i1 + 1];
+        const v2x = projectedVerts[i2], v2y = projectedVerts[i2 + 1];
+
+        const crossZ = (v1x - v0x) * (v2y - v0y) - (v1y - v0y) * (v2x - v0x);
+        if (crossZ < 0) continue;
+
+        const p = state.faces[faceId];
         const video = videos[p.videoIndex % videos.length];
 
         if (video && video.readyState >= 2) {
@@ -239,92 +250,57 @@ export function drawChaoticIcosahedronVideo(
             const rot = p.rot;
             const sizePatch = p.size * Math.min(vw, vh);
 
-            const getPoint = (ang: number) => {
-                const a = rot + ang;
-                return {
-                    x: Math.max(0, Math.min(vw, cx + Math.cos(a) * sizePatch)),
-                    y: Math.max(0, Math.min(vh, cy + Math.sin(a) * sizePatch))
-                };
-            };
+            const cosRot = Math.cos(rot), sinRot = Math.sin(rot);
+            const cosRot2 = Math.cos(rot + (Math.PI * 2) / 3), sinRot2 = Math.sin(rot + (Math.PI * 2) / 3);
+            const cosRot3 = Math.cos(rot + (Math.PI * 4) / 3), sinRot3 = Math.sin(rot + (Math.PI * 4) / 3);
 
-            const s0 = getPoint(0);
-            const s1 = getPoint((Math.PI * 2) / 3);
-            const s2 = getPoint((Math.PI * 4) / 3);
+            const s0x = Math.max(0, Math.min(vw, cx + cosRot * sizePatch));
+            const s0y = Math.max(0, Math.min(vh, cy + sinRot * sizePatch));
+            const s1x = Math.max(0, Math.min(vw, cx + cosRot2 * sizePatch));
+            const s1y = Math.max(0, Math.min(vh, cy + sinRot2 * sizePatch));
+            const s2x = Math.max(0, Math.min(vw, cx + cosRot3 * sizePatch));
+            const s2y = Math.max(0, Math.min(vh, cy + sinRot3 * sizePatch));
 
-            // --- ABERRATION LOGIC (Stress Detection) ---
-            const v0off = state.vOffsets[face.indices[0]];
-            const v1off = state.vOffsets[face.indices[1]];
-            const v2off = state.vOffsets[face.indices[2]];
+            const idx0 = indices[0] * 2, idx1 = indices[1] * 2, idx2 = indices[2] * 2;
+            const ox0 = state.vOffsets[idx0], oy0 = state.vOffsets[idx0 + 1];
+            const ox1 = state.vOffsets[idx1], oy1 = state.vOffsets[idx1 + 1];
+            const ox2 = state.vOffsets[idx2], oy2 = state.vOffsets[idx2 + 1];
 
-            // Calculate face stress (avg displacement magnitude)
-            const stress = (
-                Math.sqrt(v0off.x * v0off.x + v0off.y * v0off.y) +
-                Math.sqrt(v1off.x * v1off.x + v1off.y * v1off.y) +
-                Math.sqrt(v2off.x * v2off.x + v2off.y * v2off.y)
-            ) / 3;
+            const stress = (Math.sqrt(ox0 * ox0 + oy0 * oy0) + Math.sqrt(ox1 * ox1 + oy1 * oy1) + Math.sqrt(ox2 * ox2 + oy2 * oy2)) / 3;
 
-            // DRAW PASS 1: Base texture (Slightly dimmed to allow color layers to pop)
             ctx.globalAlpha = opacity * 0.9;
-            mapTriangle(
-                ctx, video,
-                s0.x, s0.y, s1.x, s1.y, s2.x, s2.y,
-                face.v0.x, face.v0.y, face.v1.x, face.v1.y, face.v2.x, face.v2.y
-            );
+            mapTriangle(ctx, video, s0x, s0y, s1x, s1y, s2x, s2y, v0x, v0y, v1x, v1y, v2x, v2y);
 
-            // DRAW PASS 2 & 3: Vivid Chromatic Aberration (only on stress)
             if (stress > 0.4) {
                 const aberrationAmt = Math.min(stress * 0.2, 12);
-                const abOpacity = Math.min(stress * 0.1, 0.7);
-
                 ctx.save();
                 ctx.globalCompositeOperation = 'screen';
-                ctx.globalAlpha = opacity * abOpacity;
+                ctx.globalAlpha = opacity * Math.min(stress * 0.1, 0.7);
 
-                // Red/Cyan Shift pass 1 (Cyan/Blue-ish)
-                // Use high saturation to avoid white-washing
                 ctx.filter = 'hue-rotate(180deg) saturate(300%) contrast(1.2)';
-                mapTriangle(
-                    ctx, video,
-                    s0.x, s0.y, s1.x, s1.y, s2.x, s2.y,
-                    face.v0.x - aberrationAmt, face.v0.y,
-                    face.v1.x - aberrationAmt, face.v1.y,
-                    face.v2.x - aberrationAmt, face.v2.y
-                );
+                mapTriangle(ctx, video, s0x, s0y, s1x, s1y, s2x, s2y, v0x - aberrationAmt, v0y, v1x - aberrationAmt, v1y, v2x - aberrationAmt, v2y);
 
-                // Pass 2 (Red shift)
                 ctx.filter = 'hue-rotate(0deg) saturate(300%) contrast(1.2)';
-                mapTriangle(
-                    ctx, video,
-                    s0.x, s0.y, s1.x, s1.y, s2.x, s2.y,
-                    face.v0.x + aberrationAmt, face.v0.y,
-                    face.v1.x + aberrationAmt, face.v1.y,
-                    face.v2.x + aberrationAmt, face.v2.y
-                );
+                mapTriangle(ctx, video, s0x, s0y, s1x, s1y, s2x, s2y, v0x + aberrationAmt, v0y, v1x + aberrationAmt, v1y, v2x + aberrationAmt, v2y);
 
                 ctx.restore();
-                ctx.filter = 'none'; // Reset filter
+                ctx.filter = 'none';
             }
-
         } else {
             ctx.beginPath();
-            ctx.moveTo(face.v0.x, face.v0.y);
-            ctx.lineTo(face.v1.x, face.v1.y);
-            ctx.lineTo(face.v2.x, face.v2.y);
+            ctx.moveTo(v0x, v0y); ctx.lineTo(v1x, v1y); ctx.lineTo(v2x, v2y);
             ctx.closePath();
-            ctx.fillStyle = `hsl(${face.id * 18}, 60%, 40%)`;
+            ctx.fillStyle = `hsl(${faceId * 18}, 60%, 40%)`;
             ctx.fill();
         }
 
         ctx.globalAlpha = opacity * 0.4;
         ctx.beginPath();
-        ctx.moveTo(face.v0.x, face.v0.y);
-        ctx.lineTo(face.v1.x, face.v1.y);
-        ctx.lineTo(face.v2.x, face.v2.y);
+        ctx.moveTo(v0x, v0y); ctx.lineTo(v1x, v1y); ctx.lineTo(v2x, v2y);
         ctx.closePath();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1;
         ctx.stroke();
-    });
-
+    }
     ctx.restore();
 }
