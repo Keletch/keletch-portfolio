@@ -131,7 +131,9 @@ export function drawProjectInfo(
     fullText: string,
     typingStartTime: number,
     waitingForInput: boolean,
-    opacity: number
+    opacity: number,
+    textColor: string = '#ffffff',
+    highlightColor: string = '#ffffff'
 ) {
     ctx.save();
 
@@ -148,7 +150,21 @@ export function drawProjectInfo(
     const totalWidth = maxWidth + (padding * 2);
 
     ctx.globalAlpha = opacity;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+
+    // Hex to RGB conversion for opacity handling
+    const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : null;
+    }
+
+    const highlightRGB = hexToRgb(highlightColor) || { r: 255, g: 255, b: 255 };
+    const textRGB = hexToRgb(textColor) || { r: 255, g: 255, b: 255 };
+
+    ctx.strokeStyle = `rgba(${highlightRGB.r}, ${highlightRGB.g}, ${highlightRGB.b}, ${opacity})`;
     ctx.lineWidth = 2;
     ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
 
@@ -164,13 +180,13 @@ export function drawProjectInfo(
     charsToShow = Math.min(charsToShow, fullText.length);
     const currentVisibleText = fullText.slice(0, charsToShow);
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = textColor;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
 
     const visibleLines = currentVisibleText.split('\n');
     visibleLines.forEach((txt, i) => {
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.fillStyle = `rgba(${textRGB.r}, ${textRGB.g}, ${textRGB.b}, ${opacity})`;
         ctx.fillText(txt, -maxWidth / 2, textBoxY + (i * lineHeight));
     });
 

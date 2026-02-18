@@ -7,6 +7,8 @@ import { useGLTF } from '@react-three/drei';
 interface RadioSectionProps {
     viewState: string;
     onNavigate: (state: string) => void;
+    accentColor?: string;
+    themeOverride?: { bgColor: string; baseColor: string; glowCenter: string; vignetteColor: string; irisColor: string; scleraColor: string };
 }
 
 const RADIO_TRACKS = [
@@ -40,13 +42,14 @@ const rightSpkCtrl = {
     offset: [0.02, 1.60, 0.08] as [number, number, number]
 };
 
-export default function RadioSection({ viewState, onNavigate }: RadioSectionProps) {
+export default function RadioSection({ viewState, onNavigate, accentColor, themeOverride }: RadioSectionProps) {
     const { scene: leftSpeakerModel } = useGLTF('/models/leftSpeaker.glb');
     const { scene: rightSpeakerModel } = useGLTF('/models/rightSpeaker.glb');
 
     const [radioStatus, setRadioStatus] = useState<'playing' | 'paused' | 'stopped'>('stopped');
     const [currentSongName, setCurrentSongName] = useState('');
-    const [radioProgress, setRadioProgress] = useState(0);
+    // Optimization: Use Ref for progress to avoid 60fps React re-renders in RadioSection and children
+    const radioProgressRef = useRef(0);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -60,7 +63,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
         const update = () => {
             if (audioRef.current && radioStatus === 'playing') {
                 const prog = audioRef.current.currentTime / (audioRef.current.duration || 1);
-                setRadioProgress(prog);
+                radioProgressRef.current = prog;
             }
             frame = requestAnimationFrame(update);
         };
@@ -82,7 +85,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
 
         const setupAudio = (audio: HTMLAudioElement) => {
             audio.onended = () => {
-                setRadioProgress(1);
+                radioProgressRef.current = 1;
                 const currentIndex = RADIO_TRACKS.indexOf(trackPath);
                 const nextIndex = currentIndex + 1;
 
@@ -92,7 +95,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
                     }, 2000);
                 } else {
                     setRadioStatus('stopped');
-                    setRadioProgress(0);
+                    radioProgressRef.current = 0;
                     setCurrentSongName('');
                 }
             };
@@ -122,7 +125,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
         audioRef.current.play();
 
         setCurrentSongName(trackName);
-        setRadioProgress(0);
+        radioProgressRef.current = 0;
         setRadioStatus('playing');
     };
 
@@ -149,7 +152,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
             audioRef.current.currentTime = 0;
         }
         setRadioStatus('stopped');
-        setRadioProgress(0);
+        radioProgressRef.current = 0;
         setCurrentSongName('');
     };
 
@@ -174,7 +177,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
         if (audioRef.current && radioStatus !== 'stopped') {
             const duration = audioRef.current.duration || 1;
             audioRef.current.currentTime = duration * progress;
-            setRadioProgress(progress);
+            radioProgressRef.current = progress;
         }
     };
 
@@ -198,7 +201,7 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
                     onStopClick={handleStop}
                     status={radioStatus}
                     currentSongName={currentSongName}
-                    currentProgress={radioProgress}
+                    currentProgress={radioProgressRef}
                     onSeek={handleSeek}
                     showMenuButton={true}
                     menuButtonPosition={{ x: -200, y: -190 }}
@@ -207,6 +210,8 @@ export default function RadioSection({ viewState, onNavigate }: RadioSectionProp
                     tracks={RADIO_TRACKS}
                     onSelectTrack={playTrack}
                     audioAnalyser={resultAnalyserRef.current || undefined}
+                    accentColor={accentColor}
+                    themeOverride={themeOverride}
                 />
             </RigidBody>
 

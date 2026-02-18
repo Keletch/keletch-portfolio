@@ -4,6 +4,7 @@ import AboutMe from '@/components/Television/AboutMe/AboutMe';
 interface AboutMeSectionProps {
     viewState: string;
     onNavigate: (state: string) => void;
+    themeOverride?: { bgColor: string; baseColor: string; glowCenter: string; vignetteColor: string; irisColor: string; scleraColor: string; isHologram?: boolean; textColor?: string; highlightColor?: string; textShadow1?: string; textShadow2?: string; };
 }
 
 const RED_SCREENS = ['redTVScreen', 'screen'];
@@ -19,7 +20,7 @@ const ABOUT_FIGURES = ['circles', 'cube', 'dna'];
 const tv2Position = { x: -2.8, y: 1.1, z: 0.45 }; // Red
 const redTVCollider = { size: [1.08, 0.80, 0.85] as [number, number, number], offset: [0.03, 0.22, -0.38] as [number, number, number] };
 
-export default function AboutMeSection({ viewState, onNavigate }: AboutMeSectionProps) {
+export default function AboutMeSection({ viewState, onNavigate, themeOverride }: AboutMeSectionProps) {
     return (
         <RigidBody
             colliders={false}
@@ -50,6 +51,7 @@ export default function AboutMeSection({ viewState, onNavigate }: AboutMeSection
                 enableStoryMode={true}
                 storyContent={ABOUT_STORY}
                 storyFigures={ABOUT_FIGURES}
+                themeOverride={themeOverride}
             />
         </RigidBody>
     );

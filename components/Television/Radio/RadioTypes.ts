@@ -21,7 +21,7 @@ export interface RadioProps {
     status?: 'playing' | 'paused' | 'stopped';
     audioAnalyser?: AnalyserNode;
     currentSongName?: string;
-    currentProgress?: number;
+    currentProgress?: number | React.MutableRefObject<number>;
     onSeek?: (progress: number) => void;
     showBackButton?: boolean;
     backButtonPosition?: { x: number, y: number };

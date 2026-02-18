@@ -35,9 +35,9 @@ export function CameraRig({ viewState }: CameraRigProps) {
     const radioPos = new THREE.Vector3(1.40, -0.60, 1.30);
     const radioLookAt = new THREE.Vector3(1.48, -0.70, 0.00);
 
-
-
     const currentLookAt = useRef(defaultLookAt.clone());
+    const tempTargetPos = useRef(new THREE.Vector3());
+    const tempTargetLookAt = useRef(new THREE.Vector3());
 
     useFrame((state, delta) => {
         // 1. Determine Target Position & LookAt based on State
@@ -66,17 +66,19 @@ export function CameraRig({ viewState }: CameraRigProps) {
             targetPos = radioPos;
             targetLookAt = radioLookAt;
         } else {
-            targetPos = new THREE.Vector3(
-                defaultPos.x + pointer.x * 0.5, // Move X slightly
-                defaultPos.y + pointer.y * 0.5, // Move Y slightly
+            tempTargetPos.current.set(
+                defaultPos.x + pointer.x * 0.5,
+                defaultPos.y + pointer.y * 0.5,
                 defaultPos.z
             );
+            targetPos = tempTargetPos.current;
 
-            targetLookAt = new THREE.Vector3(
+            tempTargetLookAt.current.set(
                 defaultLookAt.x + pointer.x * 0.2,
                 defaultLookAt.y + pointer.y * 0.2,
                 defaultLookAt.z
             );
+            targetLookAt = tempTargetLookAt.current;
         }
 
         const step = 0.05;

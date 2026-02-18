@@ -1,14 +1,17 @@
-import { useState, useEffect, Suspense, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { useGLTF } from '@react-three/drei';
 
+// Lazy Load Heavy Sections
 import Television from '@/components/Television';
 import RadioSection from '@/components/Television/Radio/RadioSection';
 import MyWorksSection from '@/components/Television/MyWorks/MyWorksSection';
 import AboutMeSection from '@/components/Television/AboutMe/AboutMeSection';
+import { TVCluster } from '@/components/Scene/TVCluster';
+
 import { CRTOverlay } from '@/components/Effects/CRTOverlay';
 import { CameraRig } from '@/components/Scene/CameraRig';
 // @ts-ignore
@@ -18,7 +21,7 @@ import { AdjustableModel } from '@/components/Debug/AdjustableModel';
 import { BackButton3D } from '@/components/Props/BackButton3D';
 import { LuckyCat } from '@/components/Props/LuckyCat';
 import { RoomFloor } from '@/components/Scene/RoomFloor';
-import { TVCluster } from '@/components/Scene/TVCluster';
+import { PaletteSelector } from '@/components/UI/PaletteSelector';
 
 RectAreaLightUniformsLib.init();
 
@@ -26,30 +29,191 @@ export type ViewState = 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focu
 
 const MOBILE_SCREENS = ['mobileScreen'];
 
-export default function TVScene() {
+type PaletteId = 'current' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I';
+
+type ThemeColors = { bgColor: string; baseColor: string; glowCenter: string; vignetteColor: string; irisColor: string; scleraColor: string; isHologram?: boolean; textColor?: string; highlightColor?: string; textShadow1?: string; textShadow2?: string; };
+
+const AMBER_COLORS: ThemeColors = {
+    bgColor: '#0a0500', baseColor: 'rgba(40, 25, 0, 0.3)', glowCenter: 'rgba(255, 170, 68, 0.1)',
+    vignetteColor: 'rgba(15, 8, 0, 0.95)', irisColor: '#ffbb33', scleraColor: '#ffffff',
+    textColor: '#ffcc00', highlightColor: '#ffaa44'
+};
+const CYAN_COLORS: ThemeColors = {
+    bgColor: '#000a0f', baseColor: 'rgba(0, 30, 50, 0.3)', glowCenter: 'rgba(0, 238, 255, 0.1)',
+    vignetteColor: 'rgba(0, 8, 15, 0.95)', irisColor: '#00eeff', scleraColor: '#ffffff',
+    textColor: '#00aaff', highlightColor: '#00ffff'
+};
+const MAGENTA_COLORS: ThemeColors = {
+    bgColor: '#0f0005', baseColor: 'rgba(50, 0, 20, 0.3)', glowCenter: 'rgba(255, 0, 119, 0.1)',
+    vignetteColor: 'rgba(15, 0, 8, 0.95)', irisColor: '#ff0077', scleraColor: '#ffffff',
+    textColor: '#ff3399', highlightColor: '#ff00cc'
+};
+const TERMINAL_COLORS: ThemeColors = {
+    bgColor: '#000a02', baseColor: 'rgba(0, 30, 5, 0.3)', glowCenter: 'rgba(0, 255, 68, 0.12)',
+    vignetteColor: 'rgba(0, 8, 0, 0.95)', irisColor: '#00ff44', scleraColor: '#ffffff',
+    textColor: '#33ff33', highlightColor: '#00ff00'
+};
+const GLITCH_COLORS: ThemeColors = {
+    bgColor: '#050000', baseColor: 'rgba(30, 0, 0, 0.3)', glowCenter: 'rgba(255, 0, 0, 0.15)',
+    vignetteColor: 'rgba(25, 0, 0, 0.95)', irisColor: '#ff0000', scleraColor: '#ffffff',
+    textColor: '#ff3333', highlightColor: '#ff0000'
+};
+
+const HOLO_COLORS: ThemeColors = {
+    bgColor: '#100020', baseColor: 'rgba(40, 0, 60, 0.3)', glowCenter: 'rgba(200, 0, 255, 0.15)',
+    vignetteColor: 'rgba(20, 0, 40, 0.90)', irisColor: '#ff00ff', scleraColor: '#ffffff',
+    isHologram: true,
+    textColor: '#ff88ff', highlightColor: '#ff00ff'
+};
+const HACKER_COLORS: ThemeColors = {
+    bgColor: '#000000', baseColor: '#000000', glowCenter: 'rgba(0, 255, 50, 0.1)',
+    vignetteColor: '#000000', irisColor: '#4af626', scleraColor: 'rgba(74, 246, 38, 0.15)',
+    isHologram: true,
+    textColor: '#4af626', highlightColor: '#4af626'
+};
+const NOIR_COLORS: ThemeColors = {
+    bgColor: '#050505', baseColor: 'rgba(10, 10, 10, 0.3)', glowCenter: 'rgba(255, 255, 255, 0.05)',
+    vignetteColor: 'rgba(0, 0, 0, 0.95)', irisColor: '#ffffff', scleraColor: '#ffffff',
+    textColor: '#aaaaaa', highlightColor: '#ffffff'
+};
+const VELVET_COLORS: ThemeColors = {
+    bgColor: '#1a001a', baseColor: 'rgba(40, 0, 40, 0.3)', glowCenter: 'rgba(255, 200, 50, 0.1)',
+    vignetteColor: 'rgba(20, 0, 20, 0.95)', irisColor: '#ffcc00', scleraColor: '#ffffff',
+    textColor: '#ffd700', highlightColor: '#ffcc00'
+};
+const GOLD_COLORS: ThemeColors = {
+    bgColor: '#101010', baseColor: 'rgba(20, 20, 20, 0.3)', glowCenter: 'rgba(255, 215, 0, 0.1)',
+    vignetteColor: 'rgba(5, 5, 5, 0.95)', irisColor: '#ffd700', scleraColor: '#ffffff',
+    textColor: '#ffd700', highlightColor: '#ffaa00'
+};
+
+// Vision TV override for Original palette: blood background + white text/sphere
+const VISION_ORIGINAL_COLORS: ThemeColors = {
+    bgColor: '#200000', baseColor: 'rgba(60, 0, 0, 0.3)', glowCenter: 'rgba(255, 0, 0, 0.1)',
+    vignetteColor: 'rgba(20, 0, 0, 0.95)', irisColor: '#ffffff', scleraColor: '#ffffff',
+    textColor: '#ffffff', highlightColor: '#ffffff'
+};
+
+
+const PALETTE_CONFIGS: Record<PaletteId, {
+    floor: { texture: string; overlay1: string; overlay2: string };
+    cluster: { toon: string; dirty: string; lowpoly: string; typical: string };
+    mobile: string;
+    radio: { accent: string; theme: ThemeColors } | undefined;
+    aboutMe: ThemeColors | undefined;
+    myWorks: string | undefined;
+    vision: ThemeColors | undefined;
+}> = {
+    current: {
+        floor: { texture: '/textures/weirdPattern3.avif', overlay1: '#ff0000', overlay2: '#0000ff' },
+        cluster: { toon: 'toon', dirty: 'blood', lowpoly: 'classic', typical: 'sulfur' },
+        mobile: 'mobile',
+        radio: undefined,
+        aboutMe: undefined,
+        myWorks: undefined,
+        vision: VISION_ORIGINAL_COLORS
+    },
+    A: {
+        floor: { texture: '/textures/blackConcrete.avif', overlay1: '#ff8800', overlay2: '#ff6600' },
+        cluster: { toon: 'amber', dirty: 'amber', lowpoly: 'amber', typical: 'amber' },
+        mobile: 'amber',
+        radio: { accent: '#ffaa44', theme: AMBER_COLORS },
+        aboutMe: AMBER_COLORS,
+        myWorks: 'amber',
+        vision: undefined
+    },
+    B: {
+        floor: { texture: '/textures/concreteTexture.avif', overlay1: '#00eeff', overlay2: '#00bbcc' },
+        cluster: { toon: 'cyan', dirty: 'magenta', lowpoly: 'cyan', typical: 'magenta' },
+        mobile: 'cyan',
+        radio: { accent: '#00eeff', theme: CYAN_COLORS },
+        aboutMe: MAGENTA_COLORS,
+        myWorks: 'cyan',
+        vision: undefined
+    },
+    C: {
+        floor: { texture: '/textures/otherConcrete.avif', overlay1: '#00ff44', overlay2: '#00cc33' },
+        cluster: { toon: 'terminal', dirty: 'terminal', lowpoly: 'terminal', typical: 'terminal' },
+        mobile: 'terminal',
+        radio: { accent: '#00ff44', theme: TERMINAL_COLORS },
+        aboutMe: TERMINAL_COLORS,
+        myWorks: 'terminal',
+        vision: undefined
+    },
+    D: {
+        floor: { texture: '/textures/glitchy.avif', overlay1: '#ff0000', overlay2: '#550000' },
+        cluster: { toon: 'glitch', dirty: 'blood', lowpoly: 'glitch', typical: 'blood' },
+        mobile: 'glitch',
+        radio: { accent: '#ff0000', theme: GLITCH_COLORS },
+        aboutMe: GLITCH_COLORS,
+        myWorks: 'glitch',
+        vision: undefined
+    },
+
+    E: {
+        floor: { texture: '/textures/thisOned.avif', overlay1: '#ffcc00', overlay2: '#ffaa00' },
+        cluster: { toon: 'gold', dirty: 'gold', lowpoly: 'gold', typical: 'gold' },
+        mobile: 'gold',
+        radio: { accent: '#ffcc00', theme: GOLD_COLORS },
+        aboutMe: GOLD_COLORS,
+        myWorks: 'gold',
+        vision: undefined
+    },
+
+    F: {
+        floor: { texture: '/textures/metalicHoloUVFloor.avif', overlay1: '#ff00ff', overlay2: '#00ffff' },
+        cluster: { toon: 'holo', dirty: 'holo', lowpoly: 'holo', typical: 'holo' },
+        mobile: 'holo',
+        radio: { accent: '#ff00ff', theme: HOLO_COLORS },
+        aboutMe: HOLO_COLORS,
+        myWorks: 'holo',
+        vision: undefined
+    },
+    G: {
+        floor: { texture: '/textures/weirdPattern2.avif', overlay1: '#00ff00', overlay2: '#003300' },
+        cluster: { toon: 'hacker', dirty: 'hacker', lowpoly: 'hacker', typical: 'hacker' },
+        mobile: 'hacker',
+        radio: { accent: '#00ff00', theme: HACKER_COLORS },
+        aboutMe: HACKER_COLORS,
+        myWorks: 'hacker',
+        vision: undefined
+    },
+    H: {
+        floor: { texture: '/textures/another.avif', overlay1: '#ffffff', overlay2: '#888888' },
+        cluster: { toon: 'noir', dirty: 'noir', lowpoly: 'noir', typical: 'noir' },
+        mobile: 'noir',
+        radio: { accent: '#ffffff', theme: NOIR_COLORS },
+        aboutMe: NOIR_COLORS,
+        myWorks: 'noir',
+        vision: undefined
+    },
+    I: {
+        floor: { texture: '/textures/thisOne.avif', overlay1: '#ffcc00', overlay2: '#ff00ff' },
+        cluster: { toon: 'velvet', dirty: 'velvet', lowpoly: 'velvet', typical: 'velvet' },
+        mobile: 'velvet',
+        radio: { accent: '#ffcc00', theme: VELVET_COLORS },
+        aboutMe: VELVET_COLORS,
+        myWorks: 'velvet',
+        vision: undefined
+    },
+
+};
+
+interface TVSceneProps {
+    isLoaded: boolean;
+}
+
+export default function TVScene({ isLoaded }: TVSceneProps) {
     const [cameraZ, setCameraZ] = useState(14);
     const [viewState, setViewState] = useState<ViewState>('default');
     const [isCameraSettled, setCameraSettled] = useState(true);
     const [dpr, setDpr] = useState(1.0);
+    const [isPhysicsActive, setPhysicsActive] = useState(false);
+    const [palette, setPalette] = useState<PaletteId>('current');
+
+    const paletteConfig = PALETTE_CONFIGS[palette];
 
     const rectLightRef = useRef<THREE.RectAreaLight>(null);
-
-    useLayoutEffect(() => {
-        if (rectLightRef.current) {
-            rectLightRef.current.lookAt(0.1, 6.0, 0.40);
-        }
-    }, []);
-
-    useEffect(() => {
-        const handleResize = () => {
-            const isMobile = window.innerWidth < 768;
-            setCameraZ(isMobile ? 20 : 14);
-            if (isMobile) setDpr(0.8);
-        };
-        handleResize();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
 
     const handleZoom = (e: any, targetState: ViewState) => {
         e.stopPropagation();
@@ -73,20 +237,30 @@ export default function TVScene() {
     const book5Ctrl = { pos: [0.33, -1.9, -0.15] as [number, number, number], scale: 1.3, size: [0.05, 0.35, 0.27] as [number, number, number], offset: [-1.39, 0.82, 0.14] as [number, number, number] };
 
     const { scene: dvdModel } = useGLTF('/models/dvd.glb');
+    const clonedDvd = useMemo(() => dvdModel.clone(), [dvdModel]);
+
+    // Handle Physics Start based on parent prop
+    useEffect(() => {
+        if (isLoaded) {
+            setTimeout(() => {
+                setPhysicsActive(true);
+            }, 5);
+        }
+    }, [isLoaded]);
 
     return (
-        <div style={{ width: '100%', height: '100vh', background: '#000000' }}>
+        <div style={{ width: '100%', height: '100vh', background: '#000000', position: 'relative' }}>
+
             <Canvas
-                shadows
-                camera={{ position: [-3.5, 2.5, cameraZ], fov: 35 }}
-                key={cameraZ}
+                shadows={false}
+                camera={{ position: [-3.5, 2.5, 14], fov: 35 }}
                 dpr={dpr}
                 gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0, preserveDrawingBuffer: true }}
             >
                 <PerformanceMonitor onIncline={() => setDpr(1.5)} onDecline={() => setDpr(0.7)} >
                     <color attach="background" args={['#000000']} />
                     <ambientLight intensity={0.7} />
-                    <directionalLight position={[0, 10, 5]} intensity={2.0} color="#fff0dd" castShadow />
+                    <directionalLight position={[0, 10, 5]} intensity={2.0} color="#fff0dd" />
                     <spotLight position={[0, 8, 6]} angle={1.2} penumbra={0.4} intensity={80} color="#ffc485" />
                     <pointLight position={[-6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
                     <pointLight position={[6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
@@ -96,63 +270,82 @@ export default function TVScene() {
                     <pointLight position={[5.3, 1.9, 0.9]} intensity={10} distance={6.5} decay={2.75} color="#ffaa00" />
                     <rectAreaLight ref={rectLightRef} position={[5.7, 1.4, 1.0]} width={1.0} height={1.2} color="#ffcc00" intensity={5} />
 
-                    <Suspense fallback={null}>
-                        <Physics gravity={[0, -9.81, 0]} numSolverIterations={12}>
-                            <RoomFloor />
-                            <TVCluster viewState={viewState} onNavigate={(st: ViewState) => setViewState(st)} />
-                            <RadioSection viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} />
-                            <AboutMeSection viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} />
-                            <MyWorksSection viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} />
+                    <Physics gravity={[0, -9.81, 0]} numSolverIterations={12} paused={!isPhysicsActive}>
+                        <RoomFloor
+                            texturePath={paletteConfig.floor.texture}
+                            overlayColor1={paletteConfig.floor.overlay1}
+                            overlayColor2={paletteConfig.floor.overlay2}
+                        />
 
-                            <RigidBody colliders={false} position={dvdCtrl.pos}>
-                                <CuboidCollider args={dvdCtrl.size} position={dvdCtrl.offset} friction={0.5} restitution={0.1} />
-                                <primitive object={dvdModel.clone()} />
-                            </RigidBody>
+                        <TVCluster viewState={viewState} onNavigate={(st: ViewState) => setViewState(st)} clusterThemes={paletteConfig.cluster} visionColors={paletteConfig.vision} />
 
-                            <RigidBody colliders={false} position={mobileCtrl.pos} rotation={mobileCtrl.rot}>
-                                <CuboidCollider args={mobileCtrl.size} position={mobileCtrl.offset} friction={0.5} restitution={0.1} />
-                                <Television modelPath="/models/mobile.glb" screenNames={MOBILE_SCREENS} theme="mobile" invertY={true} />
-                            </RigidBody>
+                        <RadioSection
+                            viewState={viewState}
+                            onNavigate={(st: string) => setViewState(st as ViewState)}
+                            accentColor={paletteConfig.radio?.accent}
+                            themeOverride={paletteConfig.radio?.theme}
+                        />
 
-                            <RigidBody colliders={false} position={luckyCatCtrl.pos}>
-                                <CuboidCollider args={luckyCatCtrl.size} position={luckyCatCtrl.offset} friction={0.5} restitution={0.1} />
-                                <LuckyCat scale={luckyCatCtrl.scale} />
-                            </RigidBody>
+                        <AboutMeSection
+                            viewState={viewState}
+                            onNavigate={(st: string) => setViewState(st as ViewState)}
+                            themeOverride={paletteConfig.aboutMe}
+                        />
 
-                            <AdjustableModel modelPath="/models/rubiksGold.glb" initialPos={rubiksGoldCtrl.pos} initialRot={rubiksGoldCtrl.rot} initialScale={rubiksGoldCtrl.scale} initialColliderSize={rubiksGoldCtrl.size} initialColliderOffset={rubiksGoldCtrl.offset} isInteractive={false} />
+                        <MyWorksSection
+                            viewState={viewState}
+                            onNavigate={(st: string) => setViewState(st as ViewState)}
+                            themeOverride={paletteConfig.myWorks}
+                        />
 
-                            <AdjustableModel
-                                modelPath="/models/b1.glb" initialPos={book1Ctrl.pos} initialRot={book1Ctrl.rot} initialScale={book1Ctrl.scale} initialColliderSize={book1Ctrl.size} initialColliderOffset={book1Ctrl.offset}
-                                onClick={(e) => handleZoom(e, 'tv_red_focus')} label="About me"
-                                labelConfig={{ position: [-1.882, 0.96, 0.51], rotation: [0, -0.2, 0], fontSize: 0.1, color: '#ffffff' }}
-                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
-                            />
-                            <AdjustableModel
-                                modelPath="/models/b2.glb" initialPos={book2Ctrl.pos} initialScale={book2Ctrl.scale} initialColliderSize={book2Ctrl.size} initialColliderOffset={book2Ctrl.offset}
-                                onClick={(e) => handleZoom(e, 'tv_lcd_focus')} label="My Works"
-                                labelConfig={{ position: [-1.80, 1.05, 0.52], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
-                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
-                            />
-                            <AdjustableModel
-                                modelPath="/models/b3.glb" initialPos={book3Ctrl.pos} initialScale={book3Ctrl.scale} initialColliderSize={book3Ctrl.size} initialColliderOffset={book3Ctrl.offset}
-                                onClick={(e) => handleZoom(e, 'tv_dirty_focus')} label="Vision"
-                                labelConfig={{ position: [-1.65, 0.90, 0.53], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
-                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
-                            />
-                            <AdjustableModel
-                                modelPath="/models/b4.glb" initialPos={book4Ctrl.pos} initialScale={book4Ctrl.scale} initialColliderSize={book4Ctrl.size} initialColliderOffset={book4Ctrl.offset}
-                                onClick={(e) => handleZoom(e, 'tv_typical_focus')} label="Lifestyle"
-                                labelConfig={{ position: [-1.49, 0.92, 0.53], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
-                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
-                            />
-                            <AdjustableModel
-                                modelPath="/models/b5.glb" initialPos={book5Ctrl.pos} initialScale={book5Ctrl.scale} initialColliderSize={book5Ctrl.size} initialColliderOffset={book5Ctrl.offset}
-                                onClick={(e) => handleZoom(e, 'tv_lowpoly_focus')} label="Extras"
-                                labelConfig={{ position: [-1.35, 0.85, 0.51], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
-                                isInteractive={viewState === 'shelf_focus' && isCameraSettled}
-                            />
-                        </Physics>
-                    </Suspense>
+                        <RigidBody colliders={false} position={dvdCtrl.pos}>
+                            <CuboidCollider args={dvdCtrl.size} position={dvdCtrl.offset} friction={0.5} restitution={0.1} />
+                            <primitive object={clonedDvd} />
+                        </RigidBody>
+
+                        <RigidBody colliders={false} position={mobileCtrl.pos} rotation={mobileCtrl.rot}>
+                            <CuboidCollider args={mobileCtrl.size} position={mobileCtrl.offset} friction={0.5} restitution={0.1} />
+                            <Television modelPath="/models/mobile.glb" screenNames={MOBILE_SCREENS} theme={paletteConfig.mobile as any} invertY={true} />
+                        </RigidBody>
+
+                        <RigidBody colliders={false} position={luckyCatCtrl.pos}>
+                            <CuboidCollider args={luckyCatCtrl.size} position={luckyCatCtrl.offset} friction={0.5} restitution={0.1} />
+                            <LuckyCat scale={luckyCatCtrl.scale} />
+                        </RigidBody>
+
+                        <AdjustableModel modelPath="/models/rubiksGold.glb" initialPos={rubiksGoldCtrl.pos} initialRot={rubiksGoldCtrl.rot} initialScale={rubiksGoldCtrl.scale} initialColliderSize={rubiksGoldCtrl.size} initialColliderOffset={rubiksGoldCtrl.offset} isInteractive={false} />
+
+                        <AdjustableModel
+                            modelPath="/models/b1.glb" initialPos={book1Ctrl.pos} initialRot={book1Ctrl.rot} initialScale={book1Ctrl.scale} initialColliderSize={book1Ctrl.size} initialColliderOffset={book1Ctrl.offset}
+                            onClick={(e) => handleZoom(e, 'tv_red_focus')} label="About me"
+                            labelConfig={{ position: [-1.882, 0.96, 0.51], rotation: [0, -0.2, 0], fontSize: 0.1, color: '#ffffff' }}
+                            isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                        />
+                        <AdjustableModel
+                            modelPath="/models/b2.glb" initialPos={book2Ctrl.pos} initialScale={book2Ctrl.scale} initialColliderSize={book2Ctrl.size} initialColliderOffset={book2Ctrl.offset}
+                            onClick={(e) => handleZoom(e, 'tv_lcd_focus')} label="My Works"
+                            labelConfig={{ position: [-1.80, 1.05, 0.52], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
+                            isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                        />
+                        <AdjustableModel
+                            modelPath="/models/b3.glb" initialPos={book3Ctrl.pos} initialScale={book3Ctrl.scale} initialColliderSize={book3Ctrl.size} initialColliderOffset={book3Ctrl.offset}
+                            onClick={(e) => handleZoom(e, 'tv_dirty_focus')} label="Vision"
+                            labelConfig={{ position: [-1.65, 0.90, 0.53], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
+                            isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                        />
+                        <AdjustableModel
+                            modelPath="/models/b4.glb" initialPos={book4Ctrl.pos} initialScale={book4Ctrl.scale} initialColliderSize={book4Ctrl.size} initialColliderOffset={book4Ctrl.offset}
+                            onClick={(e) => handleZoom(e, 'tv_typical_focus')} label="Lifestyle"
+                            labelConfig={{ position: [-1.49, 0.92, 0.53], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
+                            isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                        />
+                        <AdjustableModel
+                            modelPath="/models/b5.glb" initialPos={book5Ctrl.pos} initialScale={book5Ctrl.scale} initialColliderSize={book5Ctrl.size} initialColliderOffset={book5Ctrl.offset}
+                            onClick={(e) => handleZoom(e, 'tv_lowpoly_focus')} label="Extras"
+                            labelConfig={{ position: [-1.35, 0.85, 0.51], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
+                            isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                        />
+                    </Physics>
 
                     <CameraRig viewState={viewState} />
 
@@ -174,6 +367,7 @@ export default function TVScene() {
                     <CRTOverlay />
                 </PerformanceMonitor>
             </Canvas>
+            <PaletteSelector current={palette} onChange={(p) => setPalette(p as PaletteId)} />
         </div>
     );
 }

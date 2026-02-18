@@ -54,7 +54,6 @@ export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(
         return { canvas: c, ctx: cx };
     }, [isHorizontal]);
 
-
     useMemo(() => {
         const tex = new THREE.CanvasTexture(canvas);
         tex.minFilter = THREE.LinearFilter;
@@ -78,8 +77,6 @@ export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(
             jitterY = (Math.random() - 0.5) * 2;
         }
 
-
-
         ctx.save();
 
         if (inverted) {
@@ -100,7 +97,6 @@ export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(
         ctx.font = `bold ${fontSize}px "Courier New", monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-
 
         const lines = text.split('\n');
         const lineHeight = fontSize * 1.0;

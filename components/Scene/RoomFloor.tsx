@@ -3,12 +3,27 @@ import * as THREE from 'three';
 import { useTexture } from '@react-three/drei';
 import { RigidBody, CuboidCollider } from '@react-three/rapier';
 
-export function RoomFloor() {
-    const floorTexture = useTexture('/textures/weirdPattern3.avif');
-    floorTexture.wrapS = THREE.RepeatWrapping;
-    floorTexture.wrapT = THREE.RepeatWrapping;
-    floorTexture.repeat.set(12, 12);
-    floorTexture.anisotropy = 16;
+interface RoomFloorProps {
+    texturePath?: string;
+    overlayColor1?: string;
+    overlayColor2?: string;
+}
+
+export function RoomFloor({
+    texturePath = '/textures/weirdPattern3.avif',
+    overlayColor1 = '#ff0000',
+    overlayColor2 = '#0000ff'
+}: RoomFloorProps) {
+    const floorTexture = useTexture(texturePath);
+
+    // Ensure texture settings are applied when texture changes
+    React.useLayoutEffect(() => {
+        floorTexture.wrapS = THREE.RepeatWrapping;
+        floorTexture.wrapT = THREE.RepeatWrapping;
+        floorTexture.repeat.set(12, 12);
+        floorTexture.anisotropy = 16;
+        floorTexture.needsUpdate = true;
+    }, [floorTexture]);
 
     return (
         <RigidBody type="fixed" colliders={false} position={[0, -2.1, 0]}>
@@ -29,7 +44,7 @@ export function RoomFloor() {
                 <planeGeometry args={[50, 50]} />
                 <meshStandardMaterial
                     map={floorTexture}
-                    color="#ff0000"
+                    color={overlayColor1}
                     transparent
                     opacity={0.5}
                     blending={THREE.AdditiveBlending}
@@ -42,7 +57,7 @@ export function RoomFloor() {
                 <planeGeometry args={[50, 50]} />
                 <meshStandardMaterial
                     map={floorTexture}
-                    color="#0000ff"
+                    color={overlayColor2}
                     transparent
                     opacity={0.5}
                     blending={THREE.AdditiveBlending}
@@ -53,3 +68,5 @@ export function RoomFloor() {
         </RigidBody>
     );
 }
+
+useTexture.preload('/textures/concreteTexture.avif');

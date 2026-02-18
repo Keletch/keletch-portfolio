@@ -61,23 +61,13 @@ export default function Television({
 
 
 
-    const renderAccumulator = useRef(0);
-    const FPS_LIMIT = 24;
-    const FRAME_DURATION = 1 / FPS_LIMIT;
-
     useFrame((state, delta) => {
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
-            if (dist > 15) return;
+            if (dist > 25) return; // Only cull if very far away
         }
 
-        renderAccumulator.current += delta;
-        if (renderAccumulator.current < FRAME_DURATION) {
-            return;
-        }
-
-        const dt = renderAccumulator.current;
-        renderAccumulator.current %= FRAME_DURATION;
+        const dt = delta;
 
         if (screenTextureRef.current && groupRef.current) {
 
@@ -167,96 +157,93 @@ export default function Television({
 
             if (ctx) {
                 const w = canvas.width;
+
                 const h = canvas.height;
+
+                // Optimization: Cache gradients
+                if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
+                const cache = screenTextureRef.current.userData;
+                const needsUpdate = cache.w !== w || cache.h !== h || cache.theme !== theme;
+
+                if (needsUpdate) {
+                    cache.w = w;
+                    cache.h = h;
+                    cache.theme = theme;
+
+                    // 1. Backlight
+                    const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
+                    backlight.addColorStop(0, activeTheme.glowCenter);
+                    backlight.addColorStop(1, 'rgba(0,0,0,0)');
+                    cache.backlight = backlight;
+
+                    // 2. Vignette
+                    const vignette = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
+                    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+                    vignette.addColorStop(0.5, 'rgba(0,0,0,0.1)');
+
+                    const vignetteColor = activeTheme.vignetteColor;
+                    vignette.addColorStop(1, vignetteColor);
+                    cache.vignette = vignette;
+
+                }
 
                 ctx.fillStyle = activeTheme.bgColor;
                 ctx.fillRect(0, 0, w, h);
 
-                const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
-                backlight.addColorStop(0, activeTheme.glowCenter);
-                backlight.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.fillStyle = backlight;
-                ctx.fillRect(0, 0, w, h);
+                if (cache.backlight) {
+                    ctx.fillStyle = cache.backlight;
+                    ctx.fillRect(0, 0, w, h);
+                }
 
                 ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
 
+                ctx.save();
 
-                const drawContent = () => {
-                    ctx.save();
+                const isLCD = theme === 'toxic';
+                const scleraMaxOffsetX = isLCD ? 150 : 100;
+                const scleraMaxOffsetY = 100;
 
-                    const isLCD = theme === 'toxic';
-                    const scleraMaxOffsetX = isLCD ? 150 : 100;
-                    const scleraMaxOffsetY = 100;
+                const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
+                const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
 
-                    const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
-                    const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
+                ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
 
-                    ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
+                let scaleEye = 1.0;
+                if (theme === 'mobile') scaleEye = 0.6;
 
-                    let scaleEye = 1.0;
-                    if (theme === 'mobile') scaleEye = 0.6;
+                let geoCorrectionX = 1.0;
+                if (theme === 'toxic' && screenAspect.current > 1.2) {
+                    geoCorrectionX = 1 / (screenAspect.current * 0.85);
+                }
 
-                    let geoCorrectionX = 1.0;
-                    if (theme === 'toxic' && screenAspect.current > 1.2) {
-                        geoCorrectionX = 1 / (screenAspect.current * 0.85);
-                    }
+                ctx.scale(geoCorrectionX * scaleEye, blink.openness * scaleEye);
 
-                    ctx.scale(geoCorrectionX * scaleEye, blink.openness * scaleEye);
+                const irisColor = activeTheme.irisColor;
 
-                    let irisColor = '#5090ff';
-                    if (theme === 'toxic') irisColor = '#00bb33';
-                    if (theme === 'blood') irisColor = '#cc0000';
-                    if (theme === 'sulfur') irisColor = '#d4c264';
-                    if (theme === 'toon') irisColor = '#dcdcdc';
-                    if (theme === 'mobile') irisColor = '#0088ff';
+                // Generic lookup range
+                const customLookRange = (theme === 'toxic') ? 32
+                    : (theme === 'mobile') ? 15
+                        : 26;
+                const isHologram = theme === 'mobile' || theme === 'hacker' || theme === 'holo';
+                const scleraColor = activeTheme.scleraColor || '#ffffff';
 
-                    // Generic lookup range
-                    const customLookRange = (theme === 'toxic') ? 32
-                        : (theme === 'mobile') ? 15
-                            : 26;
-                    const isHologram = theme === 'mobile';
-                    const scleraColor = (theme === 'mobile') ? activeTheme.scleraColor : '#ffffff';
+                drawPixelEye(
+                    ctx,
+                    normalizedMouse.current,
+                    irisColor,
+                    customLookRange,
+                    scleraColor,
+                    isHologram
+                );
 
-                    drawPixelEye(
-                        ctx,
-                        normalizedMouse.current,
-                        irisColor,
-                        customLookRange,
-                        scleraColor,
-                        isHologram
-                    );
+                ctx.restore();
+                // Optimization: Use cached Vignette and Glow
+                if (cache.vignette) {
+                    ctx.fillStyle = cache.vignette;
+                    ctx.fillRect(0, 0, w, h);
+                }
 
-                    ctx.restore();
-                };
-
-                drawContent();
-
-                const gradient = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
-                gradient.addColorStop(0, 'rgba(0,0,0,0)');
-                gradient.addColorStop(0.5, 'rgba(0,0,0,0.1)');
-
-                let vignetteColor = 'rgba(0,0,0,1.0)';
-                if (theme === 'toxic') vignetteColor = 'rgba(0, 10, 0, 0.95)';
-                if (theme === 'blood') vignetteColor = 'rgba(20, 0, 0, 0.95)';
-                if (theme === 'sulfur') vignetteColor = 'rgba(20, 20, 0, 0.95)';
-                if (theme === 'toon') vignetteColor = 'rgba(5, 5, 5, 0.98)';
-                if (theme === 'classic') vignetteColor = 'rgba(0, 5, 20, 0.95)';
-
-                gradient.addColorStop(1, vignetteColor);
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, w, h);
-
-                const glow = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 300);
-
-                let glowColor = 'rgba(20, 40, 100, 0.1)';
-                if (theme === 'blood') glowColor = 'rgba(150, 0, 0, 0.15)';
-                if (theme === 'sulfur') glowColor = 'rgba(200, 200, 50, 0.12)';
-                if (theme === 'mobile') glowColor = 'rgba(0, 100, 255, 0.2)';
-
-                glow.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.fillStyle = glow;
-                ctx.fillRect(0, 0, w, h);
 
                 if (isFocused && focusedText) {
                     ctx.save();
@@ -276,13 +263,16 @@ export default function Television({
 
                     const textY = -h / 2 + textYOffset;
 
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
+                    const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
+
+                    ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
                     ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
 
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+                    ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
                     ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
 
-                    ctx.fillStyle = '#ffffff';
+                    ctx.fillStyle = activeTheme.textColor || '#ffffff';
 
                     if (Math.random() > 0.1) {
                         ctx.fillText(focusedText, jitterX, textY + jitterY);
@@ -291,20 +281,7 @@ export default function Television({
                     ctx.restore();
                 }
 
-                if (isFocused) {
-                    ctx.save();
-                    ctx.translate(w / 2, h / 2);
-                    if (invertY) {
-                        ctx.rotate(Math.PI);
-                        ctx.scale(-1, 1);
-                    }
 
-
-
-                    ctx.globalCompositeOperation = 'source-over';
-
-                    ctx.restore();
-                }
             }
 
             screenTextureRef.current.needsUpdate = true;

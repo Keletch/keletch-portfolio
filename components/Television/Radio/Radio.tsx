@@ -44,8 +44,12 @@ export default function RadioTV({
     onNextClick,
     tracks = [],
     onSelectTrack,
-    audioAnalyser
-}: RadioProps) {
+    audioAnalyser,
+    accentColor,
+    themeOverride
+}: RadioProps & { accentColor?: string; themeOverride?: { bgColor: string; baseColor: string; glowCenter: string; vignetteColor: string; irisColor: string; scleraColor: string } }) {
+    const accent = accentColor || '#00ff44';
+    const activeTheme = themeOverride ? { ...RADIO_THEME, ...themeOverride } : RADIO_THEME;
     const groupRef = useRef<THREE.Group>(null);
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });
@@ -134,7 +138,7 @@ export default function RadioTV({
         blinkTimer: 0
     });
 
-    const activeTheme = RADIO_THEME;
+
 
     const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | 'next' | null => {
         if (!isFocused) return null;
@@ -180,23 +184,13 @@ export default function RadioTV({
         return null;
     };
 
-    const renderAccumulator = useRef(0);
-    const FPS_LIMIT = 24;
-    const FRAME_DURATION = 1 / FPS_LIMIT;
-
     useFrame((state, delta) => {
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
             if (dist > 15) return;
         }
 
-        renderAccumulator.current += delta;
-        if (renderAccumulator.current < FRAME_DURATION) {
-            return;
-        }
-
-        const dt = renderAccumulator.current;
-        renderAccumulator.current %= FRAME_DURATION;
+        const dt = delta;
 
         if (screenTextureRef.current && groupRef.current) {
 
@@ -280,10 +274,7 @@ export default function RadioTV({
                 ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
 
-                // DRAW EYES
-                // Eyes are default if renderedFigure is null (Idle)
-                // If renderedFigure is 'menu' OR 'player', we fade eyes out.
-                // We prevent "flashing" the eye when switching between menu and player.
+                // Eye opacity: fade out when player or menu is showing
                 let eyeOpacity = 1.0;
                 const hidesEye = (fig: string | null) => fig === 'menu' || (fig && fig.startsWith('player'));
 
@@ -291,11 +282,9 @@ export default function RadioTV({
                     const sourceHides = hidesEye(transitionSourceRef.current);
                     const targetHides = hidesEye(targetFigure);
 
-                    // If we are moving between two figures that BOTH hide the eye, force it to stay hidden.
                     if (sourceHides && targetHides) {
                         eyeOpacity = 0;
                     } else {
-                        // Normal fade (from or to Idle)
                         eyeOpacity = Math.max(0, 1.0 - (transitionOpacity.current || 0));
                     }
                 }
@@ -310,7 +299,7 @@ export default function RadioTV({
                     ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
                     let scaleEye = 0.6;
                     ctx.scale(scaleEye, blink.openness * scaleEye);
-                    const irisColor = '#00ff44';
+                    const irisColor = accent;
                     const customLookRange = 15;
                     const isHologram = true;
                     const scleraColor = activeTheme.scleraColor;
@@ -321,13 +310,13 @@ export default function RadioTV({
                 const gradient = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
                 gradient.addColorStop(0, 'rgba(0,0,0,0)');
                 gradient.addColorStop(0.5, 'rgba(0,0,0,0.1)');
-                const vignetteColor = 'rgba(0, 20, 0, 0.95)'; // Sonar vignette
+                const vignetteColor = activeTheme.vignetteColor;
                 gradient.addColorStop(1, vignetteColor);
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, 0, w, h);
 
                 const glow = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 300);
-                const glowColor = 'rgba(0, 255, 50, 0.15)'; // Sonar glow
+                const glowColor = activeTheme.glowCenter;
                 glow.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = glow;
                 ctx.fillRect(0, 0, w, h);
@@ -343,7 +332,6 @@ export default function RadioTV({
                 if (isFocused) {
                     if (focusedText) {
                         ctx.save();
-                        // Inner save for text since we are already translated
                         const jitterX = (Math.random() - 0.5) * 4;
                         const jitterY = (Math.random() - 0.5) * 4;
                         ctx.font = '900 50px "Courier New", monospace';
@@ -379,8 +367,8 @@ export default function RadioTV({
                         const morphTarget = status === 'playing' ? 1 : 0;
                         morphProgressRef.current += (morphTarget - morphProgressRef.current) * 0.15;
                         if (Math.abs(morphProgressRef.current - morphTarget) < 0.001) morphProgressRef.current = morphTarget;
-                        drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, '#00ff44');
-                        drawPlayPauseButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current, '#00ff44');
+                        drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, accent);
+                        drawPlayPauseButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current, accent);
                     }
 
                     if (showBackButton) {
@@ -396,13 +384,13 @@ export default function RadioTV({
                             if (Math.abs(screenTextureRef.current.userData.hoverAnimBack) < 0.001) screenTextureRef.current.userData.hoverAnimBack = 0;
                             hoverProgress = screenTextureRef.current.userData.hoverAnimBack;
                         }
-                        drawBackButton(ctx, btnX, btnY, hoverProgress, '#00ff44');
+                        drawBackButton(ctx, btnX, btnY, hoverProgress, accent);
                     }
 
                     if (showMenuButton) {
                         const btnX = menuButtonPosition ? menuButtonPosition.x : RADIO_BUTTON_CONFIG.MENU.x;
                         const btnY = menuButtonPosition ? menuButtonPosition.y : RADIO_BUTTON_CONFIG.MENU.y;
-                        const isHover = menuButtonHovered || isMenuOpen; // Keep active if open
+                        const isHover = menuButtonHovered || isMenuOpen;
                         let hoverProgress = 0;
                         if (screenTextureRef.current) {
                             if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
@@ -416,7 +404,7 @@ export default function RadioTV({
                             }
                             hoverProgress = screenTextureRef.current.userData.hoverAnimMenu;
                         }
-                        drawMenuButton(ctx, btnX, btnY, hoverProgress, '#00ff44');
+                        drawMenuButton(ctx, btnX, btnY, hoverProgress, accent);
                     }
 
                     if (showNextButton) {
@@ -436,9 +424,9 @@ export default function RadioTV({
                             }
                             hoverProgress = screenTextureRef.current.userData.hoverAnimNext;
                         }
-                        drawNextButton(ctx, btnX, btnY, hoverProgress, '#00ff44');
+                        drawNextButton(ctx, btnX, btnY, hoverProgress, accent);
                     }
-                } // End of isFocused block
+                }
 
                 const figureOpacity = transitionOpacity.current;
                 const figureStepped = Math.floor(figureOpacity * 5) / 5;
@@ -459,7 +447,7 @@ export default function RadioTV({
                             80, // Radius
                             audioAnalyser,
                             state.clock.elapsedTime,
-                            '#00ff44',
+                            accent,
                             linStepped
                         );
                     }
@@ -473,15 +461,19 @@ export default function RadioTV({
                         const barX = -150 + jX;
                         const barY = 190 + jY;
                         const barWidth = 300;
+                        const actualProgress = isSeekDragging
+                            ? seekDragValue
+                            : (typeof currentProgress === 'number' ? currentProgress : currentProgress.current);
+
                         drawProgressBar(
                             ctx,
                             barX,
                             barY,
                             barWidth,
-                            isSeekDragging ? seekDragValue : currentProgress,
+                            actualProgress,
                             currentSongName,
                             figureStepped,
-                            '#00ff44'
+                            accent
                         );
                     }
                 }
@@ -494,7 +486,7 @@ export default function RadioTV({
                         hoveredTrackIndex,
                         currentSongName,
                         figureStepped,
-                        '#00ff44'
+                        accent
                     );
                 }
 
@@ -528,14 +520,8 @@ export default function RadioTV({
                                 return;
                             }
 
-                            // Handle List Drag
                             if (isListDragging && isMenuOpen) {
                                 const deltaY = dy - dragStartY;
-                                // dy increases downwards? No, dy is centered 0.
-                                // if pull down (dy increases), scroll top decreases?
-                                // scrollTop is positive offset.
-                                // If I move mouse DOWN (dy increases), I am dragging list DOWN, so we want to see HIGHER elements.
-                                // So scrollTop should DECREASE.
                                 const newScroll = dragStartScroll - deltaY;
                                 const listHeight = 280;
                                 const itemHeight = 40;
@@ -638,12 +624,6 @@ export default function RadioTV({
                     onClick={(e: any) => {
                         if (e.object.userData.isScreen && e.uv) {
                             if (isSeekDragging) return;
-                            // Assume click is not a drag if movement was small?
-                            // For simplicity, if we were dragging, we might not want to register click.
-                            // But React Three Fiber onClick usually fires on up.
-                            // However, we are tracking drag state. If `isListDragging` was true, `onPointerUp` clears it.
-                            // But `onClick` might fire after.
-                            // Let's rely on standard logic: if it was a drag, usually we prevent click. But here simpler.
 
                             let dx = e.uv.x * 512 - 256;
                             let dy = (1 - e.uv.y) * 512 - 256;
@@ -677,7 +657,6 @@ export default function RadioTV({
                                 // Check List Click
                                 const listX = -220; const listY = -140; const listW = 440; const listH = 280;
                                 if (dx >= listX && dx <= listX + listW && dy >= listY && dy <= listY + listH) {
-                                    // Clicked in list
                                     const relativeY = dy - listY + scrollTop;
                                     const index = Math.floor(relativeY / 40);
                                     if (index >= 0 && index < tracks.length) {

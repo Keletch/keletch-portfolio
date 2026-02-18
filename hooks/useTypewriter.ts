@@ -15,17 +15,76 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
     const [typingStartTime, setTypingStartTime] = useState(0);
     const isTypingRef = useRef(false);
 
-    // Audio Ref
-    const typingAudioRef = useRef<HTMLAudioElement | null>(null);
+    // Audio Context & Buffer
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const audioBufferRef = useRef<AudioBuffer | null>(null);
 
-    // 1. Load typing sound
+    // 1. Load typing sound (Web Audio API)
     useEffect(() => {
         if (enableStoryMode && typeof window !== 'undefined') {
-            const audio = new Audio('/sounds/space.wav');
-            audio.volume = 0.05;
-            typingAudioRef.current = audio;
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            const ctx = new AudioContextClass();
+            audioContextRef.current = ctx;
+
+            fetch('/sounds/Bubbles.m4a')
+                .then(res => res.arrayBuffer())
+                .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
+                .then(decodedAudio => {
+                    audioBufferRef.current = decodedAudio;
+                })
+                .catch(err => console.error("Error loading typewriter sound:", err));
+
+            return () => {
+                ctx.close();
+            };
         }
     }, [enableStoryMode]);
+
+    // Helper to play sound with variation
+    const playTypewriterSound = useCallback(() => {
+        const ctx = audioContextRef.current;
+        const buffer = audioBufferRef.current;
+
+        if (!ctx || !buffer) return;
+
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => { });
+        }
+
+        if (ctx.state === 'running' || ctx.state === 'suspended') {
+            try {
+                const source = ctx.createBufferSource();
+                const gainNode = ctx.createGain();
+
+                source.buffer = buffer;
+
+                // Varied Pitch: 0.5 to 2.0 (Deep bubbles to light bubbles)
+                source.playbackRate.value = 0.5 + Math.random() * 1.5;
+
+                // Base volume 0.05 (very subtle)
+                const baseVolume = 0.05;
+                const volumeVariation = Math.random() * 0.02;
+                const volume = baseVolume + volumeVariation;
+
+                // Envelope: Attack -> Hold -> Fade Out
+                const now = ctx.currentTime;
+                const duration = buffer.duration;
+                // Ensure fade out happens before end of file to prevent clicking
+                const fadeDuration = Math.min(duration * 0.5, 0.2);
+
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(volume, now + 0.01); // Quick attack
+                gainNode.gain.setValueAtTime(volume, now + duration - fadeDuration);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration); // Smooth Fade Out
+
+                source.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                source.start(0);
+            } catch (e) {
+                // Ignore audio errors
+            }
+        }
+    }, []);
 
     // 2. Start Story Mode trigger
     const startStory = useCallback(() => {
@@ -80,7 +139,6 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
         }
     }, [storyMode, storyContent, currentParagraph, waitingForInput, onStoryEnd, stopStory, signalTypingFinished]);
 
-
     // Keyboard Listener
     useEffect(() => {
         if (!storyMode) return;
@@ -105,6 +163,6 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
         stopStory,
         handleInteraction,
         signalTypingFinished,
-        typingAudioRef
+        playTypewriterSound
     };
 }

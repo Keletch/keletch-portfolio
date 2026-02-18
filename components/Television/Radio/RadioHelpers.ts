@@ -43,49 +43,36 @@ export function drawPlayPauseButton(
     const barHeight = r * 2.2;
     const barSpacing = r * 0.8;
 
-    // Phase 1: Triangle morphs to single generic vertical bar
-    // We'll morph the triangle into a rectangle (the left bar)
+    // Phase 1: Triangle morphs to single bar
 
-    // Triangle vertices
     const triV0 = { x: r, y: 0 };
     const triV1 = { x: -0.5 * r, y: -0.866 * r };
     const triV2 = { x: -0.5 * r, y: 0.866 * r };
 
-    // Left Bar target vertices (centered for the single bar phase)
-    // When m=0.5, it should be a single bar.
-    // Ideally at m=1.0, the left bar is at -barSpacing/2
-    // So let's define the single bar at center first.
-    const rectV0 = { x: barWidth / 2, y: -barHeight / 2 }; // top-right
-    const rectV1 = { x: -barWidth / 2, y: -barHeight / 2 }; // top-left
-    const rectV2 = { x: -barWidth / 2, y: barHeight / 2 }; // bottom-left
-    const rectV3 = { x: barWidth / 2, y: barHeight / 2 }; // bottom-right
+    // Left bar target vertices (centered bar phase)
+    const rectV0 = { x: barWidth / 2, y: -barHeight / 2 };
+    const rectV1 = { x: -barWidth / 2, y: -barHeight / 2 };
+    const rectV2 = { x: -barWidth / 2, y: barHeight / 2 };
+    const rectV3 = { x: barWidth / 2, y: barHeight / 2 };
 
     // Morph Logic
     if (m <= 0.5) {
         // Phase 1: Triangle -> Single Center Bar
-        // Normalize m to 0-1 range for this phase
         const t = m * 2;
 
-        // Interpolate vertices
-        // Map Triangle V0 (Tip) -> Rect V0 & V3 (Right side)
-        // Map Triangle V1 (Top Left) -> Rect V1 (Top Left)
-        // Map Triangle V2 (Bottom Left) -> Rect V2 (Bottom Left)
-
-        // We need 4 points for the rect. Triangle has 3.
-        // We can double up V0 in the triangle to split into V0/V3 of rect.
+        // Interpolate triangle -> rect vertices
 
         const cV0 = { x: triV0.x * (1 - t) + rectV0.x * t, y: triV0.y * (1 - t) + rectV0.y * t };
         const cV1 = { x: triV1.x * (1 - t) + rectV1.x * t, y: triV1.y * (1 - t) + rectV1.y * t };
         const cV2 = { x: triV2.x * (1 - t) + rectV2.x * t, y: triV2.y * (1 - t) + rectV2.y * t };
         const cV3 = { x: triV0.x * (1 - t) + rectV3.x * t, y: triV0.y * (1 - t) + rectV3.y * t };
 
-        // Bezier control points smooth out as t -> 1
+        // Bezier control points flatten as t -> 1
         const t0 = { x: 0, y: -r * k * (1 - t) };
         const t1 = { x: -0.866 * r * k * (1 - t), y: 0.5 * r * k * (1 - t) };
         const t2 = { x: 0.866 * r * k * (1 - t), y: 0.5 * r * k * (1 - t) };
 
         ctx.beginPath();
-        // Top edge: V1 -> V0
         ctx.moveTo(cx + cV0.x, cy + cV0.y);
         ctx.bezierCurveTo(
             cx + cV0.x + t0.x, cy + cV0.y + t0.y,
@@ -93,51 +80,40 @@ export function drawPlayPauseButton(
             cx + cV1.x, cy + cV1.y
         );
 
-        // Left edge: V1 -> V2
-        // Restoring bezier curve for rounded back, interpolating to flat for rectangle
         ctx.bezierCurveTo(
             cx + cV1.x + t1.x, cy + cV1.y + t1.y,
             cx + cV2.x - t2.x, cy + cV2.y - t2.y,
             cx + cV2.x, cy + cV2.y
         );
 
-        // Bottom edge: V2 -> V3
-        // For triangle, V2 -> V0 (Tip)
         ctx.bezierCurveTo(
             cx + cV2.x + t2.x, cy + cV2.y + t2.y,
             cx + cV3.x - t0.x, cy + cV3.y - t0.y,
             cx + cV3.x, cy + cV3.y
         );
 
-        // Right edge: V3 -> V0
         ctx.lineTo(cx + cV0.x, cy + cV0.y);
 
         ctx.closePath();
         ctx.fill();
 
     } else {
-        // Phase 2: Single Bar (l) -> Double Bar (ll)
-        // Normalize m to 0-1 range for this phase
+        // Phase 2: Single Bar -> Double Bar
         const t = (m - 0.5) * 2;
-
-        // Easing
-        const ease = t * (2 - t); // Ease out
+        const ease = t * (2 - t);
 
         const offset = barSpacing * ease;
 
-        // Draw Left Bar (moving left)
+        // Left bar
         const leftX = cx - offset / 2;
 
         ctx.beginPath();
         ctx.roundRect(leftX - barWidth / 2, cy - barHeight / 2, barWidth, barHeight, 2);
         ctx.fill();
 
-        // Draw Right Bar (moving right - sliding out)
+        // Right bar (slides out)
         if (t > 0) {
             const rightX = cx + offset / 2;
-            // Scale height/opacity up as it emerges? Or just slide?
-            // "slide out another l" implies splitting or emerging.
-            // Sliding from center seems smoothest.
 
             ctx.beginPath();
             ctx.roundRect(rightX - barWidth / 2, cy - barHeight / 2, barWidth, barHeight, 2);
@@ -379,12 +355,9 @@ export function drawReactiveCircle(
         bassSum += dataArray[i];
     }
     const bassAvg = (bassSum / bassEnd) / 255;
-    // Enhanced Kick Pulse: 
-    // Increased multiplier (1.4) and slightly adjusted power (2.2) 
-    // to make the "jump" more powerful and noticeable.
     const pulse = 1 + Math.pow(bassAvg, 2.2) * 1.4;
 
-    // 3D Ring Logic
+    // 3D Ring
     const segments = 120;
     const ringPoints: { x: number, y: number, z: number }[] = [];
 
@@ -393,7 +366,7 @@ export function drawReactiveCircle(
     const rotY = time * 0.3;
     const rotZ = time * 0.2;
 
-    // Define Frequency Bands
+    // Frequency band separation
     const activeStart = 10;
     const bufferRange = Math.floor(bufferLength * 0.8) - activeStart;
     const midRangeEnd = Math.floor(bufferRange * 0.4); // First 40% is mids
@@ -403,40 +376,31 @@ export function drawReactiveCircle(
     for (let i = 0; i < segments; i++) {
         const theta = (i / segments) * Math.PI * 2;
 
-        /**
-         * QUADRANT SPATIAL SEPARATION:
-         * We want Mids on the sides (Left/Right) and Highs on top/bottom.
-         * Math.cos(theta)^2 gives 1 at 0, 180 (Sides) and 0 at 90, 270 (Top/Bottom).
-         */
-        const midWeight = Math.pow(Math.cos(theta), 2); // 1 = full mid, 0 = full high
+        // Spatial separation: mids on sides, highs on top/bottom
+        const midWeight = Math.pow(Math.cos(theta), 2);
         const highWeight = 1 - midWeight;
 
-        // Calculate Mid Bin (from first half of spectrum)
-        const midProgress = Math.abs(Math.sin(theta)); // Symmetric 0->1->0
+        const midProgress = Math.abs(Math.sin(theta));
         const midBin = activeStart + Math.floor(midProgress * midRangeEnd);
 
-        // Calculate High Bin (from second half of spectrum)
-        const highProgress = Math.abs(Math.cos(theta)); // Perpendicular symmetric
+        const highProgress = Math.abs(Math.cos(theta));
         const highBin = activeStart + highRangeStart + Math.floor(highProgress * (highRangeEnd - highRangeStart));
 
-        // Get and weight the values
         const midVal = (dataArray[midBin] || 0) / 255;
         const highVal = (dataArray[highBin] || 0) / 255;
 
-        // Apply different power curves for better separation
-        const midSpike = Math.pow(midVal, 2.5) * 5.0;  // Mids are wider/thicker spikes
-        const highSpike = Math.pow(highVal, 3.5) * 8.0; // Highs are thinner/sharper spikes
+        const midSpike = Math.pow(midVal, 2.5) * 5.0;
+        const highSpike = Math.pow(highVal, 3.5) * 8.0;
 
         const distortion = 1 + (midSpike * midWeight) + (highSpike * highWeight);
 
         const r = radius * pulse * distortion;
 
-        // Base Point
         let px = Math.cos(theta) * r;
         let py = Math.sin(theta) * r;
         let pz = 0;
 
-        // Apply same 3D rotations
+        // 3D rotation
         let y1 = py * Math.cos(rotX) - pz * Math.sin(rotX);
         let z1 = py * Math.sin(rotX) + pz * Math.cos(rotX);
         let x1 = px;
@@ -452,17 +416,11 @@ export function drawReactiveCircle(
         ringPoints.push({ x: x3, y: y3, z: z3 });
     }
 
-    // Project and Draw
     ctx.beginPath();
     for (let i = 0; i < ringPoints.length; i++) {
         const p = ringPoints[i];
-        // Perspective Projection
-        // We use a larger focal length to accommodate massive spikes without flipping
         const focalLength = 2000;
         const denominator = focalLength - p.z;
-
-        // Prevent flipping (negative scale) if z exceeds focalLength
-        // This stops the "malformation" where spikes bounce back into the screen.
         const scale = focalLength / Math.max(10, denominator);
 
         const screenX = p.x * scale;

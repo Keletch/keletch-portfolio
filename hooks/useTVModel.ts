@@ -57,8 +57,6 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
                     }
 
                     child.userData.isScreen = true;
-                    // Reference will be captured by ref in parent or we traverse again. 
-                    // Actually, let's capture it here if we can, but since this is useMemo, refs are safe to mutate.
                     screenMeshRef.current = child;
 
                     child.material = new THREE.MeshBasicMaterial({
@@ -69,7 +67,7 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
                         side: THREE.DoubleSide,
                     });
                 } else {
-                    // Look PSX / Cartoon process
+                    // PSX-style nearest-neighbor filtering
                     if (child.material) {
                         const processMaterial = (mat: any) => {
                             if (mat.map) {

@@ -2,9 +2,12 @@ import React from 'react';
 import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import { useGLTF } from '@react-three/drei';
 import Television from '@/components/Television';
+import Vision from '@/components/Television/Vision/Vision';
 interface TVClusterProps {
     viewState: string;
     onNavigate: (state: any) => void;
+    clusterThemes?: { toon: string; dirty: string; lowpoly: string; typical: string };
+    visionColors?: { irisColor: string; textColor?: string; highlightColor?: string;[key: string]: any };
 }
 
 const TOON_SCREENS = ['toonTVScreen', 'screen', 'toontvscreen'];
@@ -13,8 +16,8 @@ const DIRTY_SCREENS = ['dirtyTVScreen', 'screen'];
 const TYPICAL_SCREENS = ['typicaltvscreen', 'screen', 'typical_tv_screen', 'tipicaltvscreen'];
 const LOWPOLY_SCREENS = ['screen'];
 
-
-export function TVCluster({ viewState, onNavigate }: TVClusterProps) {
+export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors }: TVClusterProps) {
+    const themes = clusterThemes || { toon: 'toon', dirty: 'blood', lowpoly: 'classic', typical: 'sulfur' };
     const { scene: tvStandModel } = useGLTF('/models/tvStand.glb');
     const clonedStand = React.useMemo(() => tvStandModel.clone(), [tvStandModel]);
 
@@ -60,21 +63,27 @@ export function TVCluster({ viewState, onNavigate }: TVClusterProps) {
 
             <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv1Position.x, tv1Position.y, tv1Position.z]}>
                 <CuboidCollider args={colliders.toon.size} position={colliders.toon.offset} friction={0.3} restitution={0.1} />
-                <Television modelPath="/models/toonTV.glb" screenNames={TOON_SCREENS} theme="toon" invertY={true} />
+                <Television modelPath="/models/toonTV.glb" screenNames={TOON_SCREENS} theme={themes.toon as any} invertY={true} />
             </RigidBody>
-
 
             <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv4Position.x, tv4Position.y, tv4Position.z]}>
                 <CuboidCollider args={colliders.blood.size} position={colliders.blood.offset} friction={0.3} restitution={0.1} />
-                <Television
+                <Vision
                     modelPath="/models/dirtyTV.glb"
                     screenNames={DIRTY_SCREENS}
-                    theme="blood"
+                    theme={themes.dirty as any}
                     gazeOffset={{ x: 0, y: -0.1 }}
                     invertY={true}
                     focusedText="Vision"
                     isFocused={viewState === 'tv_dirty_focus'}
                     textYOffset={40}
+                    showBackButton={true}
+                    backButtonPosition={{ x: 200, y: -190 }}
+                    onBackClick={() => onNavigate('default')}
+                    showMenuButton={true}
+                    menuButtonPosition={{ x: -200, y: -190 }}
+                    onMenuClick={() => onNavigate('shelf_focus')}
+                    visionColors={visionColors}
                 />
             </RigidBody>
 
@@ -84,6 +93,7 @@ export function TVCluster({ viewState, onNavigate }: TVClusterProps) {
                     modelPath="/models/LowPolyTV.glb"
                     invertY={true}
                     screenNames={LOWPOLY_SCREENS}
+                    theme={themes.lowpoly as any}
                     focusedText="Extras"
                     isFocused={viewState === 'tv_lowpoly_focus'}
                     textYOffset={40}
@@ -94,7 +104,7 @@ export function TVCluster({ viewState, onNavigate }: TVClusterProps) {
                 <Television
                     modelPath="/models/typicalTV.glb"
                     screenNames={TYPICAL_SCREENS}
-                    theme="sulfur"
+                    theme={themes.typical as any}
                     invertY={true}
                     focusedText="Lifestyle"
                     isFocused={viewState === 'tv_typical_focus'}

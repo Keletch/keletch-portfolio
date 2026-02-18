@@ -105,7 +105,7 @@ export default function MyWorks({
         startStory: startTyping,
         handleInteraction: handleOSDClick,
         signalTypingFinished,
-        typingAudioRef
+        playTypewriterSound
     } = useTypewriter({
         storyContent: ['dummy'],
         enableStoryMode: true
@@ -135,20 +135,21 @@ export default function MyWorks({
     const exitStartTime = useRef(0);
     const prevLookAtRef = useRef({ x: 0, y: 0 });
     const mouseVelRef = useRef({ x: 0, y: 0 });
+    const mouseIcoRef = useRef({ x: 0, y: 0 });
 
     useEffect(() => {
         if (galleryState === 'exiting') {
             exitStartTime.current = performance.now() / 1000;
         }
     }, [galleryState]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
 
 
     // Video Loading Effect
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const currentSrc = PROJECTS[currentProjectIndex].videoSrc;
-            const NUM_VIDEOS = 6; // Reduced from 10 for performance
+            const NUM_VIDEOS = 1;
 
             // Initialize video array if empty
             if (galleryVideosRef.current.length === 0) {
@@ -162,25 +163,15 @@ export default function MyWorks({
                 }
             }
 
-            // Staggered loading to prevent main-thread freeze
-            galleryVideosRef.current.forEach((vid, i) => {
-                setTimeout(() => {
-                    if (vid.getAttribute('src') !== currentSrc) {
-                        vid.src = currentSrc;
-                        vid.load();
-
-                        vid.onloadedmetadata = () => {
-                            const duration = vid.duration;
-                            if (duration > 0) {
-                                vid.currentTime = (duration / NUM_VIDEOS) * i;
-                            }
-                            vid.play().catch(() => { });
-                        };
-                    } else {
-                        if (vid.paused) vid.play().catch(() => { });
-                    }
-                }, i * 50); // 50ms stagger per video
-            });
+            // Update video source
+            const vid = galleryVideosRef.current[0];
+            if (vid && vid.getAttribute('src') !== currentSrc) {
+                vid.src = currentSrc;
+                const playPromise = vid.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => { });
+                }
+            }
         }
     }, [currentProjectIndex]);
 
@@ -188,8 +179,15 @@ export default function MyWorks({
     const handleNextProject = () => {
         setIsProjectTransition(true);
         setGalleryState('static');
+
+        // 1. Hide content (flicker out)
+        // 2. Load Video mid-transition (hidden)
         setTimeout(() => {
             setCurrentProjectIndex(prev => (prev + 1) % PROJECTS.length);
+        }, 100);
+
+        // 3. Reveal new content
+        setTimeout(() => {
             setGalleryState('gallery');
             setIsProjectTransition(false);
         }, STATIC_DURATION);
@@ -198,8 +196,12 @@ export default function MyWorks({
     const handlePrevProject = () => {
         setIsProjectTransition(true);
         setGalleryState('static');
+
         setTimeout(() => {
             setCurrentProjectIndex(prev => (prev - 1 + PROJECTS.length) % PROJECTS.length);
+        }, 100);
+
+        setTimeout(() => {
             setGalleryState('gallery');
             setIsProjectTransition(false);
         }, STATIC_DURATION);
@@ -226,8 +228,16 @@ export default function MyWorks({
             }, startStaticDelay);
 
         } else {
-            // Reset immediately on blur
-            setGalleryState('idle');
+            // Check if we need an exit animation
+            if (galleryState === 'gallery' || galleryState === 'static') {
+                setGalleryState('exiting');
+                // Allow time for flicker out animation before resetting to idle
+                zoomTimer = setTimeout(() => {
+                    setGalleryState('idle');
+                }, 1000);
+            } else {
+                setGalleryState('idle');
+            }
         }
 
         return () => {
@@ -303,9 +313,7 @@ export default function MyWorks({
 
     const activeTheme = THEMES[theme] || THEMES.classic;
 
-    const renderAccumulator = useRef(0);
-    const FPS_LIMIT = 24;
-    const FRAME_DURATION = 1 / FPS_LIMIT;
+
 
     const eyeMorphProgress = useRef(0);
 
@@ -315,16 +323,6 @@ export default function MyWorks({
             if (dist > 15) return;
         }
 
-        // 1. Physics update (Native Refresh Rate)
-        updateIcoDeepState(icoDeepStateRef.current, delta);
-
-        // 2. Logic Gate
-        renderAccumulator.current += delta;
-        const shouldUpdateLogic = renderAccumulator.current >= FRAME_DURATION;
-        const dt = shouldUpdateLogic ? renderAccumulator.current : 0;
-        if (shouldUpdateLogic) {
-            renderAccumulator.current %= FRAME_DURATION;
-        }
 
         if (screenTextureRef.current && groupRef.current) {
             if (galleryState !== 'idle') {
@@ -350,19 +348,18 @@ export default function MyWorks({
                 }
             }
 
-            if (shouldUpdateLogic) {
-                updateScreenGaze(state, dt);
-                updateBlink(dt, state.clock.elapsedTime);
+            updateScreenGaze(state, delta);
+            updateBlink(delta, state.clock.elapsedTime);
 
-                let targetMorph = (galleryState === 'gallery' || galleryState === 'static') ? 1.0 : 0.0;
-                if (galleryState === 'exiting') {
-                    const currentTime = performance.now() / 1000;
-                    if (currentTime - exitStartTime.current < 0.5) targetMorph = 1.0;
-                }
-                const morphSpeed = 2.0 * dt;
-                eyeMorphProgress.current += (targetMorph - eyeMorphProgress.current) * morphSpeed;
-                if (Math.abs(eyeMorphProgress.current - targetMorph) < 0.001) eyeMorphProgress.current = targetMorph;
+            let targetMorph = (galleryState === 'gallery' || galleryState === 'static') ? 1.0 : 0.0;
+            if (galleryState === 'exiting') {
+                const currentTime = performance.now() / 1000;
+                if (currentTime - exitStartTime.current < 0.5) targetMorph = 1.0;
             }
+            const morphSpeed = 2.0 * delta;
+            eyeMorphProgress.current += (targetMorph - eyeMorphProgress.current) * morphSpeed;
+            if (Math.abs(eyeMorphProgress.current - targetMorph) < 0.001) eyeMorphProgress.current = targetMorph;
+
 
             const canvas = screenTextureRef.current.image as HTMLCanvasElement;
             const ctx = canvas.getContext('2d');
@@ -388,18 +385,11 @@ export default function MyWorks({
                 ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
 
-                // Additional darkening for Gallery mode if needed, but keeping base vibrant for now
+                // Additional darkening for Gallery mode
                 if (galleryState === 'gallery' || galleryState === 'exiting') {
-                    // Optional: slight dimming if text contrast is an issue, but user asked for SAME color
-                    // ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                    // ctx.fillRect(0,0,w,h);
                 }
 
-
                 // 2. RENDER EYE
-
-                // Opacity: Always 1.0. 
-
                 if (morph < 0.99 || galleryState === 'gallery' || galleryState === 'static' || galleryState === 'exiting') {
                     ctx.save();
 
@@ -446,7 +436,7 @@ export default function MyWorks({
                     const blinkScaleY = blinkState.current.openness;
                     ctx.scale(geoCorrectionX * currentBaseScale, currentBaseScale * blinkScaleY);
 
-                    let irisColor = theme === 'toxic' ? '#00bb33' : '#5090ff';
+                    let irisColor = activeTheme.irisColor;
 
                     let pupilPos = normalizedMouse.current;
                     if (morph > 0.8) {
@@ -474,7 +464,7 @@ export default function MyWorks({
                         }
                     }
 
-                    drawPixelEye(ctx, pupilPos, irisColor, 32, '#ffffff', false);
+                    drawPixelEye(ctx, pupilPos, irisColor, 32, activeTheme.scleraColor, !!(activeTheme as any).isHologram);
 
                     if (morph > 0.8) {
                         const time = state.clock.elapsedTime;
@@ -504,13 +494,9 @@ export default function MyWorks({
                     ctx.restore();
                 }
 
-
-                // 3. VIDEO + PROJECT INFO 
-                // Show in 'gallery' always.
-                // Show in 'static' ONLY during project transitions (isProjectTransition=true).
-                // Show in 'exiting' to allow flicker OUT animation.
+                // 3. VIDEO + PROJECT INFO
                 const shouldShowContent = galleryState === 'gallery' || (galleryState === 'static' && isProjectTransition) || galleryState === 'exiting';
-                if (shouldShowContent && isFocused) {
+                if (shouldShowContent) {
 
                     const hasVideos = galleryVideosRef.current.length > 0;
                     if (hasVideos) {
@@ -526,18 +512,12 @@ export default function MyWorks({
                             // 3D Chaotic Video Icosahedron
                             const videoOpacity = videoOpacityRef.current;
 
-                            // Calculate local mouse position for the icosahedron
-                            // currentLookAt is -1 to 1 relative to screen center.
-                            const mouseIco = {
-                                x: currentLookAt.current.x * (w / 2),
-                                y: (invertY ? currentLookAt.current.y : -currentLookAt.current.y) * (h / 2) + 20
-                            };
+                            mouseIcoRef.current.x = currentLookAt.current.x * (w / 2);
+                            mouseIcoRef.current.y = (invertY ? currentLookAt.current.y : -currentLookAt.current.y) * (h / 2) + 20;
 
-                            // Position slightly above center (lowered from -70 to -20 for better centring)
                             ctx.translate(0, -20);
 
-                            // Draw chaotic icosahedron using the array of staggered videos and interactivity
-                            drawChaoticIcosahedronVideo(ctx, galleryVideosRef.current, videoOpacity, icoDeepStateRef.current, mouseIco);
+                            drawChaoticIcosahedronVideo(ctx, galleryVideosRef.current, videoOpacity, icoDeepStateRef.current, mouseIcoRef.current);
 
                             ctx.restore();
                         } catch (e) {
@@ -545,7 +525,6 @@ export default function MyWorks({
                     }
 
                     // OSD: Project info text box
-
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
@@ -554,14 +533,23 @@ export default function MyWorks({
                     }
 
                     const osdOpacity = osdOpacityRef.current;
-                    const typingState = drawProjectInfo(ctx, w, h, wrappedLines.lines, wrappedLines.fullText, typingStartTime, waitingForInput, osdOpacity);
+                    const typingState = drawProjectInfo(
+                        ctx,
+                        w,
+                        h,
+                        wrappedLines.lines,
+                        wrappedLines.fullText,
+                        typingStartTime,
+                        waitingForInput,
+                        osdOpacity,
+                        activeTheme.textColor || '#ffffff',
+                        activeTheme.highlightColor || '#ffffff'
+                    );
 
                     // Sound for typewriter
                     if (typingState && typingState.charsShown > lastTypedCharCount.current) {
-                        if (typingAudioRef.current && osdOpacity > 0.1) {
-                            typingAudioRef.current.playbackRate = 0.9 + Math.random() * 0.3;
-                            typingAudioRef.current.currentTime = 0;
-                            typingAudioRef.current.play().catch(() => { });
+                        if (osdOpacity > 0.1) {
+                            playTypewriterSound();
                         }
                         lastTypedCharCount.current = typingState.charsShown;
                     }
@@ -589,11 +577,16 @@ export default function MyWorks({
                     ctx.textBaseline = 'top';
                     const textY = -h / 2 + textYOffset;
 
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
+                    const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
+
+                    ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
                     ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+
+                    ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
                     ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-                    ctx.fillStyle = '#ffffff';
+
+                    ctx.fillStyle = activeTheme.textColor || '#ffffff';
                     if (Math.random() > 0.1) {
                         ctx.fillText(focusedText, jitterX, textY + jitterY);
                     }
@@ -658,12 +651,11 @@ export default function MyWorks({
                         drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, '#ffffff');
                     }
 
-                    // Eye button is now part of the morphing eye
+                    // Eye button is part of the morphing eye
 
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.restore();
                 }
-
 
                 // --- RENDERING PIPELINE END ---
             }
@@ -671,8 +663,6 @@ export default function MyWorks({
             screenTextureRef.current.needsUpdate = true;
         }
     });
-
-
 
     return (
         <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
@@ -751,17 +741,11 @@ export default function MyWorks({
                                 handleNextProject(); // INTERNAL NAV
                             } else if (buttonHit === 'back' && onBackClick) {
                                 e.stopPropagation();
-                                // Trigger Exit Transition
-                                setGalleryState('exiting');
-                                setTimeout(() => {
-                                    onBackClick();
-                                }, STATIC_DURATION);
+                                // Trigger Exit Transition immediately
+                                onBackClick();
                             } else if (buttonHit === 'menu' && onMenuClick) {
                                 e.stopPropagation();
-                                setGalleryState('exiting');
-                                setTimeout(() => {
-                                    onMenuClick();
-                                }, STATIC_DURATION);
+                                onMenuClick();
                             } else if (buttonHit === 'prev') {
                                 e.stopPropagation();
                                 handlePrevProject(); // INTERNAL NAV

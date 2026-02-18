@@ -16,72 +16,6 @@ void main() {
 const fragmentShader = `
 uniform sampler2D tDiffuse;
 uniform float uTime;
-uniform float uScanlineStrength;
-uniform float uNoiseStrength;
-uniform float uCurvature;
-
-varying vec2 vUv;
-
-// Curvature function (Barrel Distortion)
-vec2 curve(vec2 uv) {
-    uv = (uv - 0.5) * 2.0; // Remap to -1 to 1
-    uv *= 1.1; // Zoom out slightly to fit curve
-    vec2 offset = abs(uv.yx) / vec2(uCurvature, uCurvature);
-    uv = uv + uv * offset * offset;
-    uv = uv * 0.5 + 0.5; // Remap back to 0 to 1
-    return uv;
-}
-
-// Random noise
-float random(vec2 uv) {
-    return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
-}
-
-void main() {
-    vec2 uv = curve(vUv);
-    
-    // Bounds check - discard pixels outside curvature
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
-    }
-
-    // Chromatic Aberration (RGB Split at edges)
-    float aberration = 0.003 * dist;
-    vec2 distVec = 0.5 - uv;
-    float dist = dot(distVec, distVec);
-    
-    // Offset channels based on distance from center
-    vec4 rColor = texture2D(tDiffuse, uv + vec2(aberration * 2.0, 0.0));
-    vec4 gColor = texture2D(tDiffuse, uv); // Green is anchor
-    vec4 bColor = texture2D(tDiffuse, uv - vec2(aberration * 2.0, 0.0));
-    
-    vec3 color = vec3(rColor.r, gColor.g, bColor.b);
-
-    // Scanlines
-    float scanline = sin(uv.y * 800.0 + uTime * 5.0) * 0.5 + 0.5;
-    color *= 1.0 - (scanline * uScanlineStrength);
-
-    // Static Noise
-    float noise = random(uv + uTime);
-    color *= 1.0 - (noise * uNoiseStrength);
-
-    // Vignette
-    float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
-    vignette = pow(vignette * 15.0, 0.25);
-    color *= vignette;
-
-    // Pulse brightness slightly (Flicker)
-    color *= 0.98 + 0.02 * sin(uTime * 10.0);
-
-    gl_FragColor = vec4(color, 1.0);
-}
-`;
-
-// Optimized Fragment Shader for "Balatro" Look (Fixing syntax errors in above pseudo-code)
-const finalFragmentShader = `
-uniform sampler2D tDiffuse;
-uniform float uTime;
 uniform vec2 uResolution;
 
 varying vec2 vUv;
@@ -103,27 +37,27 @@ vec2 curve(vec2 uv) {
 }
 
 float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
 }
 
 void main() {
     vec2 uv = curve(vUv);
-    
+
     // Bounds check (Basic)
-    if(uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0){
-         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-         return;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
     }
-    
+
     // --- ROUNDED CORNERS (Robust Vignette Approach) ---
     // Calculate distance from edge using product of UVs
     // This creates a smooth rounded-rect gradient naturally
     float edge = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
-    
+
     // Hard cut with small smooth transition to create "Rounded Bezel"
     // '0.005' roughly controls the corner radius/tightness here
     float mask = smoothstep(0.0, 0.02, edge * 50.0);
-    
+
     // Apply Mask immediately to black out corners
     if (mask < 0.1) {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
@@ -132,23 +66,23 @@ void main() {
 
     // --- GLITCH SWEEP ("Hum Bar") ---
     vec2 distortedUV = uv;
-    
+
     // Cycle duration: 15 seconds
     // Sweep happens only in the LAST 5 seconds (10s to 15s)
     // This creates an initial 10s silence on load.
     float sweepCycle = mod(uTime, 15.0);
     float sweepY = -10.0;
-    
+
     if (sweepCycle > 10.0) {
         float phase = sweepCycle - 10.0;
         // Linear drop top to bottom over 5 seconds
-        sweepY = 1.1 - (phase / 5.0) * 1.2; 
+        sweepY = 1.1 - (phase / 5.0) * 1.2;
     }
     
     float sweepDist = abs(uv.y - sweepY);
     // Reverted size: 0.04 (Larger, "Natural")
     float sweepWidth = 0.04;
-    
+
     // Calculate normalized distance from center (0.0 = center, 1.0 = edge)
     float edgeFactor = sweepDist / sweepWidth;
 
@@ -156,9 +90,9 @@ void main() {
          // Distortion: No wobble (no sine wave). Just a directional "drag" or "slip".
          // Strength ripples from center of line
          float strength = smoothstep(sweepWidth, 0.0, sweepDist);
-         
-         // Shift ONLY to one side (Sync Tear)
-         distortedUV.x -= 0.02 * strength; 
+
+        // Shift ONLY to one side (Sync Tear)
+        distortedUV.x -= 0.02 * strength;
     }
 
     // Chromatic Aberration
@@ -167,16 +101,16 @@ void main() {
     float shift = ABERRATION_OFFSET * dist * 3.0;
 
     // Sample channels
-    float sH = shift; 
-    
+    float sH = shift;
+
     // Chromatic accumulation at limits (KEPT from latest request)
     if (sweepDist < sweepWidth) {
         // Strong chromatic split ONLY at the very top/bottom edges of the line
         // We use smoothstep to isolate the outer 25% of the line
         float outerEdge = smoothstep(0.75, 1.0, edgeFactor);
-        
+
         // This makes red/blue split huge exactly where the line meets the normal image
-        sH += 0.005 * outerEdge; 
+        sH += 0.005 * outerEdge;
     }
 
     vec4 cr = texture2D(tDiffuse, distortedUV + vec2(sH, 0.0));
@@ -187,8 +121,8 @@ void main() {
     vec3 col = vec3(cr.r, cg.g, cb.b);
 
     // Scanlines (Moving slowly)
-    float s = sin(uv.y * SCANLINE_COUNT - uTime * 2.0); 
-    s = (s * 0.5 + 0.5); 
+    float s = sin(uv.y * SCANLINE_COUNT - uTime * 2.0);
+    s = (s * 0.5 + 0.5);
     // Reduced opacity to keep brightness (was 0.15)
     col *= 1.0 - (s * 0.12);
 
@@ -203,8 +137,8 @@ void main() {
 
     // --- CRT GLOW / BRIGHTNESS ---
     // 1. Boost overall brightness to compensate for mask
-    col *= 1.35; 
-    
+    col *= 1.35;
+
     // 2. Phosphor "Lift" (Shadowsoftness)
     // CRTs rarely hit pure black due to glass reflection and phosphor glow.
     // We lift the blacks slightly and apply a gamma curve to smooth limits.
@@ -217,8 +151,6 @@ void main() {
 
 export function CRTOverlay() {
     const { gl, scene, camera, size } = useThree();
-    const screenMesh = useRef<THREE.Mesh>(null);
-    const sceneCamera = useRef<THREE.Camera>(camera);
 
     // 1. Create Render Target (FBO)
     const renderTarget = useMemo(() => {
@@ -240,7 +172,7 @@ export function CRTOverlay() {
                 uResolution: { value: new THREE.Vector2(size.width, size.height) }
             },
             vertexShader: vertexShader,
-            fragmentShader: finalFragmentShader,
+            fragmentShader: fragmentShader,
             depthWrite: false,
             depthTest: false,
         });
@@ -258,25 +190,9 @@ export function CRTOverlay() {
         return sc;
     }, []);
 
-    // 4. Render Loop
-    useFrame((state) => {
-        const time = state.clock.elapsedTime;
 
-        // A. Render the ACTUAL scene to the FBO
-        gl.setRenderTarget(renderTarget);
-        gl.clear();
-        gl.render(scene, camera);
 
-        // B. Set uniforms for effects
-        material.uniforms.tDiffuse.value = renderTarget.texture;
-        material.uniforms.uTime.value = time;
 
-        // C. Render the Screen Quad to the actual Canvas
-        gl.setRenderTarget(null);
-    }, 1);
-
-    useEffect(() => {
-    }, [gl]);
 
     // ORTHOGRAPHIC CAMERA FOR QUAD
     const orthoCamera = useMemo(() => {

@@ -4,6 +4,20 @@ import * as THREE from 'three';
 import { AboutMeProps, ABOUTME_THEME, ABOUTME_BUTTON_CONFIG } from './AboutMeTypes';
 import { drawPixelEye, drawConcentricCircles, draw3DCube, drawDNAHelix, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave, paginateStory } from './AboutMeHelpers';
 
+interface ThemeOverride {
+    bgColor: string;
+    baseColor: string;
+    glowCenter: string;
+    vignetteColor: string;
+    irisColor: string;
+    scleraColor: string;
+    isHologram?: boolean;
+    textColor?: string;
+    highlightColor?: string;
+    textShadow1?: string;
+    textShadow2?: string;
+}
+
 import { useTypewriter } from '@/hooks/useTypewriter';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
@@ -36,8 +50,10 @@ export default function AboutMeTV({
     onMenuClick,
     storyContent,
     storyFigures,
-    enableStoryMode = false
-}: AboutMeProps) {
+    enableStoryMode = false,
+    themeOverride
+}: AboutMeProps & { themeOverride?: ThemeOverride }) {
+    const activeTheme = themeOverride ? { ...ABOUTME_THEME, ...themeOverride } : ABOUTME_THEME;
     const groupRef = useRef<THREE.Group>(null);
     const { size } = useThree();
     const normalizedMouse = useRef({ x: 0, y: 0 });
@@ -63,7 +79,7 @@ export default function AboutMeTV({
         return paginateStory(
             storyContent,
             380,
-            2,
+            4,
             '20px "Courier New", monospace'
         );
     }, [storyContent, enableStoryMode]);
@@ -77,7 +93,7 @@ export default function AboutMeTV({
         stopStory,
         handleInteraction,
         signalTypingFinished,
-        typingAudioRef
+        playTypewriterSound
     } = useTypewriter({
         storyContent: paginationResult.pages,
         enableStoryMode
@@ -126,7 +142,7 @@ export default function AboutMeTV({
         blinkTimer: 0
     });
 
-    const activeTheme = ABOUTME_THEME;
+
 
     const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | 'story_text' | null => {
         if (!isFocused) return null;
@@ -177,8 +193,6 @@ export default function AboutMeTV({
     };
 
     const renderAccumulator = useRef(0);
-    const FPS_LIMIT = 24;
-    const FRAME_DURATION = 1 / FPS_LIMIT;
 
     useFrame((state, delta) => {
         if (groupRef.current) {
@@ -186,11 +200,7 @@ export default function AboutMeTV({
             if (dist > 15) return;
         }
 
-        renderAccumulator.current += delta;
-        if (renderAccumulator.current < FRAME_DURATION) return;
-
-        const dt = renderAccumulator.current;
-        renderAccumulator.current %= FRAME_DURATION;
+        const dt = delta;
 
         if (screenTextureRef.current && groupRef.current) {
             const targetPos = new THREE.Vector3();
@@ -291,20 +301,18 @@ export default function AboutMeTV({
                         const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
                         const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
                         ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
-                        const isHologram = (theme === 'sonar' || theme === 'mobile');
+                        const isHologram = (theme === 'sonar' || theme === 'mobile' || (activeTheme as any).isHologram);
                         ctx.scale(1.0, blink.openness);
 
-                        // simplified colors for about me (void usually)
-                        let irisColor = '#9900ff';
-                        if (theme === 'void') irisColor = '#9900ff';
+                        const irisColor = activeTheme.irisColor;
 
                         drawPixelEye(
                             ctx,
                             normalizedMouse.current,
                             irisColor,
-                            26,
-                            '#ffffff',
-                            false
+                            activeTheme.lookRange,
+                            activeTheme.scleraColor,
+                            isHologram
                         );
                     }
                     ctx.restore();
@@ -321,8 +329,7 @@ export default function AboutMeTV({
                 const gradient = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
                 gradient.addColorStop(0, 'rgba(0,0,0,0)');
                 gradient.addColorStop(0.5, 'rgba(0,0,0,0.1)');
-                // ... Theme colors ...
-                gradient.addColorStop(1, 'rgba(10, 0, 20, 0.95)'); // Void vignette
+                gradient.addColorStop(1, activeTheme.vignetteColor);
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, 0, w, h);
 
@@ -336,65 +343,58 @@ export default function AboutMeTV({
                         ctx.rotate(Math.PI);
                         ctx.scale(-1, 1);
                     }
-                    const textBoxY = 70;
+                    const textBoxY = 42;
                     const maxWidth = 380;
                     const lineHeight = 28;
                     const padding = 15;
-                    const boxHeight = 86; // Fixed height in helper
+                    const boxHeight = 142; // Expanded height for 4 lines
                     const totalWidth = maxWidth + (padding * 2);
 
                     ctx.globalAlpha = storyStepped;
-                    ctx.strokeStyle = `rgba(255, 255, 255, ${storyStepped})`;
+                    ctx.strokeStyle = activeTheme.highlightColor ? `rgba(${parseInt(activeTheme.highlightColor.slice(1, 3), 16)}, ${parseInt(activeTheme.highlightColor.slice(3, 5), 16)}, ${parseInt(activeTheme.highlightColor.slice(5, 7), 16)}, ${storyStepped})` : `rgba(255, 255, 255, ${storyStepped})`;
                     ctx.lineWidth = 2;
                     ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
 
                     // --- Text Rendering Logic (Time-based) ---
                     const fullText = paginationResult.pages[currentParagraph] || '';
                     if (fullText) {
-                        // Calculate characters to show based on time
                         let charsToShow = 0;
                         if (waitingForInput) {
-                            // If user skipped or paragraph finished, show all
                             charsToShow = fullText.length;
                         } else {
-                            // Calculate characters to show based on time
-                            const charSpeed = 0.05; // Seconds per char
+                            const charSpeed = 0.05;
                             const timeSinceStart = (Date.now() - typingStartTime) / 1000;
                             charsToShow = Math.floor(timeSinceStart / charSpeed);
 
-                            // Signal specific to hook if done
                             if (charsToShow >= fullText.length) {
                                 signalTypingFinished();
                             }
                         }
 
-                        // Cap charsToShow to length
                         charsToShow = Math.min(charsToShow, fullText.length);
 
-                        // Sound Logic
+                        // Typing sound
                         if (charsToShow > lastCharCountRef.current) {
-                            if (typingAudioRef.current) {
-                                typingAudioRef.current.playbackRate = 0.9 + Math.random() * 0.3;
-                                typingAudioRef.current.currentTime = 0;
-                                typingAudioRef.current.play().catch(() => { });
-                            }
+                            playTypewriterSound();
                             lastCharCountRef.current = charsToShow;
                         }
 
                         const currentVisibleText = fullText.slice(0, charsToShow);
 
                         ctx.font = '20px "Courier New", monospace';
-                        ctx.fillStyle = '#ffffff';
+                        ctx.fillStyle = activeTheme.textColor || '#ffffff';
                         ctx.textAlign = 'left';
                         ctx.textBaseline = 'top';
 
-                        // Split by pre-calculated newlines
-                        // We need to be careful: slicing the full string might cut a line mid-way.
-                        // But since we preserve newlines in fullText, slicing it preserves the structure up to that point.
                         const visibleLines = currentVisibleText.split('\n');
 
                         visibleLines.forEach((txt, i) => {
-                            ctx.fillStyle = `rgba(255, 255, 255, ${storyStepped})`;
+                            const baseTextColor = activeTheme.textColor || '#ffffff';
+                            // Parse hex to rgb for alpha
+                            const r = parseInt(baseTextColor.slice(1, 3), 16);
+                            const g = parseInt(baseTextColor.slice(3, 5), 16);
+                            const b = parseInt(baseTextColor.slice(5, 7), 16);
+                            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${storyStepped})`;
                             ctx.fillText(txt, -maxWidth / 2, textBoxY + (i * lineHeight));
                         });
                     }
@@ -402,7 +402,11 @@ export default function AboutMeTV({
                     if (waitingForInput) {
                         if (Math.floor(state.clock.elapsedTime * 2) % 2 === 0) {
                             ctx.font = '20px "Courier New", monospace';
-                            ctx.fillStyle = `rgba(255, 255, 255, ${storyStepped})`;
+                            const arrowColor = activeTheme.highlightColor || '#ffffff';
+                            const r = parseInt(arrowColor.slice(1, 3), 16);
+                            const g = parseInt(arrowColor.slice(3, 5), 16);
+                            const b = parseInt(arrowColor.slice(5, 7), 16);
+                            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${storyStepped})`;
                             ctx.fillText('▼', (maxWidth / 2) - 15, textBoxY + (lineHeight * 1.5));
                         }
                     }
@@ -423,11 +427,16 @@ export default function AboutMeTV({
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     const textY = -h / 2 + textYOffset;
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
+                    const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
+
+                    ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
                     ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+
+                    ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
                     ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-                    ctx.fillStyle = '#ffffff';
+
+                    ctx.fillStyle = activeTheme.textColor || '#ffffff';
                     if (Math.random() > 0.1) {
                         ctx.fillText(focusedText, jitterX, textY + jitterY);
                     }

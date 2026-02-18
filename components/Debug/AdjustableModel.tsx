@@ -17,7 +17,6 @@ export interface LabelConfig {
 
 interface AdjustableModelProps {
     modelPath: string;
-    // name prop removed as it was for GUI
     initialPos?: [number, number, number];
     initialRot?: [number, number, number];
     initialScale?: number;
@@ -90,19 +89,11 @@ export function AdjustableModel({
 
         // 2. Holographic Text Animation
         if (textRef.current) {
-            // 1. Text Scale: STATIC (No animation/pop-up)
-            // Use exact font size from user calibration (0.04 - 0.08 range)
             if (labelConfig) {
-                // No boost, direct mapping
                 const finalScale = labelConfig.fontSize;
                 textRef.current.scale.set(finalScale, finalScale, finalScale);
             }
 
-            // Holographic "Stable Hover" Effect
-            // 1. Color: Handled inside RetroTextPlane (White)
-
-            // 2. Opacity: Stable Fade-In (No breathing/flicker)
-            // high opacity (0.85) for clear visibility, semi-transparent for "ghost" feel
             const targetOpacity = hovered ? 0.85 : 0;
 
             // Smoothly transition opacity
@@ -114,12 +105,9 @@ export function AdjustableModel({
                     delta * 8
                 );
 
-                // Keep transparent flag true just in case
                 textRef.current.material.transparent = true;
             }
 
-            // 3. Floating Effect REMOVED
-            // Text stays at fixed config position
             if (labelConfig) {
                 textRef.current.position.y = labelConfig.position[1];
             }
@@ -133,7 +121,7 @@ export function AdjustableModel({
 
     return (
         <RigidBody
-            colliders={false} // Custom collider
+            colliders={false}
             position={initialPos}
             rotation={initialRot}
             enabledRotations={[true, true, true]}
@@ -165,9 +153,7 @@ export function AdjustableModel({
                         onPointerEnter={handlePointerEnter}
                         onPointerLeave={handlePointerLeave}
                     >
-                        {/* Divide args by 2? No, boxGeometry uses full width/height/depth. CuboidCollider uses half-extents? */}
-                        {/* Rapier CuboidCollider args are HALF-EXTENTS. Three.js BoxGeometry args are FULL EXTENTS. */}
-                        {/* We must multiply collider size by 2 to match visual box. */}
+                        {/* CuboidCollider uses half-extents, BoxGeometry uses full extents */}
                         <boxGeometry args={[
                             initialColliderSize[0] * 2,
                             initialColliderSize[1] * 2,
@@ -184,18 +170,9 @@ export function AdjustableModel({
                         text={verticalText}
                         position={labelConfig.position}
                         rotation={labelConfig.rotation}
-                        // Scale adjustment: Book labels were font size ~0.06. 
-                        // Our plane is height 4 units. To match 0.06 world height... no wait.
-                        // Drei Text fontSize is world units. 0.06 means specific height.
-                        // Our canvas is 128x512.
-                        // We need to scale the plane so it fits nicely.
-                        // Let's start with a scale of 0.2 to test. User said "deja el tamaño igual".
-                        // We might need to tweak this scale to match the previous visual size.
-                        scale={0.25 * labelConfig.fontSize * 10} // Rough heuristic to match previous size
+                        scale={0.25 * labelConfig.fontSize * 10}
                     />
                 )}
-
-                {/* Fallback removed as hardcoding is verified */}
             </group>
         </RigidBody>
     );

@@ -24,6 +24,7 @@ export interface IcoDeepState {
     faces: FaceParticle[];
     vOffsets: Float32Array;
     vVelocities: Float32Array;
+    chromaEnergy: number; // New: Tracks interaction intensity (0 to 1)
 }
 
 function hash(n: number): number {
@@ -52,7 +53,8 @@ export function initIcoDeepState(): IcoDeepState {
         angleY: Math.random() * Math.PI,
         faces,
         vOffsets: new Float32Array(ICO_VERTS.length * 2),
-        vVelocities: new Float32Array(ICO_VERTS.length * 2)
+        vVelocities: new Float32Array(ICO_VERTS.length * 2),
+        chromaEnergy: 0 // Start B&W
     };
 }
 
@@ -62,8 +64,11 @@ export function updateIcoDeepState(
     mouse?: { x: number; y: number },
     mouseVel?: { x: number; y: number }
 ) {
-    state.angleX += delta * 0.05;
-    state.angleY += delta * 0.04;
+    // CRITICAL FIX: Clamp delta globally to prevent physics explosions on lag spikes
+    const safeDelta = Math.min(delta, 0.05);
+
+    state.angleX += safeDelta * 0.05;
+    state.angleY += safeDelta * 0.04;
 
     const springK = 15.0;
     const damping = 0.85;
@@ -108,17 +113,37 @@ export function updateIcoDeepState(
         }
 
         // 3. Integration
-        velX = (velX + fx * delta) * damping;
-        velY = (velY + fy * delta) * damping;
+        velX = (velX + fx * safeDelta) * damping;
+        velY = (velY + fy * safeDelta) * damping;
 
-        state.vOffsets[i2] = offX + velX * delta;
-        state.vOffsets[i2 + 1] = offY + velY * delta;
+        state.vOffsets[i2] = offX + velX * safeDelta;
+        state.vOffsets[i2 + 1] = offY + velY * safeDelta;
         state.vVelocities[i2] = velX;
         state.vVelocities[i2 + 1] = velY;
     }
 
+    // Dynamic Color Energy logic
+    // DECOUPLED: Driven purely by mouse velocity, NOT physics stress.
+    // This ensures project transitions / lag spikes never affect color.
+    let mouseSpeed = 0;
+    if (mouseVel) {
+        mouseSpeed = Math.sqrt(mouseVel.x * mouseVel.x + mouseVel.y * mouseVel.y);
+    }
+    const mouseInput = Math.min(mouseSpeed * 0.003, 1.0);
+
+    // Asymmetric: Hard to gain, Easy to lose
+    if (mouseInput > state.chromaEnergy) {
+        // Gaining color: slow buildup
+        state.chromaEnergy += (mouseInput - state.chromaEnergy) * (safeDelta * 0.15);
+    } else {
+        // Losing color: fast decay back to B&W
+        state.chromaEnergy += (mouseInput - state.chromaEnergy) * (safeDelta * 3.0);
+    }
+    state.chromaEnergy = Math.max(0, Math.min(1, state.chromaEnergy));
+
+
     state.faces.forEach((p, i) => {
-        const localDelta = delta * (0.9 + hash(i + 10) * 0.2);
+        const localDelta = safeDelta * (0.9 + hash(i + 10) * 0.2);
         p.cx += p.vx * localDelta;
         p.cy += p.vy * localDelta;
         p.rot += p.vr * localDelta;
@@ -194,7 +219,7 @@ export function drawChaoticIcosahedronVideo(
 
     ctx.save();
     const scale = 65;
-    const { angleX, angleY } = state;
+    const { angleX, angleY, chromaEnergy } = state; // Get chroma energy
 
     const cosY = Math.cos(angleY);
     const sinY = Math.sin(angleY);
@@ -261,46 +286,54 @@ export function drawChaoticIcosahedronVideo(
             const s2x = Math.max(0, Math.min(vw, cx + cosRot3 * sizePatch));
             const s2y = Math.max(0, Math.min(vh, cy + sinRot3 * sizePatch));
 
-            const idx0 = indices[0] * 2, idx1 = indices[1] * 2, idx2 = indices[2] * 2;
-            const ox0 = state.vOffsets[idx0], oy0 = state.vOffsets[idx0 + 1];
-            const ox1 = state.vOffsets[idx1], oy1 = state.vOffsets[idx1 + 1];
-            const ox2 = state.vOffsets[idx2], oy2 = state.vOffsets[idx2 + 1];
+            ctx.globalAlpha = opacity;
 
-            const stress = (Math.sqrt(ox0 * ox0 + oy0 * oy0) + Math.sqrt(ox1 * ox1 + oy1 * oy1) + Math.sqrt(ox2 * ox2 + oy2 * oy2)) / 3;
+            // Apply grayscale BEFORE drawing — video is BORN in B&W, never flashes color
+            const desaturationAmt = 1.0 - chromaEnergy; // 1 = full B&W, 0 = full color
+            ctx.filter = desaturationAmt > 0.01 ? `grayscale(${desaturationAmt})` : 'none';
 
-            ctx.globalAlpha = opacity * 0.9;
             mapTriangle(ctx, video, s0x, s0y, s1x, s1y, s2x, s2y, v0x, v0y, v1x, v1y, v2x, v2y);
 
-            if (stress > 0.4) {
-                const aberrationAmt = Math.min(stress * 0.2, 12);
-                ctx.save();
-                ctx.globalCompositeOperation = 'screen';
-                ctx.globalAlpha = opacity * Math.min(stress * 0.1, 0.7);
+            ctx.filter = 'none'; // Reset filter for wireframe
 
-                ctx.filter = 'hue-rotate(180deg) saturate(300%) contrast(1.2)';
-                mapTriangle(ctx, video, s0x, s0y, s1x, s1y, s2x, s2y, v0x - aberrationAmt, v0y, v1x - aberrationAmt, v1y, v2x - aberrationAmt, v2y);
-
-                ctx.filter = 'hue-rotate(0deg) saturate(300%) contrast(1.2)';
-                mapTriangle(ctx, video, s0x, s0y, s1x, s1y, s2x, s2y, v0x + aberrationAmt, v0y, v1x + aberrationAmt, v1y, v2x + aberrationAmt, v2y);
-
-                ctx.restore();
-                ctx.filter = 'none';
-            }
         } else {
-            ctx.beginPath();
-            ctx.moveTo(v0x, v0y); ctx.lineTo(v1x, v1y); ctx.lineTo(v2x, v2y);
-            ctx.closePath();
-            ctx.fillStyle = `hsl(${faceId * 18}, 60%, 40%)`;
-            ctx.fill();
+            // Video transition / loading -> Transparent
         }
 
-        ctx.globalAlpha = opacity * 0.4;
+        // 3. RGB Chromatic Aberration Wireframe
+        // Draw 3 offset lines: Red, Green, Blue
+        const wireAbberation = 2.0; // Pixel offset for wireframe split
+
+        ctx.globalCompositeOperation = 'screen'; // Additive blending for RGB
+
+        // RED Channel (Shift Left)
         ctx.beginPath();
-        ctx.moveTo(v0x, v0y); ctx.lineTo(v1x, v1y); ctx.lineTo(v2x, v2y);
+        ctx.moveTo(v0x - wireAbberation, v0y); ctx.lineTo(v1x - wireAbberation, v1y); ctx.lineTo(v2x - wireAbberation, v2y);
         ctx.closePath();
-        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = opacity * 0.4;
+        ctx.strokeStyle = '#ff0000';
         ctx.lineWidth = 1;
         ctx.stroke();
+
+        // GREEN Channel (Center)
+        ctx.beginPath();
+        ctx.moveTo(v0x, v0y - wireAbberation); ctx.lineTo(v1x, v1y - wireAbberation); ctx.lineTo(v2x, v2y - wireAbberation);
+        ctx.closePath();
+        ctx.globalAlpha = opacity * 0.4;
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // BLUE Channel (Shift Right)
+        ctx.beginPath();
+        ctx.moveTo(v0x + wireAbberation, v0y); ctx.lineTo(v1x + wireAbberation, v1y); ctx.lineTo(v2x + wireAbberation, v2y);
+        ctx.closePath();
+        ctx.globalAlpha = opacity * 0.4;
+        ctx.strokeStyle = '#0000ff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.globalCompositeOperation = 'source-over'; // Reset
     }
     ctx.restore();
 }

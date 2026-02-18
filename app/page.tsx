@@ -1,24 +1,21 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useState } from 'react';
+import { Loader } from '@/components/UI/Loader';
 
 const TVScene = dynamic(() => import('@/components/Scene/TVScene'), {
     ssr: false,
-    loading: () => (
-        <div style={{
-            width: '100vw',
-            height: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#0a0a0a',
-            color: '#fff'
-        }}>
-            Cargando escena...
-        </div>
-    ),
+    loading: () => null,
 });
 
 export default function Home() {
-    return <TVScene />;
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    return (
+        <>
+            {!isLoaded && <Loader onFinished={() => setIsLoaded(true)} />}
+            <TVScene isLoaded={isLoaded} />
+        </>
+    );
 }

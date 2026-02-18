@@ -43,5 +43,10 @@ export const ABOUTME_THEME = {
     lightIntensity: 7.0,
     vignetteColor: 'rgba(10, 0, 20, 0.95)',
     lookRange: 26,
-    scleraColor: '#ffffff'
+    scleraColor: '#ffffff',
+    isHologram: false,
+    textColor: '#ffffff',
+    highlightColor: '#ffffff',
+    textShadow1: undefined as string | undefined,
+    textShadow2: undefined as string | undefined
 };

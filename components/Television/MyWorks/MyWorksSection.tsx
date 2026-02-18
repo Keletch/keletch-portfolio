@@ -4,6 +4,7 @@ import MyWorks from '@/components/Television/MyWorks/MyWorks';
 interface MyWorksSectionProps {
     viewState: string;
     onNavigate: (state: string) => void;
+    themeOverride?: string;
 }
 
 const LCD_SCREENS = ['LCDScreen', 'screen', 'LCD_Screen'];
@@ -11,7 +12,7 @@ const LCD_SCREENS = ['LCDScreen', 'screen', 'LCD_Screen'];
 const tv3Position = { x: -1.9, y: 2.5, z: 0.40 }; // Toxic / MyWorks
 const toxicCollider = { size: [1.05, 0.60, 0.24] as [number, number, number], offset: [0.00, 0.26, -0.04] as [number, number, number] };
 
-export default function MyWorksSection({ viewState, onNavigate }: MyWorksSectionProps) {
+export default function MyWorksSection({ viewState, onNavigate, themeOverride }: MyWorksSectionProps) {
     return (
         <RigidBody
             colliders={false}
@@ -25,7 +26,7 @@ export default function MyWorksSection({ viewState, onNavigate }: MyWorksSection
             <MyWorks
                 modelPath="/models/LCDTVFixed.glb"
                 screenNames={LCD_SCREENS}
-                theme="toxic"
+                theme={(themeOverride || 'toxic') as any}
                 scale={1.1}
                 invertY={true}
                 focusedText="My Works"
