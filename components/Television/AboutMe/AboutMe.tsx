@@ -193,6 +193,7 @@ export default function AboutMeTV({
     };
 
     const renderAccumulator = useRef(0);
+    const targetPosRef = useRef(new THREE.Vector3());
 
     useFrame((state, delta) => {
         if (groupRef.current) {
@@ -203,7 +204,7 @@ export default function AboutMeTV({
         const dt = delta;
 
         if (screenTextureRef.current && groupRef.current) {
-            const targetPos = new THREE.Vector3();
+            const targetPos = targetPosRef.current;
             if (!screenMeshRef.current) {
                 groupRef.current.traverse((child) => {
                     if (child instanceof THREE.Mesh) {

@@ -61,8 +61,8 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
                 // Varied Pitch: 0.5 to 2.0 (Deep bubbles to light bubbles)
                 source.playbackRate.value = 0.5 + Math.random() * 1.5;
 
-                // Base volume 0.05 (very subtle)
-                const baseVolume = 0.05;
+                // Base volume 0.15 (more audible)
+                const baseVolume = 0.15;
                 const volumeVariation = Math.random() * 0.02;
                 const volume = baseVolume + volumeVariation;
 

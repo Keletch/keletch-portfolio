@@ -3,6 +3,7 @@ import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import { useGLTF } from '@react-three/drei';
 import Television from '@/components/Television';
 import Vision from '@/components/Television/Vision/Vision';
+import LifestyleTV from '@/components/Television/Lifestyle/Lifestyle';
 interface TVClusterProps {
     viewState: string;
     onNavigate: (state: any) => void;
@@ -101,14 +102,20 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors }
             </RigidBody>
             <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv6Position.x, tv6Position.y, tv6Position.z]}>
                 <CuboidCollider args={colliders.sulfur.size} position={colliders.sulfur.offset} friction={0.3} restitution={0.1} />
-                <Television
+                <LifestyleTV
                     modelPath="/models/typicalTV.glb"
                     screenNames={TYPICAL_SCREENS}
                     theme={themes.typical as any}
                     invertY={true}
                     focusedText="Lifestyle"
-                    isFocused={viewState === 'tv_typical_focus'}
+                    isFocused={viewState === 'tv_typical_focus' || viewState === 'tv_typical_gallery'}
                     textYOffset={40}
+                    showBackButton={true}
+                    backButtonPosition={{ x: 200, y: -190 }}
+                    onBackClick={() => onNavigate('default')}
+                    showMenuButton={true}
+                    menuButtonPosition={{ x: -200, y: -190 }}
+                    onMenuClick={() => onNavigate('shelf_focus')}
                 />
             </RigidBody>
         </group>

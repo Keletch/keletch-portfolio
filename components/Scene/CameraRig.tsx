@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useRef } from 'react';
 
 interface CameraRigProps {
-    viewState: 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus';
+    viewState: 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus' | 'tv_typical_gallery';
 }
 
 export function CameraRig({ viewState }: CameraRigProps) {
@@ -56,7 +56,7 @@ export function CameraRig({ viewState }: CameraRigProps) {
         } else if (viewState === 'tv_dirty_focus') {
             targetPos = dirtyTVPos;
             targetLookAt = dirtyTVLookAt;
-        } else if (viewState === 'tv_typical_focus') {
+        } else if (viewState === 'tv_typical_focus' || viewState === 'tv_typical_gallery') {
             targetPos = typicalTVPos;
             targetLookAt = typicalTVLookAt;
         } else if (viewState === 'tv_lowpoly_focus') {

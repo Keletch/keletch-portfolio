@@ -324,10 +324,10 @@ export default function Vision({
                             ctx.font = `bold 10px "Courier New", monospace`;
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'middle';
-                            ctx.fillText('▾', 0, TEXT_Y + 50);
+                            ctx.fillText('▾', 0, TEXT_Y + 70);
                         } else {
                             ctx.beginPath();
-                            ctx.arc(0, TEXT_Y + 50, 3, 0, Math.PI * 2);
+                            ctx.arc(0, TEXT_Y + 70, 3, 0, Math.PI * 2);
                             ctx.fill();
                         }
                     }

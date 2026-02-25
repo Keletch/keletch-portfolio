@@ -184,6 +184,8 @@ export default function RadioTV({
         return null;
     };
 
+    const targetPosRef = useRef(new THREE.Vector3());
+
     useFrame((state, delta) => {
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
@@ -194,7 +196,7 @@ export default function RadioTV({
 
         if (screenTextureRef.current && groupRef.current) {
 
-            const targetPos = new THREE.Vector3();
+            const targetPos = targetPosRef.current;
 
             if (!screenMeshRef.current) {
                 groupRef.current.traverse((child) => {

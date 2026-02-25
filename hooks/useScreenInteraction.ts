@@ -21,10 +21,12 @@ export function useScreenInteraction({
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });
 
+    const targetPosRef = useRef(new THREE.Vector3());
+
     const updateScreenGaze = (state: RootState, dt: number, aspectCompensation = 1.0) => {
         if (!groupRef.current) return;
 
-        const targetPos = new THREE.Vector3();
+        const targetPos = targetPosRef.current;
 
         // 1. Find Screen Mesh (Lazy / Cached)
         if (!screenMeshRef.current) {

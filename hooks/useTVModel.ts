@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -57,7 +57,7 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
                     }
 
                     child.userData.isScreen = true;
-                    screenMeshRef.current = child;
+                    screenMeshRef.current = child as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
 
                     child.material = new THREE.MeshBasicMaterial({
                         map: texture,
@@ -98,6 +98,24 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
 
         return clone;
     }, [model, modelPath, modelYOffset, rotationX, screenNames, uvRotation]);
+
+    // Resource tracking and cleanup to prevent WebGL memory leaks
+    useEffect(() => {
+        return () => {
+            if (screenTextureRef.current) {
+                screenTextureRef.current.dispose();
+                screenTextureRef.current = null;
+            }
+            if (screenMeshRef.current?.material) {
+                const mat = screenMeshRef.current.material;
+                if (Array.isArray(mat)) {
+                    mat.forEach(m => m.dispose());
+                } else {
+                    mat.dispose();
+                }
+            }
+        };
+    }, [clonedModel]);
 
     return {
         clonedModel,

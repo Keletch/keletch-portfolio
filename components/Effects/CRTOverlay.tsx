@@ -20,13 +20,21 @@ uniform vec2 uResolution;
 
 varying vec2 vUv;
 
-// --- CONFIG ---
-const float CURVE_INTENSITY = 4.0; // Higher = flatter, Lower = more curved. Try 4.0 or 5.0
-const float VIGNETTE_AGRESSIVENESS = 15.0; // Higher = tighter vignette
-const float SCANLINE_COUNT = 600.0;
-const float SCANLINE_OPACITY = 0.15; // Subtle
-const float NOISE_OPACITY = 0.08; // Grain
-const float ABERRATION_OFFSET = 0.003; 
+// --- CONFIG UNIFORMS ---
+uniform float uCurveIntensity;
+uniform float uVignetteStr;
+uniform float uScanlineCount;
+uniform float uScanlineOpacity;
+uniform float uNoiseOpacity;
+uniform float uAberrationOffset;
+uniform float uBlurSize;
+
+#define CURVE_INTENSITY uCurveIntensity
+#define VIGNETTE_STR uVignetteStr
+#define SCANLINE_COUNT uScanlineCount
+#define SCANLINE_OPACITY uScanlineOpacity
+#define NOISE_OPACITY uNoiseOpacity
+#define ABERRATION_OFFSET uAberrationOffset
 
 vec2 curve(vec2 uv) {
     uv = (uv - 0.5) * 2.0;
@@ -43,22 +51,15 @@ float random(vec2 st) {
 void main() {
     vec2 uv = curve(vUv);
 
-    // Bounds check (Basic)
+    // Bounds check
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
 
-    // --- ROUNDED CORNERS (Robust Vignette Approach) ---
-    // Calculate distance from edge using product of UVs
-    // This creates a smooth rounded-rect gradient naturally
+    // --- ROUNDED CORNERS ---
     float edge = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
-
-    // Hard cut with small smooth transition to create "Rounded Bezel"
-    // '0.005' roughly controls the corner radius/tightness here
     float mask = smoothstep(0.0, 0.02, edge * 50.0);
-
-    // Apply Mask immediately to black out corners
     if (mask < 0.1) {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
@@ -66,84 +67,74 @@ void main() {
 
     // --- GLITCH SWEEP ("Hum Bar") ---
     vec2 distortedUV = uv;
-
-    // Cycle duration: 15 seconds
-    // Sweep happens only in the LAST 5 seconds (10s to 15s)
-    // This creates an initial 10s silence on load.
     float sweepCycle = mod(uTime, 15.0);
     float sweepY = -10.0;
 
     if (sweepCycle > 10.0) {
         float phase = sweepCycle - 10.0;
-        // Linear drop top to bottom over 5 seconds
         sweepY = 1.1 - (phase / 5.0) * 1.2;
     }
     
     float sweepDist = abs(uv.y - sweepY);
-    // Reverted size: 0.04 (Larger, "Natural")
     float sweepWidth = 0.04;
-
-    // Calculate normalized distance from center (0.0 = center, 1.0 = edge)
     float edgeFactor = sweepDist / sweepWidth;
 
     if (sweepDist < sweepWidth) {
-         // Distortion: No wobble (no sine wave). Just a directional "drag" or "slip".
-         // Strength ripples from center of line
-         float strength = smoothstep(sweepWidth, 0.0, sweepDist);
-
-        // Shift ONLY to one side (Sync Tear)
+        float strength = smoothstep(sweepWidth, 0.0, sweepDist);
         distortedUV.x -= 0.02 * strength;
     }
 
-    // Chromatic Aberration
-    vec2 d = abs(uv - 0.5);
-    float dist = dot(d, d); 
-    float shift = ABERRATION_OFFSET * dist * 3.0;
+    // --- NTSC / VHS COLOR BLEED (SMEAR/BLUR) ---
+    // Simulate low horizontal bandwidth of composite video (NTSC/PAL)
+    // We apply a horizontal blur to soften images exactly like old VHS tapes.
+    float blurSize = uBlurSize; // Width of the horizontal smear
+    vec3 col = vec3(0.0);
+    
+    // 7-tap horizontal blur for softness
+    col += texture2D(tDiffuse, distortedUV + vec2(-blurSize * 3.0, 0.0)).rgb * 0.05;
+    col += texture2D(tDiffuse, distortedUV + vec2(-blurSize * 2.0, 0.0)).rgb * 0.10;
+    col += texture2D(tDiffuse, distortedUV + vec2(-blurSize, 0.0)).rgb * 0.20;
+    col += texture2D(tDiffuse, distortedUV).rgb * 0.30;
+    col += texture2D(tDiffuse, distortedUV + vec2(blurSize, 0.0)).rgb * 0.20;
+    col += texture2D(tDiffuse, distortedUV + vec2(blurSize * 2.0, 0.0)).rgb * 0.10;
+    col += texture2D(tDiffuse, distortedUV + vec2(blurSize * 3.0, 0.0)).rgb * 0.05;
 
-    // Sample channels
-    float sH = shift;
+    // --- CHROMATIC ABERRATION ---
+    // Apply slight RGB separation ON TOP of the blurred image
+    vec2 fromCenter = distortedUV - 0.5;
+    float dist = dot(fromCenter, fromCenter);
+    float shift = dist * ABERRATION_OFFSET;
 
-    // Chromatic accumulation at limits (KEPT from latest request)
+    // Extra shift at the hum bar tear
     if (sweepDist < sweepWidth) {
-        // Strong chromatic split ONLY at the very top/bottom edges of the line
-        // We use smoothstep to isolate the outer 25% of the line
         float outerEdge = smoothstep(0.75, 1.0, edgeFactor);
-
-        // This makes red/blue split huge exactly where the line meets the normal image
-        sH += 0.005 * outerEdge;
+        shift += 0.005 * outerEdge;
     }
 
-    vec4 cr = texture2D(tDiffuse, distortedUV + vec2(sH, 0.0));
-    vec4 cg = texture2D(tDiffuse, distortedUV);
-    vec4 cb = texture2D(tDiffuse, distortedUV - vec2(sH, 0.0));
+    // Pull red from left, blue from right to create edge glow/bleed
+    float cr = texture2D(tDiffuse, distortedUV + vec2(shift + blurSize, 0.0)).r;
+    float cb = texture2D(tDiffuse, distortedUV - vec2(shift * 1.5, 0.0)).b;
+    
+    // Mix the shifted sharp colors into our blurred NTSC base
+    col.r = mix(col.r, cr, 0.6); // Red tends to bleed most on NTSC
+    col.b = mix(col.b, cb, 0.4);
 
-    // Combine
-    vec3 col = vec3(cr.r, cg.g, cb.b);
+    // --- SCANLINES ---
+    float scanline = sin(uv.y * SCANLINE_COUNT - uTime * 5.0);
+    col *= 1.0 - (scanline * 0.5 + 0.5) * SCANLINE_OPACITY;
 
-    // Scanlines (Moving slowly)
-    float s = sin(uv.y * SCANLINE_COUNT - uTime * 2.0);
-    s = (s * 0.5 + 0.5);
-    // Reduced opacity to keep brightness (was 0.15)
-    col *= 1.0 - (s * 0.12);
+    // --- NOISE (Granulado) ---
+    float noise = random(uv + mod(uTime, 10.0));
+    col *= 1.0 - (noise * NOISE_OPACITY);
 
-    // Noise
-    float n = random(uv + mod(uTime, 10.0));
-    col *= 1.0 - (n * NOISE_OPACITY);
-
-    // Vignette
+    // --- VIGNETTE ---
     float vig = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
-    vig = pow(vig * VIGNETTE_AGRESSIVENESS, 0.25);
+    vig = clamp(pow(vig * 16.0, VIGNETTE_STR), 0.0, 1.0);
     col *= vig;
 
-    // --- CRT GLOW / BRIGHTNESS ---
-    // 1. Boost overall brightness to compensate for mask
-    col *= 1.35;
-
-    // 2. Phosphor "Lift" (Shadowsoftness)
-    // CRTs rarely hit pure black due to glass reflection and phosphor glow.
-    // We lift the blacks slightly and apply a gamma curve to smooth limits.
-    col += 0.02; // Lift black floor
-    col = pow(col, vec3(0.95)); // Soften contrast (Gamma lift)
+    // --- COLOR GRADING ---
+    // Lift blacks slightly and add overall contrast for cinematic feel
+    col = col * 1.05 + 0.01;
 
     gl_FragColor = vec4(col, 1.0);
 }
@@ -169,7 +160,14 @@ export function CRTOverlay() {
             uniforms: {
                 tDiffuse: { value: null },
                 uTime: { value: 0 },
-                uResolution: { value: new THREE.Vector2(size.width, size.height) }
+                uResolution: { value: new THREE.Vector2(size.width, size.height) },
+                uCurveIntensity: { value: 4.0 },
+                uVignetteStr: { value: 0.55 },
+                uScanlineCount: { value: 800.0 },
+                uScanlineOpacity: { value: 0.05 },
+                uNoiseOpacity: { value: 0.2 },
+                uAberrationOffset: { value: 0.009 },
+                uBlurSize: { value: 0.0005 }
             },
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
@@ -210,8 +208,11 @@ export function CRTOverlay() {
         // 2. Render Quad to Screen
         state.gl.setRenderTarget(null);
         state.gl.clear(); // Clear whatever R3F might have put there or debris
+
+        // Update uniforms
         material.uniforms.tDiffuse.value = renderTarget.texture;
         material.uniforms.uTime.value = state.clock.elapsedTime;
+
         state.gl.render(screenScene, orthoCamera);
     }, 1);
 

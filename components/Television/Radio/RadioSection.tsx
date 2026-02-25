@@ -16,7 +16,8 @@ const RADIO_TRACKS = [
     '/music/Mashwina.m4a',
     '/music/Mystery_Tape_01.m4a',
     '/music/Spore (GoldTrue).m4a',
-    '/music/Thombstone_of_a_Ghost_Garden.m4a'
+    '/music/Thombstone_of_a_Ghost_Garden.m4a',
+    '/music/LOTUS FLOWER BY KRAKATOA.m4a',
 ];
 
 const RADIO_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'radioscreen'];
