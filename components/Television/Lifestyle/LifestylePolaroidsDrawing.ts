@@ -70,15 +70,17 @@ export function updatePolaroids(dt: number, hoveredId: string | null, zoomedId: 
     for (let i = activePolaroids.length - 1; i >= 0; i--) {
         const info = activePolaroids[i];
 
-        // Freeze aging for hovered photos so they don't fade away while interacting.
-        // But if it's ZOOMED, we MUST keep aging it, otherwise its animation freezes!
-        if (info.p.id === hoveredId && info.p.id !== zoomedId) {
+        // Freeze aging globally if any polaroid is zoomed (stops the gallery from rotating out behind the zoomed one)
+        // Also freeze specifically if hovered so it doesn't fade away under the cursor
+        const isFrozen = (zoomedId !== null) || (info.p.id === hoveredId);
+
+        if (isFrozen) {
             if (info.age < 1.0) {
-                // If popping in, allow it to finish popping in
+                // Keep aging until pop-in finishes (1.0s) completely
                 info.age = Math.min(1.0, info.age + dt);
             }
         } else {
-            // Normal aging for everything else (including the zoomed one)
+            // Normal aging for everything else
             info.age += dt;
         }
 
