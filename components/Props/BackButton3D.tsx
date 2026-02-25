@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { RetroTextPlane } from '@/components/UI/RetroTextPlane';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 
 interface BackButton3DProps {
@@ -15,7 +15,7 @@ export function BackButton3D({ onClick, visible, scale = 0.15 }: BackButton3DPro
     const [hovered, setHovered] = useState(false);
     const meshRef = useRef<THREE.Mesh>(null);
 
-    const handleClick = (e: any) => {
+    const handleClick = (e: ThreeEvent<MouseEvent>) => {
         if (!visible) return;
         e.stopPropagation();
         onClick();

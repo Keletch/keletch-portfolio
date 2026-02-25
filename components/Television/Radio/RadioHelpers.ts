@@ -396,22 +396,22 @@ export function drawReactiveCircle(
 
         const r = radius * pulse * distortion;
 
-        let px = Math.cos(theta) * r;
-        let py = Math.sin(theta) * r;
-        let pz = 0;
+        const px = Math.cos(theta) * r;
+        const py = Math.sin(theta) * r;
+        const pz = 0;
 
         // 3D rotation
-        let y1 = py * Math.cos(rotX) - pz * Math.sin(rotX);
-        let z1 = py * Math.sin(rotX) + pz * Math.cos(rotX);
-        let x1 = px;
+        const y1 = py * Math.cos(rotX) - pz * Math.sin(rotX);
+        const z1 = py * Math.sin(rotX) + pz * Math.cos(rotX);
+        const x1 = px;
 
-        let x2 = x1 * Math.cos(rotY) + z1 * Math.sin(rotY);
-        let z2 = -x1 * Math.sin(rotY) + z1 * Math.cos(rotY);
-        let y2 = y1;
+        const x2 = x1 * Math.cos(rotY) + z1 * Math.sin(rotY);
+        const z2 = -x1 * Math.sin(rotY) + z1 * Math.cos(rotY);
+        const y2 = y1;
 
-        let x3 = x2 * Math.cos(rotZ) - y2 * Math.sin(rotZ);
-        let y3 = x2 * Math.sin(rotZ) + y2 * Math.cos(rotZ);
-        let z3 = z2;
+        const x3 = x2 * Math.cos(rotZ) - y2 * Math.sin(rotZ);
+        const y3 = x2 * Math.sin(rotZ) + y2 * Math.cos(rotZ);
+        const z3 = z2;
 
         ringPoints.push({ x: x3, y: y3, z: z3 });
     }

@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
@@ -8,7 +8,7 @@ import { useBlink } from '@/hooks/useBlink';
 import { useScreenInteraction } from '@/hooks/useScreenInteraction';
 import { updateButtonHoverAnimation } from '@/components/Television/SharedHelpers';
 
-import { THEMES } from '@/components/Television/Types';
+import { THEMES, ThemeColors } from '@/components/Television/Types';
 import { MyWorksProps, MYWORKS_BUTTON_CONFIG } from './MyWorksTypes';
 import { drawPixelEye } from '@/components/Television/Helpers';
 import {
@@ -16,7 +16,6 @@ import {
     drawBackButton,
     drawMenuButton,
     drawButtonShockwave,
-    drawEyeButton,
     drawProjectInfo,
     checkButtonHover,
     wrapText
@@ -41,7 +40,6 @@ export default function MyWorks({
     textYOffset = 60,
     showStartButton = false,
     startButtonPosition,
-    onStartClick,
     showBackButton = false,
     onBackClick,
     backButtonPosition,
@@ -50,10 +48,8 @@ export default function MyWorks({
     onMenuClick,
     showPrevButton = false,
     prevButtonPosition,
-    onPrevClick,
     showEyeButton = false,
     eyeButtonPosition,
-    onEyeClick,
     disableStartPulse = false
 }: MyWorksProps) {
     const groupRef = useRef<THREE.Group>(null);
@@ -99,7 +95,6 @@ export default function MyWorks({
     const icoDeepStateRef = useRef<IcoDeepState>(initIcoDeepState());
 
     const {
-        storyMode: typingMode,
         waitingForInput,
         typingStartTime,
         startStory: startTyping,
@@ -129,7 +124,7 @@ export default function MyWorks({
             // Reset when leaving gallery
             hasStartedTyping.current = false;
         }
-    }, [galleryState, currentProjectIndex]);
+    }, [galleryState, currentProjectIndex, startTyping]);
 
 
     const exitStartTime = useRef(0);
@@ -244,6 +239,7 @@ export default function MyWorks({
             clearTimeout(zoomTimer);
             clearTimeout(staticTimer);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isFocused]);
 
     // Reset hover states
@@ -258,15 +254,10 @@ export default function MyWorks({
         }
     }, [isFocused]);
 
-    const {
-        renderedFigure,
-        transitionOpacity: transitionOpacityRef
-    } = useFigureTransition(null);
 
     const {
         clonedModel,
         screenTextureRef,
-        screenMeshRef,
         screenAspect
     } = useTVModel({
         modelPath,
@@ -306,9 +297,7 @@ export default function MyWorks({
     } = useFigureTransition(galleryState === 'gallery' ? 'video' : null, 0);
 
     const eyeTarget = (galleryState === 'idle' || galleryState === 'zooming') ? 'eye' : null;
-    const {
-        transitionOpacity: eyeOpacityRef
-    } = useFigureTransition(eyeTarget, 0);
+    useFigureTransition(eyeTarget, 0);
 
 
     const activeTheme = THEMES[theme] || THEMES.classic;
@@ -368,7 +357,6 @@ export default function MyWorks({
             if (ctx) {
                 const w = canvas.width;
                 const h = canvas.height;
-                const time = state.clock.elapsedTime;
 
                 // --- RENDERING PIPELINE START ---
 
@@ -436,7 +424,7 @@ export default function MyWorks({
                     const blinkScaleY = blinkState.current.openness;
                     ctx.scale(geoCorrectionX * currentBaseScale, currentBaseScale * blinkScaleY);
 
-                    let irisColor = activeTheme.irisColor;
+                    const irisColor = activeTheme.irisColor;
 
                     let pupilPos = normalizedMouse.current;
                     if (morph > 0.8) {
@@ -459,12 +447,12 @@ export default function MyWorks({
                             } else {
                                 pupilPos = { x: 0, y: 0 };
                             }
-                        } catch (e) {
+                        } catch {
                             pupilPos = normalizedMouse.current;
                         }
                     }
 
-                    drawPixelEye(ctx, pupilPos, irisColor, 32, activeTheme.scleraColor, !!(activeTheme as any).isHologram);
+                    drawPixelEye(ctx, pupilPos, irisColor, 32, activeTheme.scleraColor, !!(activeTheme as ThemeColors).isHologram);
 
                     if (morph > 0.8) {
                         const time = state.clock.elapsedTime;
@@ -517,10 +505,10 @@ export default function MyWorks({
 
                             ctx.translate(0, -20);
 
-                            drawChaoticIcosahedronVideo(ctx, galleryVideosRef.current, videoOpacity, icoDeepStateRef.current, mouseIcoRef.current);
+                            drawChaoticIcosahedronVideo(ctx, galleryVideosRef.current, videoOpacity, icoDeepStateRef.current);
 
                             ctx.restore();
-                        } catch (e) {
+                        } catch {
                         }
                     }
 
@@ -669,7 +657,7 @@ export default function MyWorks({
             {clonedModel && (
                 <primitive
                     object={clonedModel}
-                    onPointerMove={(e: any) => {
+                    onPointerMove={(e: ThreeEvent<MouseEvent>) => {
                         if (!isFocused) return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
@@ -716,7 +704,7 @@ export default function MyWorks({
                         if (eyeButtonHovered) setEyeButtonHovered(false);
                         document.body.style.cursor = 'auto';
                     }}
-                    onClick={(e: any) => {
+                    onClick={(e: ThreeEvent<MouseEvent>) => {
                         if (e.object.userData.isScreen && e.uv) {
                             // Ensure click hits the button
                             const buttonHit = checkButtonHover(

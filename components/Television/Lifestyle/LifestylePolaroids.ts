@@ -59,7 +59,7 @@ export const POLAROIDS: PolaroidData[] = rawPhotos.map((photo, i) => {
 });
 
 // Helper to load HTMLImageElements once
-let preloadedImages: Record<string, HTMLImageElement> = {};
+const preloadedImages: Record<string, HTMLImageElement> = {};
 
 export function getPolaroidImage(path: string): HTMLImageElement | null {
     if (preloadedImages[path]) return preloadedImages[path];

@@ -116,13 +116,13 @@ export function draw3DCube(
     const sinX = Math.sin(angleX);
 
     const project = (x: number, y: number, z: number): [number, number] => {
-        let rotY_x = x * cosY + z * sinY;
-        let rotY_y = y;
-        let rotY_z = -x * sinY + z * cosY;
+        const rotY_x = x * cosY + z * sinY;
+        const rotY_y = y;
+        const rotY_z = -x * sinY + z * cosY;
 
-        let rotX_x = rotY_x;
-        let rotX_y = rotY_y * cosX - rotY_z * sinX;
-        let rotX_z = rotY_y * sinX + rotY_z * cosX;
+        const rotX_x = rotY_x;
+        const rotX_y = rotY_y * cosX - rotY_z * sinX;
+        const rotX_z = rotY_y * sinX + rotY_z * cosX;
 
         const scale = 80 / (rotX_z + 3);
         return [rotX_x * scale, rotX_y * scale];
@@ -150,13 +150,13 @@ export function draw3DCube(
         const cosXInner = Math.cos(innerAngleX);
         const sinXInner = Math.sin(innerAngleX);
 
-        let rotY_x = x * cosYInner + z * sinYInner;
-        let rotY_y = y;
-        let rotY_z = -x * sinYInner + z * cosYInner;
+        const rotY_x = x * cosYInner + z * sinYInner;
+        const rotY_y = y;
+        const rotY_z = -x * sinYInner + z * cosYInner;
 
-        let rotX_x = rotY_x;
-        let rotX_y = rotY_y * cosXInner - rotY_z * sinXInner;
-        let rotX_z = rotY_y * sinXInner + rotY_z * cosXInner;
+        const rotX_x = rotY_x;
+        const rotX_y = rotY_y * cosXInner - rotY_z * sinXInner;
+        const rotX_z = rotY_y * sinXInner + rotY_z * cosXInner;
 
         const scale = 80 / (rotX_z + 3);
         return [rotX_x * scale, rotX_y * scale, rotX_z];
@@ -173,7 +173,7 @@ export function draw3DCube(
         [0, 3, 7, 4], [1, 2, 6, 5]
     ];
 
-    const facesWithDepth = faces.map((face, idx) => {
+    const facesWithDepth = faces.map((face) => {
         const avgZ = face.reduce((sum, i) => sum + innerVertices[i][2], 0) / face.length;
         return { face, avgZ };
     }).sort((a, b) => a.avgZ - b.avgZ);

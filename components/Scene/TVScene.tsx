@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Canvas, ThreeEvent } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
@@ -14,7 +14,7 @@ import { TVCluster } from '@/components/Scene/TVCluster';
 
 import { CRTOverlay } from '@/components/Effects/CRTOverlay';
 import { CameraRig } from '@/components/Scene/CameraRig';
-// @ts-ignore
+// @ts-expect-error - No type definitions available for RectAreaLightUniformsLib
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib';
 
 import { AdjustableModel } from '@/components/Debug/AdjustableModel';
@@ -204,7 +204,6 @@ interface TVSceneProps {
 }
 
 export default function TVScene({ isLoaded }: TVSceneProps) {
-    const [cameraZ, setCameraZ] = useState(14);
     const [viewState, setViewState] = useState<ViewState>('default');
     const [isCameraSettled, setCameraSettled] = useState(true);
     const [dpr, setDpr] = useState(1.0);
@@ -215,7 +214,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
 
     const rectLightRef = useRef<THREE.RectAreaLight>(null);
 
-    const handleZoom = (e: any, targetState: ViewState) => {
+    const handleZoom = (e: ThreeEvent<MouseEvent>, targetState: ViewState) => {
         e.stopPropagation();
         document.body.style.cursor = 'auto';
         setViewState(targetState);
@@ -277,7 +276,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                             overlayColor2={paletteConfig.floor.overlay2}
                         />
 
-                        <TVCluster viewState={viewState} onNavigate={(st: ViewState) => setViewState(st)} clusterThemes={paletteConfig.cluster} visionColors={paletteConfig.vision} />
+                        <TVCluster viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} clusterThemes={paletteConfig.cluster} visionColors={paletteConfig.vision} />
 
                         <RadioSection
                             viewState={viewState}
@@ -305,7 +304,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
 
                         <RigidBody colliders={false} position={mobileCtrl.pos} rotation={mobileCtrl.rot}>
                             <CuboidCollider args={mobileCtrl.size} position={mobileCtrl.offset} friction={0.5} restitution={0.1} />
-                            <Television modelPath="/models/mobile.glb" screenNames={MOBILE_SCREENS} theme={paletteConfig.mobile as any} invertY={true} />
+                            <Television modelPath="/models/mobile.glb" screenNames={MOBILE_SCREENS} theme={paletteConfig.mobile as "classic"} invertY={true} />
                         </RigidBody>
 
                         <RigidBody colliders={false} position={luckyCatCtrl.pos}>

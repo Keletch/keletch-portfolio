@@ -39,7 +39,7 @@ export function CameraRig({ viewState }: CameraRigProps) {
     const tempTargetPos = useRef(new THREE.Vector3());
     const tempTargetLookAt = useRef(new THREE.Vector3());
 
-    useFrame((state, delta) => {
+    useFrame(() => {
         // 1. Determine Target Position & LookAt based on State
         let targetPos = defaultPos;
         let targetLookAt = defaultLookAt;

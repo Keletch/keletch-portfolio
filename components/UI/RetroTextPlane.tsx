@@ -1,5 +1,5 @@
 import React, { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 
 interface RetroTextPlaneProps {
@@ -14,9 +14,9 @@ interface RetroTextPlaneProps {
     isHorizontal?: boolean;
     inverted?: boolean;
     borderRadius?: number;
-    onClick?: (e: any) => void;
-    onPointerEnter?: (e: any) => void;
-    onPointerLeave?: (e: any) => void;
+    onClick?: (e: ThreeEvent<MouseEvent>) => void;
+    onPointerEnter?: (e: ThreeEvent<MouseEvent>) => void;
+    onPointerLeave?: (e: ThreeEvent<MouseEvent>) => void;
 }
 
 export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(({
@@ -26,7 +26,6 @@ export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(
     scale = 1.0,
     fontSize = 60,
     opacity = 1.0,
-    color = '#ffffff',
     enableJitter = true,
     isHorizontal = false,
     inverted = false,
@@ -61,7 +60,7 @@ export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(
         textureRef.current = tex;
     }, [canvas]);
 
-    useFrame((state) => {
+    useFrame(() => {
         const mesh = localRef.current;
         if (!ctx || !textureRef.current || !mesh) return;
 

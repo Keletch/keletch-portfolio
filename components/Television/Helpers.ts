@@ -298,8 +298,8 @@ export function drawBackButton(
     const startRadiusBack = rBack;
     const endRadiusBack = 2;
 
-    let phase1ProgressBack = Math.min(pBack * 2, 1.0);
-    let phase2ProgressBack = Math.max((pBack - 0.5) * 2, 0);
+    const phase1ProgressBack = Math.min(pBack * 2, 1.0);
+    const phase2ProgressBack = Math.max((pBack - 0.5) * 2, 0);
 
     const widthBack = startWidthBack * (1 - phase1ProgressBack) + endWidthBack * phase1ProgressBack;
     const heightBack = startHeightBack * (1 - phase1ProgressBack) + endHeightBack * phase1ProgressBack;
@@ -361,8 +361,8 @@ export function drawMenuButton(
     const startRadius = rMenu;
     const endRadius = 2;
 
-    let phase1Progress = Math.min(pMenu * 2, 1.0);
-    let phase2Progress = Math.max((pMenu - 0.5) * 2, 0);
+    const phase1Progress = Math.min(pMenu * 2, 1.0);
+    const phase2Progress = Math.max((pMenu - 0.5) * 2, 0);
 
     const width = startWidth * (1 - phase1Progress) + endWidth * phase1Progress;
     const height = startHeight * (1 - phase1Progress) + endHeight * phase1Progress;

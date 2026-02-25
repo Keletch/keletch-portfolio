@@ -102,7 +102,7 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
             };
 
             if (!audioContextRef.current) {
-                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+                audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
             }
 
             if (audioContextRef.current && !sourceNodeRef.current) {

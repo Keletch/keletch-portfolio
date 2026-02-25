@@ -23,9 +23,9 @@ export function checkButtonHover(
 ): 'back' | 'menu' | null {
     if (!isFocused) return null;
 
-    let px = uv.x * 512;
-    let py = (1 - uv.y) * 512;
-    let dx = px - 256;
+    const px = uv.x * 512;
+    const py = (1 - uv.y) * 512;
+    const dx = px - 256;
     let dy = py - 256;
 
     if (invertY) dy = -dy;

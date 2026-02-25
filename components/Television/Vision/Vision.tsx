@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { THEMES } from '../Types';
 import { VisionProps } from './VisionTypes';
@@ -103,7 +103,6 @@ export default function Vision({
     const {
         clonedModel,
         screenTextureRef,
-        screenMeshRef,
         screenAspect
     } = useTVModel({
         modelPath,
@@ -166,6 +165,7 @@ export default function Vision({
         }
 
         return () => { clearTimeout(zoomTimer); clearTimeout(staticTimer); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isFocused]);
 
     useEffect(() => {
@@ -187,6 +187,7 @@ export default function Vision({
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storyActive, visionState, currentParagraph]);
 
     const handlePlayClick = useCallback(() => {
@@ -225,7 +226,7 @@ export default function Vision({
             updateScreenGaze(state, delta);
             updateBlink(delta, state.clock.elapsedTime);
 
-            let targetMorph = (galleryState === 'content' || galleryState === 'static' || galleryState === 'exiting') ? 1.0 : 0.0;
+            const targetMorph = (galleryState === 'content' || galleryState === 'static' || galleryState === 'exiting') ? 1.0 : 0.0;
             const morphSpeed = galleryState === 'exiting' ? 1.5 : 2.0;
             eyeMorphProgress.current += (targetMorph - eyeMorphProgress.current) * (morphSpeed * delta);
             if (Math.abs(eyeMorphProgress.current - targetMorph) < 0.001) eyeMorphProgress.current = targetMorph;
@@ -268,7 +269,7 @@ export default function Vision({
                     const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
                     const effectiveScleraY = -currentLookAt.current.y * 100;
                     ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
-                    let scaleEye = theme === 'mobile' ? 0.6 : 1.0;
+                    const scaleEye = theme === 'mobile' ? 0.6 : 1.0;
                     let geoCorrectionX = 1.0;
                     if (theme === 'toxic' && screenAspect.current > 1.2) geoCorrectionX = 1 / (screenAspect.current * 0.85);
                     ctx.globalAlpha = (1.0 - morph) * eyeOpacityRef.current;
@@ -402,7 +403,7 @@ export default function Vision({
             {clonedModel && (
                 <primitive
                     object={clonedModel}
-                    onPointerMove={(e: any) => {
+                    onPointerMove={(e: ThreeEvent<PointerEvent>) => {
                         if (!isFocused) return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
@@ -427,7 +428,7 @@ export default function Vision({
                         setPlayButtonHovered(false);
                         document.body.style.cursor = 'auto';
                     }}
-                    onClick={(e: any) => {
+                    onClick={(e: ThreeEvent<PointerEvent>) => {
                         if (e.object.userData.isScreen && e.uv) {
                             const hit = checkVisionButtonHover(
                                 e.uv, isFocused, invertY,

@@ -26,7 +26,7 @@ export default function MyWorksSection({ viewState, onNavigate, themeOverride }:
             <MyWorks
                 modelPath="/models/LCDTVFixed.glb"
                 screenNames={LCD_SCREENS}
-                theme={(themeOverride || 'toxic') as any}
+                theme={(themeOverride || 'toxic') as "toxic"}
                 scale={1.1}
                 invertY={true}
                 focusedText="My Works"
@@ -46,17 +46,14 @@ export default function MyWorksSection({ viewState, onNavigate, themeOverride }:
                 // Bottom Left: Previous
                 showPrevButton={true}
                 prevButtonPosition={{ x: -200, y: 190 }}
-                onPrevClick={() => { }}
 
                 // Bottom Right: Start (Next)
                 showStartButton={true}
                 startButtonPosition={{ x: 200, y: 190 }}
-                onStartClick={() => { }}
                 disableStartPulse={true}
 
                 // Bottom Center: Eye
                 showEyeButton={true}
-                onEyeClick={() => window.open('https://galeria.chu.mx/gallery', '_blank')}
             />
         </RigidBody>
     );

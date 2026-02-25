@@ -23,6 +23,7 @@ export function LuckyCat({
     useEffect(() => {
         if (!scene) return;
 
+        const currentGroup = groupRef.current;
         const clonedScene = scene.clone();
 
         clonedScene.traverse((child) => {
@@ -35,13 +36,13 @@ export function LuckyCat({
             console.warn('⚠️ Lucky Cat arm mesh not found');
         }
 
-        if (groupRef.current) {
-            groupRef.current.add(clonedScene);
+        if (currentGroup) {
+            currentGroup.add(clonedScene);
         }
 
         return () => {
-            if (groupRef.current) {
-                groupRef.current.clear();
+            if (currentGroup) {
+                currentGroup.clear();
             }
         };
     }, [scene]);

@@ -7,5 +7,5 @@ export interface VisionProps extends TelevisionProps {
     showMenuButton?: boolean;
     onMenuClick?: () => void;
     menuButtonPosition?: { x: number; y: number };
-    visionColors?: { irisColor: string; textColor?: string; highlightColor?: string;[key: string]: any };
+    visionColors?: { irisColor: string; textColor?: string; highlightColor?: string;[key: string]: unknown };
 }

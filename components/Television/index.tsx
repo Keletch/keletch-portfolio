@@ -1,10 +1,8 @@
-import { useRef, useState, useEffect } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useGLTF } from '@react-three/drei';
 import { TelevisionProps, THEMES } from './Types';
 import { drawPixelEye } from './Helpers';
-import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 
 const DEFAULT_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'monitor', 'glass', 'vidrio', 'cristal', 'tube', 'lcdscreen', 'lcd_screen', 'redtvscreen', 'dirtytvscreen', 'tipicaltvscreen', 'toontvscreen', 'toontv_screen'];
@@ -29,10 +27,6 @@ export default function Television({
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });
 
-    const {
-        renderedFigure,
-        transitionOpacity: transitionOpacityRef
-    } = useFigureTransition(null);
 
     const {
         clonedModel,
@@ -47,7 +41,6 @@ export default function Television({
         uvRotation
     });
 
-    const morphProgressRef = useRef(0);
 
     const blinkState = useRef({
         isBlinking: false,

@@ -1,6 +1,6 @@
 
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RadioProps, RADIO_THEME, RADIO_BUTTON_CONFIG } from './RadioTypes';
 import { drawPixelEye, drawPlayPauseButton, drawBackButton, drawMenuButton, drawNextButton, drawButtonShockwave, drawProgressBar, drawTrackList, drawReactiveCircle } from './RadioHelpers';
@@ -17,7 +17,6 @@ export default function RadioTV({
     rotation = [0, 0, 0],
     scale = 1,
     rotationX = 0,
-    theme = 'classic',
     invertY = false,
     gazeOffset = { x: 0, y: 0 },
     uvRotation = 0,
@@ -38,7 +37,6 @@ export default function RadioTV({
     backButtonPosition,
     showMenuButton = false,
     menuButtonPosition,
-    onMenuClick,
     showNextButton = false,
     nextButtonPosition,
     onNextClick,
@@ -118,8 +116,7 @@ export default function RadioTV({
     const {
         clonedModel,
         screenTextureRef,
-        screenMeshRef,
-        screenAspect
+        screenMeshRef
     } = useTVModel({
         modelPath,
         screenNames,
@@ -143,10 +140,10 @@ export default function RadioTV({
     const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | 'next' | null => {
         if (!isFocused) return null;
 
-        let px = uv.x * 512;
-        let py = (1 - uv.y) * 512;
+        const px = uv.x * 512;
+        const py = (1 - uv.y) * 512;
 
-        let dx = px - 256;
+        const dx = px - 256;
         let dy = py - 256;
 
         if (invertY) {
@@ -262,7 +259,6 @@ export default function RadioTV({
             if (ctx) {
                 const w = canvas.width;
                 const h = canvas.height;
-                const time = state.clock.elapsedTime;
 
                 ctx.fillStyle = activeTheme.bgColor;
                 ctx.fillRect(0, 0, w, h);
@@ -299,7 +295,7 @@ export default function RadioTV({
                     const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
                     const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
                     ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
-                    let scaleEye = 0.6;
+                    const scaleEye = 0.6;
                     ctx.scale(scaleEye, blink.openness * scaleEye);
                     const irisColor = accent;
                     const customLookRange = 15;
@@ -318,7 +314,6 @@ export default function RadioTV({
                 ctx.fillRect(0, 0, w, h);
 
                 const glow = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 300);
-                const glowColor = activeTheme.glowCenter;
                 glow.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = glow;
                 ctx.fillRect(0, 0, w, h);
@@ -504,12 +499,12 @@ export default function RadioTV({
             {clonedModel && (
                 <primitive
                     object={clonedModel}
-                    onPointerMove={(e: any) => {
+                    onPointerMove={(e: ThreeEvent<PointerEvent>) => {
                         if (!isFocused) return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
 
-                            let dx = e.uv.x * 512 - 256;
+                            const dx = e.uv.x * 512 - 256;
                             let dy = (1 - e.uv.y) * 512 - 256;
                             if (invertY) dy = -dy;
 
@@ -571,10 +566,10 @@ export default function RadioTV({
                             document.body.style.cursor = (newPlayHover || newBackHover || newMenuHover || newNextHover || isBarHover || isListHover) ? 'pointer' : 'auto';
                         }
                     }}
-                    onPointerDown={(e: any) => {
+                    onPointerDown={(e: ThreeEvent<PointerEvent>) => {
                         if (!isFocused) return;
                         if (e.object.userData.isScreen && e.uv) {
-                            let dx = e.uv.x * 512 - 256;
+                            const dx = e.uv.x * 512 - 256;
                             let dy = (1 - e.uv.y) * 512 - 256;
                             if (invertY) dy = -dy;
 
@@ -585,7 +580,7 @@ export default function RadioTV({
                                 const progress = Math.max(0, Math.min(1, (dx - barX) / barWidth));
                                 setIsSeekDragging(true);
                                 setSeekDragValue(progress);
-                                e.target.setPointerCapture(e.pointerId);
+                                (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                 return;
                             }
 
@@ -596,22 +591,22 @@ export default function RadioTV({
                                 setIsListDragging(true);
                                 setDragStartY(dy);
                                 setDragStartScroll(scrollTop);
-                                e.target.setPointerCapture(e.pointerId);
+                                (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                 return;
                             }
                         }
                     }}
-                    onPointerUp={(e: any) => {
+                    onPointerUp={(e: ThreeEvent<PointerEvent>) => {
                         if (isSeekDragging && onSeek) {
                             e.stopPropagation();
                             setIsSeekDragging(false);
                             onSeek(seekDragValue);
-                            e.target.releasePointerCapture(e.pointerId);
+                            (e.target as HTMLElement).releasePointerCapture(e.pointerId);
                         }
                         if (isListDragging) {
                             e.stopPropagation();
                             setIsListDragging(false);
-                            e.target.releasePointerCapture(e.pointerId);
+                            (e.target as HTMLElement).releasePointerCapture(e.pointerId);
                         }
                     }}
                     onPointerLeave={() => {
@@ -623,11 +618,11 @@ export default function RadioTV({
                         setHoveredTrackIndex(-1);
                         document.body.style.cursor = 'auto';
                     }}
-                    onClick={(e: any) => {
+                    onClick={(e: ThreeEvent<PointerEvent>) => {
                         if (e.object.userData.isScreen && e.uv) {
                             if (isSeekDragging) return;
 
-                            let dx = e.uv.x * 512 - 256;
+                            const dx = e.uv.x * 512 - 256;
                             let dy = (1 - e.uv.y) * 512 - 256;
                             if (invertY) dy = -dy;
 

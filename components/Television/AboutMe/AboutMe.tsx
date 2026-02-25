@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AboutMeProps, ABOUTME_THEME, ABOUTME_BUTTON_CONFIG } from './AboutMeTypes';
 import { drawPixelEye, drawConcentricCircles, draw3DCube, drawDNAHelix, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave, paginateStory } from './AboutMeHelpers';
@@ -55,7 +55,6 @@ export default function AboutMeTV({
 }: AboutMeProps & { themeOverride?: ThemeOverride }) {
     const activeTheme = themeOverride ? { ...ABOUTME_THEME, ...themeOverride } : ABOUTME_THEME;
     const groupRef = useRef<THREE.Group>(null);
-    const { size } = useThree();
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });
     const [startButtonHovered, setStartButtonHovered] = useState(false);
@@ -122,8 +121,7 @@ export default function AboutMeTV({
     const {
         clonedModel,
         screenTextureRef,
-        screenMeshRef,
-        screenAspect
+        screenMeshRef
     } = useTVModel({
         modelPath,
         screenNames,
@@ -147,9 +145,9 @@ export default function AboutMeTV({
     const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | 'story_text' | null => {
         if (!isFocused) return null;
 
-        let px = uv.x * 512;
-        let py = (1 - uv.y) * 512;
-        let dx = px - 256;
+        const px = uv.x * 512;
+        const py = (1 - uv.y) * 512;
+        const dx = px - 256;
         let dy = py - 256;
 
         if (invertY) {
@@ -192,7 +190,6 @@ export default function AboutMeTV({
         return null;
     };
 
-    const renderAccumulator = useRef(0);
     const targetPosRef = useRef(new THREE.Vector3());
 
     useFrame((state, delta) => {
@@ -233,7 +230,7 @@ export default function AboutMeTV({
             const gazeY = state.mouse.y - tvScreenPos.y;
 
             const sensitivity = 5.0;
-            let aspectCompensation = 1.0;
+            const aspectCompensation = 1.0;
 
             const finalX = (gazeX * sensitivity) + gazeOffset.x;
             const finalY = (invertY ? -gazeY : gazeY) * sensitivity * aspectCompensation + gazeOffset.y;
@@ -302,7 +299,7 @@ export default function AboutMeTV({
                         const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
                         const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
                         ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
-                        const isHologram = (theme === 'sonar' || theme === 'mobile' || (activeTheme as any).isHologram);
+                        const isHologram = (theme === 'sonar' || theme === 'mobile' || (activeTheme as ThemeOverride).isHologram);
                         ctx.scale(1.0, blink.openness);
 
                         const irisColor = activeTheme.irisColor;
@@ -526,7 +523,7 @@ export default function AboutMeTV({
             {clonedModel && (
                 <primitive
                     object={clonedModel}
-                    onPointerMove={(e: any) => {
+                    onPointerMove={(e: ThreeEvent<MouseEvent>) => {
                         if (!isFocused) return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
@@ -551,7 +548,7 @@ export default function AboutMeTV({
                         if (menuButtonHovered) setMenuButtonHovered(false);
                         document.body.style.cursor = 'auto';
                     }}
-                    onClick={(e: any) => {
+                    onClick={(e: ThreeEvent<MouseEvent>) => {
                         if (e.object.userData.isScreen && e.uv) {
                             const buttonHit = checkButtonHover(e.uv);
                             if (buttonHit === 'play') {

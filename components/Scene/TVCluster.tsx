@@ -6,13 +6,12 @@ import Vision from '@/components/Television/Vision/Vision';
 import LifestyleTV from '@/components/Television/Lifestyle/Lifestyle';
 interface TVClusterProps {
     viewState: string;
-    onNavigate: (state: any) => void;
+    onNavigate: (state: string) => void;
     clusterThemes?: { toon: string; dirty: string; lowpoly: string; typical: string };
-    visionColors?: { irisColor: string; textColor?: string; highlightColor?: string;[key: string]: any };
+    visionColors?: { irisColor: string; textColor?: string; highlightColor?: string;[key: string]: unknown };
 }
 
 const TOON_SCREENS = ['toonTVScreen', 'screen', 'toontvscreen'];
-const LCD_SCREENS = ['LCDScreen', 'screen', 'LCD_Screen'];
 const DIRTY_SCREENS = ['dirtyTVScreen', 'screen'];
 const TYPICAL_SCREENS = ['typicaltvscreen', 'screen', 'typical_tv_screen', 'tipicaltvscreen'];
 const LOWPOLY_SCREENS = ['screen'];
@@ -39,7 +38,6 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors }
     const standPosition = { x: 0, y: -2.0, z: 0 };
 
     const tv1Position = { x: 2.95, y: 1.1, z: 0.30 };
-    const tv3Position = { x: -1.9, y: 2.5, z: 0.40 };
     const tv4Position = { x: -0.5, y: 1.5, z: 0 };
     const tv5Position = { x: 1.6, y: 1.1, z: 0 };
     const tv6Position = { x: 0.75, y: 2.1, z: 0 };
@@ -64,7 +62,7 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors }
 
             <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv1Position.x, tv1Position.y, tv1Position.z]}>
                 <CuboidCollider args={colliders.toon.size} position={colliders.toon.offset} friction={0.3} restitution={0.1} />
-                <Television modelPath="/models/toonTV.glb" screenNames={TOON_SCREENS} theme={themes.toon as any} invertY={true} />
+                <Television modelPath="/models/toonTV.glb" screenNames={TOON_SCREENS} theme={themes.toon as "toon"} invertY={true} />
             </RigidBody>
 
             <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={[tv4Position.x, tv4Position.y, tv4Position.z]}>
@@ -72,7 +70,7 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors }
                 <Vision
                     modelPath="/models/dirtyTV.glb"
                     screenNames={DIRTY_SCREENS}
-                    theme={themes.dirty as any}
+                    theme={themes.dirty as "blood"}
                     gazeOffset={{ x: 0, y: -0.1 }}
                     invertY={true}
                     focusedText="Vision"
@@ -94,7 +92,7 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors }
                     modelPath="/models/LowPolyTV.glb"
                     invertY={true}
                     screenNames={LOWPOLY_SCREENS}
-                    theme={themes.lowpoly as any}
+                    theme={themes.lowpoly as "classic"}
                     focusedText="Extras"
                     isFocused={viewState === 'tv_lowpoly_focus'}
                     textYOffset={40}
@@ -105,7 +103,7 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors }
                 <LifestyleTV
                     modelPath="/models/typicalTV.glb"
                     screenNames={TYPICAL_SCREENS}
-                    theme={themes.typical as any}
+                    theme={themes.typical as "sulfur"}
                     invertY={true}
                     focusedText="Lifestyle"
                     isFocused={viewState === 'tv_typical_focus' || viewState === 'tv_typical_gallery'}

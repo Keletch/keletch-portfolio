@@ -204,7 +204,7 @@ function drawSinglePolaroid(
     let targetBrightness = 1.3;// Boost whites to crush shadows completely
 
     // Apply global focus scale/alpha mapping (so they all zoom out neatly when TV unfocuses)
-    let focusScale = easeOutBack(globalProgress);
+    const focusScale = easeOutBack(globalProgress);
     targetScale *= focusScale;
 
     // Add subtle floating if not zoomed
@@ -388,7 +388,7 @@ export function checkPolaroidHit(
     hoveredId: string | null,
     invertY: boolean
 ): string | null {
-    let ux = uv.x;
+    const ux = uv.x;
     let uy = uv.y;
 
     if (invertY) {

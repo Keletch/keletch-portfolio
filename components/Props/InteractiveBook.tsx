@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { ThreeEvent } from '@react-three/fiber';
 import { useGLTF, Html } from '@react-three/drei';
 import { RigidBody, CuboidCollider } from '@react-three/rapier';
 
@@ -33,7 +34,7 @@ export function InteractiveBook({
     const clonedScene = useMemo(() => scene.clone(), [scene]);
     const [hovered, setHovered] = useState(false);
 
-    const handlePointerEnter = (e: any) => {
+    const handlePointerEnter = (e: ThreeEvent<MouseEvent>) => {
         if (!isActive) return;
         e.stopPropagation();
         setHovered(true);
@@ -45,7 +46,7 @@ export function InteractiveBook({
         document.body.style.cursor = 'auto';
     };
 
-    const handleClick = (e: any) => {
+    const handleClick = (e: ThreeEvent<MouseEvent>) => {
         if (!isActive) return;
         e.stopPropagation();
         if (onNavigate) onNavigate();

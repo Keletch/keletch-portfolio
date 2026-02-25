@@ -34,7 +34,6 @@ function hash(n: number): number {
 
 export function initIcoDeepState(): IcoDeepState {
     const faces = ICO_FACES.map((_, i) => {
-        const h = hash(i);
         return {
             cx: 0.2 + hash(i + 1) * 0.6,
             cy: 0.2 + hash(i + 2) * 0.6,
@@ -89,9 +88,9 @@ export function updateIcoDeepState(
         if (mouse && mouseVel) {
             const vBase = ICO_VERTS[i];
             const scale = 65;
-            let x1 = vBase[0] * Math.cos(state.angleY) - vBase[2] * Math.sin(state.angleY);
-            let z1 = vBase[0] * Math.sin(state.angleY) + vBase[2] * Math.cos(state.angleY);
-            let y2 = vBase[1] * Math.cos(state.angleX) - z1 * Math.sin(state.angleX);
+            const x1 = vBase[0] * Math.cos(state.angleY) - vBase[2] * Math.sin(state.angleY);
+            const z1 = vBase[0] * Math.sin(state.angleY) + vBase[2] * Math.cos(state.angleY);
+            const y2 = vBase[1] * Math.cos(state.angleX) - z1 * Math.sin(state.angleX);
 
             const px = x1 * scale;
             const py = y2 * scale;
@@ -212,8 +211,7 @@ export function drawChaoticIcosahedronVideo(
     ctx: CanvasRenderingContext2D,
     videos: HTMLVideoElement[],
     opacity: number,
-    state: IcoDeepState,
-    mouse?: { x: number; y: number }
+    state: IcoDeepState
 ) {
     if (opacity < 0.01 || !state || !videos || videos.length === 0) return;
 

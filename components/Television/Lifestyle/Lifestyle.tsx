@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { LifestyleProps, LIFESTYLE_BUTTON_CONFIG } from './LifestyleTypes';
 import { THEMES } from '../Types';
@@ -424,7 +424,7 @@ export default function LifestyleTV({
             {clonedModel && (
                 <primitive
                     object={clonedModel}
-                    onPointerMove={(e: any) => {
+                    onPointerMove={(e: ThreeEvent<MouseEvent>) => {
                         if (!isFocused) return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
@@ -475,7 +475,7 @@ export default function LifestyleTV({
                         setMenuButtonHovered(false);
                         document.body.style.cursor = 'auto';
                     }}
-                    onClick={(e: any) => {
+                    onClick={(e: ThreeEvent<MouseEvent>) => {
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
                             // 1. If zoomed, clicking anywhere dismisses it

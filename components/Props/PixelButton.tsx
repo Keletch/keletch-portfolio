@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { drawBackButton, drawPlayStopButton, drawMenuButton } from '@/components/Television/Helpers';
 
@@ -28,7 +28,6 @@ export function PixelButton({
 
     const targetHover = useRef(0);
     const currentHover = useRef(0);
-    const morphProgress = useRef(0);
 
     useEffect(() => {
         if (!meshRef.current) return;
@@ -82,7 +81,7 @@ export function PixelButton({
         textureRef.current.needsUpdate = true;
     });
 
-    const handleClick = (e: any) => {
+    const handleClick = (e: ThreeEvent<MouseEvent>) => {
         if (!visible) return;
         e.stopPropagation();
         onClick();

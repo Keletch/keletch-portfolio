@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useFrame, useThree, createPortal } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -141,7 +141,7 @@ void main() {
 `;
 
 export function CRTOverlay() {
-    const { gl, scene, camera, size } = useThree();
+    const { scene, camera, size } = useThree();
 
     // 1. Create Render Target (FBO)
     const renderTarget = useMemo(() => {

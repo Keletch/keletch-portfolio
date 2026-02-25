@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useMemo, useState, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { useGLTF, Text } from '@react-three/drei';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
 import { RetroTextPlane } from '@/components/UI/RetroTextPlane';
 import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
@@ -22,9 +22,9 @@ interface AdjustableModelProps {
     initialScale?: number;
     initialColliderSize?: [number, number, number];
     initialColliderOffset?: [number, number, number];
-    onClick?: (e: any) => void;
-    onPointerEnter?: (e: any) => void;
-    onPointerLeave?: (e: any) => void;
+    onClick?: (e: ThreeEvent<MouseEvent>) => void;
+    onPointerEnter?: (e: ThreeEvent<MouseEvent>) => void;
+    onPointerLeave?: (e: ThreeEvent<MouseEvent>) => void;
     label?: string;
     isInteractive?: boolean;
     labelConfig?: LabelConfig;
@@ -54,7 +54,7 @@ export function AdjustableModel({
         document.body.style.cursor = 'auto';
     }
 
-    const handlePointerEnter = (e: any) => {
+    const handlePointerEnter = (e: ThreeEvent<MouseEvent>) => {
         if (!isInteractive) return;
         e.stopPropagation();
         setHovered(true);
@@ -62,14 +62,14 @@ export function AdjustableModel({
         if (onPointerEnter) onPointerEnter(e);
     };
 
-    const handlePointerLeave = (e: any) => {
+    const handlePointerLeave = (e: ThreeEvent<MouseEvent>) => {
         setHovered(false);
         document.body.style.cursor = 'auto';
         if (onPointerLeave) onPointerLeave(e);
     };
 
     const groupRef = useRef<THREE.Group>(null);
-    const textRef = useRef<any>(null);
+    const textRef = useRef<THREE.Mesh>(null);
 
     // Verticalize text (Japan-style cascade)
     const verticalText = label ? label.split('').join('\n') : '';
@@ -99,13 +99,13 @@ export function AdjustableModel({
             // Smoothly transition opacity
             // We need to access the material of the mesh
             if (textRef.current.material) {
-                textRef.current.material.opacity = THREE.MathUtils.lerp(
-                    textRef.current.material.opacity || 0,
+                const material = textRef.current.material as THREE.MeshBasicMaterial;
+                material.opacity = THREE.MathUtils.lerp(
+                    material.opacity || 0,
                     targetOpacity,
                     delta * 8
                 );
-
-                textRef.current.material.transparent = true;
+                material.transparent = true;
             }
 
             if (labelConfig) {
@@ -114,7 +114,8 @@ export function AdjustableModel({
 
             // Force visibility if opacity is effectively non-zero
             if (textRef.current.material) {
-                textRef.current.visible = textRef.current.material.opacity > 0.01;
+                const material = textRef.current.material as THREE.MeshBasicMaterial;
+                textRef.current.visible = material.opacity > 0.01;
             }
         }
     });
