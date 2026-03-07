@@ -58,15 +58,15 @@ export default function Television({
     useFrame((state, delta) => {
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
-            if (dist > 25) return; // Only cull if very far away
+            if (dist > 50) return;
         }
 
         const dt = delta;
 
         if (screenTextureRef.current && groupRef.current) {
-
             const targetPos = targetPosRef.current;
 
+            // Find and cache screen mesh for world position calculations
             if (!screenMeshRef.current) {
                 groupRef.current.traverse((child) => {
                     if (child instanceof THREE.Mesh) {
@@ -78,6 +78,7 @@ export default function Television({
                 });
             }
 
+            // Calculate world position of the screen center
             if (screenMeshRef.current) {
                 const mesh = screenMeshRef.current;
                 mesh.geometry.computeBoundingBox();
@@ -90,6 +91,7 @@ export default function Television({
                 groupRef.current.getWorldPosition(targetPos);
             }
 
+            // Project to screen space and calculate gaze coordinates
             const tvScreenPos = targetPos.project(state.camera);
             const gazeX = state.mouse.x - tvScreenPos.x;
             const gazeY = state.mouse.y - tvScreenPos.y;
@@ -103,6 +105,7 @@ export default function Television({
             let finalX = (gazeX * sensitivity) + gazeOffset.x;
             let finalY = (invertY ? -gazeY : gazeY) * sensitivity * aspectCompensation + gazeOffset.y;
 
+            // Handle UV rotation for specific models
             if (uvRotation !== 0) {
                 if (Math.abs(uvRotation - Math.PI / 2) < 0.01) {
                     const temp = finalX; finalX = -finalY; finalY = temp;
@@ -121,14 +124,15 @@ export default function Television({
             normalizedMouse.current.x = Math.max(-1, Math.min(1, finalX));
             normalizedMouse.current.y = Math.max(-1, Math.min(1, finalY));
 
-
             const canvas = screenTextureRef.current.image as HTMLCanvasElement;
             const ctx = canvas.getContext('2d');
 
+            // Smooth lookAt transition
             const speed = 2.0 * dt;
             currentLookAt.current.x += (normalizedMouse.current.x - currentLookAt.current.x) * speed;
             currentLookAt.current.y += (normalizedMouse.current.y - currentLookAt.current.y) * speed;
 
+            // Manage blink state machine
             const blink = blinkState.current;
             blink.blinkTimer += dt;
 
@@ -151,10 +155,9 @@ export default function Television({
 
             if (ctx) {
                 const w = canvas.width;
-
                 const h = canvas.height;
 
-                // Optimization: Cache gradients
+                // Gradient and vignette caching
                 if (!screenTextureRef.current.userData) screenTextureRef.current.userData = {};
                 const cache = screenTextureRef.current.userData;
                 const needsUpdate = cache.w !== w || cache.h !== h || cache.theme !== theme;
@@ -164,21 +167,16 @@ export default function Television({
                     cache.h = h;
                     cache.theme = theme;
 
-                    // 1. Backlight
                     const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
                     backlight.addColorStop(0, activeTheme.glowCenter);
                     backlight.addColorStop(1, 'rgba(0,0,0,0)');
                     cache.backlight = backlight;
 
-                    // 2. Vignette
                     const vignette = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
                     vignette.addColorStop(0, 'rgba(0,0,0,0)');
                     vignette.addColorStop(0.5, 'rgba(0,0,0,0.1)');
-
-                    const vignetteColor = activeTheme.vignetteColor;
-                    vignette.addColorStop(1, vignetteColor);
+                    vignette.addColorStop(1, activeTheme.vignetteColor);
                     cache.vignette = vignette;
-
                 }
 
                 ctx.fillStyle = activeTheme.bgColor;
@@ -197,15 +195,12 @@ export default function Television({
                 const isLCD = theme === 'toxic';
                 const scleraMaxOffsetX = isLCD ? 150 : 100;
                 const scleraMaxOffsetY = 100;
-
                 const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
                 const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
 
                 ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
 
-                let scaleEye = 1.0;
-                if (theme === 'mobile') scaleEye = 0.6;
-
+                let scaleEye = theme === 'mobile' ? 0.6 : 1.0;
                 let geoCorrectionX = 1.0;
                 if (theme === 'toxic' && screenAspect.current > 1.2) {
                     geoCorrectionX = 1 / (screenAspect.current * 0.85);
@@ -213,32 +208,23 @@ export default function Television({
 
                 ctx.scale(geoCorrectionX * scaleEye, blink.openness * scaleEye);
 
-                const irisColor = activeTheme.irisColor;
-
-                // Generic lookup range
-                const customLookRange = (theme === 'toxic') ? 32
-                    : (theme === 'mobile') ? 15
-                        : 26;
-                const isHologram = theme === 'mobile' || theme === 'hacker' || theme === 'holo';
-                const scleraColor = activeTheme.scleraColor || '#ffffff';
-
                 drawPixelEye(
                     ctx,
                     normalizedMouse.current,
-                    irisColor,
-                    customLookRange,
-                    scleraColor,
-                    isHologram
+                    activeTheme.irisColor,
+                    (theme === 'toxic' ? 32 : theme === 'mobile' ? 15 : 26),
+                    activeTheme.scleraColor || '#ffffff',
+                    theme === 'mobile' || theme === 'hacker' || theme === 'holo'
                 );
 
                 ctx.restore();
-                // Optimization: Use cached Vignette and Glow
+
                 if (cache.vignette) {
                     ctx.fillStyle = cache.vignette;
                     ctx.fillRect(0, 0, w, h);
                 }
 
-
+                // Render focused center text if applicable
                 if (isFocused && focusedText) {
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
@@ -256,28 +242,21 @@ export default function Television({
                     ctx.textBaseline = 'top';
 
                     const textY = -h / 2 + textYOffset;
-
                     const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
                     const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
 
-                    ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
+                    ctx.fillStyle = activeTheme.textShadow1 ? shadow1 + '80' : shadow1;
                     ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
 
-                    ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
+                    ctx.fillStyle = activeTheme.textShadow2 ? shadow2 + '80' : shadow2;
                     ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
 
                     ctx.fillStyle = activeTheme.textColor || '#ffffff';
-
-                    if (Math.random() > 0.1) {
-                        ctx.fillText(focusedText, jitterX, textY + jitterY);
-                    }
+                    if (Math.random() > 0.1) ctx.fillText(focusedText, jitterX, textY + jitterY);
 
                     ctx.restore();
                 }
-
-
             }
-
             screenTextureRef.current.needsUpdate = true;
         }
     });

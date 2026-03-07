@@ -25,6 +25,7 @@ export const VISION_BUTTON_CONFIG = {
     PLAY: { x: 0, y: 190, radius: 30 }
 };
 
+// UV-based hover detection for Vision interactive elements
 export function checkVisionButtonHover(
     uv: THREE.Vector2,
     isFocused: boolean,
@@ -44,36 +45,30 @@ export function checkVisionButtonHover(
     const py = (1 - uv.y) * 512;
     const dx = px - 256;
     let dy = py - 256;
-
     if (invertY) dy = -dy;
 
     if (showPlayButton) {
-        const btnX = playButtonPosition ? playButtonPosition.x : VISION_BUTTON_CONFIG.PLAY.x;
-        const btnY = playButtonPosition ? playButtonPosition.y : VISION_BUTTON_CONFIG.PLAY.y;
-        const distPlay = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-        if (distPlay < VISION_BUTTON_CONFIG.PLAY.radius) return 'play';
+        const btnX = playButtonPosition?.x ?? VISION_BUTTON_CONFIG.PLAY.x;
+        const btnY = playButtonPosition?.y ?? VISION_BUTTON_CONFIG.PLAY.y;
+        if (Math.sqrt((dx - btnX) ** 2 + (dy - btnY) ** 2) < VISION_BUTTON_CONFIG.PLAY.radius) return 'play';
     }
 
     if (showBackButton) {
-        const btnX = backButtonPosition ? backButtonPosition.x : VISION_BUTTON_CONFIG.BACK.x;
-        const btnY = backButtonPosition ? backButtonPosition.y : VISION_BUTTON_CONFIG.BACK.y;
-        const distBack = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-        if (distBack < VISION_BUTTON_CONFIG.BACK.radius) return 'back';
+        const btnX = backButtonPosition?.x ?? VISION_BUTTON_CONFIG.BACK.x;
+        const btnY = backButtonPosition?.y ?? VISION_BUTTON_CONFIG.BACK.y;
+        if (Math.sqrt((dx - btnX) ** 2 + (dy - btnY) ** 2) < VISION_BUTTON_CONFIG.BACK.radius) return 'back';
     }
 
     if (showMenuButton) {
-        const btnX = menuButtonPosition ? menuButtonPosition.x : VISION_BUTTON_CONFIG.MENU.x;
-        const btnY = menuButtonPosition ? menuButtonPosition.y : VISION_BUTTON_CONFIG.MENU.y;
-        const distMenu = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-        if (distMenu < VISION_BUTTON_CONFIG.MENU.radius) return 'menu';
+        const btnX = menuButtonPosition?.x ?? VISION_BUTTON_CONFIG.MENU.x;
+        const btnY = menuButtonPosition?.y ?? VISION_BUTTON_CONFIG.MENU.y;
+        if (Math.sqrt((dx - btnX) ** 2 + (dy - btnY) ** 2) < VISION_BUTTON_CONFIG.MENU.radius) return 'menu';
     }
 
     if (storyMode && storyTextBox) {
         const halfW = storyTextBox.w / 2;
-        if (dx >= storyTextBox.x - halfW && dx <= storyTextBox.x + halfW) {
-            if (dy >= storyTextBox.y && dy <= storyTextBox.y + storyTextBox.h) {
-                return 'story_text';
-            }
+        if (dx >= storyTextBox.x - halfW && dx <= storyTextBox.x + halfW && dy >= storyTextBox.y && dy <= storyTextBox.y + storyTextBox.h) {
+            return 'story_text';
         }
     }
 

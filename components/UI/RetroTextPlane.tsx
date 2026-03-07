@@ -81,12 +81,11 @@ export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(
         if (inverted) {
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            if (ctx.roundRect) {
-                ctx.roundRect(0, 0, w, h, borderRadius);
-            } else {
-                ctx.rect(0, 0, w, h);
-            }
+            if (ctx.roundRect) ctx.roundRect(0, 0, w, h, borderRadius);
+            else ctx.rect(0, 0, w, h);
             ctx.fill();
+
+            // Cut text shape out of the background
             ctx.globalCompositeOperation = 'destination-out';
             ctx.fillStyle = '#000000';
         } else {
@@ -105,14 +104,10 @@ export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(
         lines.forEach((line, i) => {
             const lineY = startY + i * lineHeight;
 
-            let shouldDraw = true;
-            if (enableJitter && Math.random() < 0.05) {
-                shouldDraw = false;
-            }
+            // Flicker effect
+            if (enableJitter && Math.random() < 0.05) return;
 
-            if (shouldDraw) {
-                ctx.fillText(line, w / 2 + jitterX, lineY + jitterY);
-            }
+            ctx.fillText(line, w / 2 + jitterX, lineY + jitterY);
         });
 
         ctx.restore();

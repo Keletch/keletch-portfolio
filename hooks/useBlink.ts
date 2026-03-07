@@ -1,3 +1,6 @@
+/**
+ * Manages periodic eye blinking logic for TV models.
+ */
 import { useRef } from 'react';
 
 interface BlinkState {

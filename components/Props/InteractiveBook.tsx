@@ -3,7 +3,8 @@
 import React, { useState, useMemo } from 'react';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGLTF, Html } from '@react-three/drei';
-import { RigidBody, CuboidCollider } from '@react-three/rapier';
+import { CuboidCollider } from '@react-three/rapier';
+import { ResettableRigidBody } from '@/components/Scene/ResettableRigidBody';
 
 interface InteractiveBookProps {
     modelPath: string;
@@ -53,7 +54,7 @@ export function InteractiveBook({
     };
 
     return (
-        <RigidBody
+        <ResettableRigidBody
             colliders={false}
             position={pos}
             rotation={rot}
@@ -86,6 +87,6 @@ export function InteractiveBook({
                     </div>
                 </Html>
             )}
-        </RigidBody>
+        </ResettableRigidBody>
     );
 }

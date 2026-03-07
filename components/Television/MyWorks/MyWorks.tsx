@@ -109,19 +109,16 @@ export default function MyWorks({
     const lastTypedCharCount = useRef(0);
     const hasStartedTyping = useRef(false);
 
-    // Initialize gallery and start typing when entering gallery
+    // Typing effect initialization
     useEffect(() => {
         if (galleryState === 'gallery') {
             galleryEnterTime.current = performance.now() / 1000;
             lastTypedCharCount.current = 0;
-
-            // Only start typing once per project
             if (!hasStartedTyping.current) {
                 startTyping();
                 hasStartedTyping.current = true;
             }
         } else {
-            // Reset when leaving gallery
             hasStartedTyping.current = false;
         }
     }, [galleryState, currentProjectIndex, startTyping]);
@@ -170,18 +167,13 @@ export default function MyWorks({
         }
     }, [currentProjectIndex]);
 
-    // Navigation Handlers
+    // Navigation logic with flicker transitions
     const handleNextProject = () => {
         setIsProjectTransition(true);
         setGalleryState('static');
-
-        // 1. Hide content (flicker out)
-        // 2. Load Video mid-transition (hidden)
         setTimeout(() => {
             setCurrentProjectIndex(prev => (prev + 1) % PROJECTS.length);
         }, 100);
-
-        // 3. Reveal new content
         setTimeout(() => {
             setGalleryState('gallery');
             setIsProjectTransition(false);
@@ -191,11 +183,9 @@ export default function MyWorks({
     const handlePrevProject = () => {
         setIsProjectTransition(true);
         setGalleryState('static');
-
         setTimeout(() => {
             setCurrentProjectIndex(prev => (prev - 1 + PROJECTS.length) % PROJECTS.length);
         }, 100);
-
         setTimeout(() => {
             setGalleryState('gallery');
             setIsProjectTransition(false);
@@ -203,33 +193,24 @@ export default function MyWorks({
     };
 
 
-    // Transition Logic
+    // Screen state transitions (idle -> zoom -> static -> gallery)
     useEffect(() => {
         let zoomTimer: NodeJS.Timeout;
         let staticTimer: NodeJS.Timeout;
 
         if (isFocused) {
-            // Start sequence
             setGalleryState('zooming');
             const startStaticDelay = Math.max(0, ZOOM_DURATION - STATIC_DURATION);
-
             zoomTimer = setTimeout(() => {
                 setGalleryState('static');
-
                 staticTimer = setTimeout(() => {
                     setGalleryState('gallery');
                 }, STATIC_DURATION);
-
             }, startStaticDelay);
-
         } else {
-            // Check if we need an exit animation
             if (galleryState === 'gallery' || galleryState === 'static') {
                 setGalleryState('exiting');
-                // Allow time for flicker out animation before resetting to idle
-                zoomTimer = setTimeout(() => {
-                    setGalleryState('idle');
-                }, 1000);
+                zoomTimer = setTimeout(() => setGalleryState('idle'), 1000);
             } else {
                 setGalleryState('idle');
             }
@@ -242,17 +223,24 @@ export default function MyWorks({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isFocused]);
 
+    const [delayedUI, setDelayedUI] = useState(false);
+
     // Reset hover states
     useEffect(() => {
-        if (!isFocused) {
+        if (isFocused) {
+            const t = setTimeout(() => setDelayedUI(true), 900);
+            return () => clearTimeout(t);
+        } else {
+            setDelayedUI(false);
             setStartButtonHovered(false);
             setBackButtonHovered(false);
             setMenuButtonHovered(false);
             setPrevButtonHovered(false);
             setEyeButtonHovered(false);
-            document.body.style.cursor = 'auto';
         }
     }, [isFocused]);
+
+    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : null, 0);
 
 
     const {
@@ -300,7 +288,8 @@ export default function MyWorks({
     useFigureTransition(eyeTarget, 0);
 
 
-    const activeTheme = THEMES[theme] || THEMES.classic;
+    const activeTheme = THEMES[theme as keyof typeof THEMES] || THEMES.classic;
+    const buttonColor = theme === 'classic' ? '#ffffff' : activeTheme.highlightColor;
 
 
 
@@ -309,7 +298,7 @@ export default function MyWorks({
     useFrame((state, delta) => {
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
-            if (dist > 15) return;
+            if (dist > 50) return;
         }
 
 
@@ -326,14 +315,17 @@ export default function MyWorks({
                     const dx = curX - prevLookAtRef.current.x;
                     const dy = curY - prevLookAtRef.current.y;
 
-                    mouseVelRef.current.x = mouseVelRef.current.x * 0.5 + (dx / delta) * 0.5;
-                    mouseVelRef.current.y = mouseVelRef.current.y * 0.5 + (dy / delta) * 0.5;
+                    const safeDelta = Math.max(0.0001, delta);
+                    mouseVelRef.current.x = mouseVelRef.current.x * 0.5 + (dx / safeDelta) * 0.5;
+                    mouseVelRef.current.y = mouseVelRef.current.y * 0.5 + (dy / safeDelta) * 0.5;
+
+                    mouseVelRef.current.x = Number.isFinite(mouseVelRef.current.x) ? mouseVelRef.current.x : 0;
+                    mouseVelRef.current.y = Number.isFinite(mouseVelRef.current.y) ? mouseVelRef.current.y : 0;
 
                     prevLookAtRef.current.x = curX;
                     prevLookAtRef.current.y = curY;
 
-                    const mouseIco = { x: curX, y: curY };
-                    updateIcoDeepState(icoDeepStateRef.current, delta, mouseIco, mouseVelRef.current);
+                    updateIcoDeepState(icoDeepStateRef.current, delta, { x: curX, y: curY }, mouseVelRef.current);
                 }
             }
 
@@ -360,16 +352,14 @@ export default function MyWorks({
 
                 // --- RENDERING PIPELINE START ---
 
-                // 1. BACKGROUND
+                // Background and backlight rendering
                 ctx.fillStyle = activeTheme.bgColor;
                 ctx.fillRect(0, 0, w, h);
-
                 const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
                 backlight.addColorStop(0, activeTheme.glowCenter);
                 backlight.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = backlight;
                 ctx.fillRect(0, 0, w, h);
-
                 ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
 
@@ -550,46 +540,65 @@ export default function MyWorks({
                     ctx.restore();
                 }
 
-                // 3. TITLE
-                if (isFocused && focusedText && (galleryState === 'gallery' || galleryState === 'static')) {
+                // UI Overlay (Title & Buttons)
+                const uiOpacityVal = uiOpacityRef.current;
+                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
+
+                if (uiSteppedOpacity > 0.01 && (galleryState === 'gallery' || galleryState === 'static' || galleryState === 'exiting')) {
+                    ctx.save();
+                    ctx.globalAlpha = uiSteppedOpacity;
+
+                    // 3. TITLE
+                    if (focusedText) {
+                        ctx.save();
+                        ctx.translate(w / 2, h / 2);
+                        if (invertY) {
+                            ctx.rotate(Math.PI);
+                            ctx.scale(-1, 1);
+                        }
+
+                        // Async flicker jitter for title
+                        const time = state.clock.elapsedTime;
+                        const titleJitter = Math.sin(time * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
+                        const titleAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + titleJitter));
+                        ctx.globalAlpha = titleAlpha;
+
+                        const locJitterX = (Math.random() - 0.5) * 4;
+                        const locJitterY = (Math.random() - 0.5) * 4;
+                        ctx.font = '900 50px "Courier New", monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'top';
+                        const textY = -h / 2 + textYOffset;
+
+                        const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
+                        const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
+
+                        ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
+                        ctx.fillText(focusedText, locJitterX + 4, textY + locJitterY);
+
+                        ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
+                        ctx.fillText(focusedText, locJitterX - 4, textY + locJitterY);
+
+                        ctx.fillStyle = activeTheme.textColor || '#ffffff';
+                        if (Math.random() > 0.1) {
+                            ctx.fillText(focusedText, locJitterX, textY + locJitterY);
+                        }
+
+                        ctx.restore();
+                    }
+
+                    // 4. BUTTONS
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
                         ctx.rotate(Math.PI);
                         ctx.scale(-1, 1);
                     }
-                    const jitterX = (Math.random() - 0.5) * 4;
-                    const jitterY = (Math.random() - 0.5) * 4;
-                    ctx.font = '900 50px "Courier New", monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-                    const textY = -h / 2 + textYOffset;
 
-                    const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                    const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-
-                    ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
-                    ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
-
-                    ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
-                    ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-
-                    ctx.fillStyle = activeTheme.textColor || '#ffffff';
-                    if (Math.random() > 0.1) {
-                        ctx.fillText(focusedText, jitterX, textY + jitterY);
-                    }
-
-                    ctx.restore();
-                }
-
-                // 4. BUTTONS
-                if (isFocused && (galleryState === 'gallery' || galleryState === 'static')) {
-                    ctx.save();
-                    ctx.translate(w / 2, h / 2);
-                    if (invertY) {
-                        ctx.rotate(Math.PI);
-                        ctx.scale(-1, 1);
-                    }
+                    // Async flicker jitter base for buttons
+                    const btnJitterBase = Math.sin(state.clock.elapsedTime * 12 + 5) > 0.8 ? (Math.random() - 0.5) * 0.3 : 0;
+                    const btnBaseAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + btnJitterBase));
+                    ctx.globalAlpha = btnBaseAlpha;
 
                     // Use shared helper for hover animations
                     if (showStartButton) {
@@ -601,9 +610,9 @@ export default function MyWorks({
                         );
 
                         if (!disableStartPulse) {
-                            drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, '#ffffff');
+                            drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, buttonColor);
                         }
-                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, 0, '#ffffff');
+                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, 0, buttonColor);
                     }
 
                     if (showPrevButton) {
@@ -614,7 +623,7 @@ export default function MyWorks({
                             screenTextureRef.current, 'hoverAnimPrev', prevButtonHovered
                         );
 
-                        drawPlayStopButton(ctx, btnPrevX, btnPrevY, hoverProgressPrev, 0, '#ffffff', Math.PI);
+                        drawPlayStopButton(ctx, btnPrevX, btnPrevY, hoverProgressPrev, 0, buttonColor, Math.PI);
                     }
 
                     if (showBackButton) {
@@ -625,7 +634,7 @@ export default function MyWorks({
                             screenTextureRef.current, 'hoverAnimBack', backButtonHovered
                         );
 
-                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, '#ffffff');
+                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, buttonColor);
                     }
 
                     if (showMenuButton) {
@@ -636,13 +645,14 @@ export default function MyWorks({
                             screenTextureRef.current, 'hoverAnimMenu', menuButtonHovered
                         );
 
-                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, '#ffffff');
+                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, buttonColor);
                     }
 
                     // Eye button is part of the morphing eye
 
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.restore();
+                    ctx.restore(); // End UI overlay
                 }
 
                 // --- RENDERING PIPELINE END ---
@@ -658,7 +668,7 @@ export default function MyWorks({
                 <primitive
                     object={clonedModel}
                     onPointerMove={(e: ThreeEvent<MouseEvent>) => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedUI !== 'ui') return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
                             const buttonHit = checkButtonHover(
@@ -696,15 +706,15 @@ export default function MyWorks({
                         }
                     }}
                     onPointerLeave={() => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedUI !== 'ui') return;
                         if (startButtonHovered) setStartButtonHovered(false);
                         if (backButtonHovered) setBackButtonHovered(false);
                         if (menuButtonHovered) setMenuButtonHovered(false);
                         if (prevButtonHovered) setPrevButtonHovered(false);
                         if (eyeButtonHovered) setEyeButtonHovered(false);
-                        document.body.style.cursor = 'auto';
                     }}
                     onClick={(e: ThreeEvent<MouseEvent>) => {
+                        if (!isFocused || renderedUI !== 'ui') return;
                         if (e.object.userData.isScreen && e.uv) {
                             // Ensure click hits the button
                             const buttonHit = checkButtonHover(

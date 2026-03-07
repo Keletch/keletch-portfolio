@@ -44,7 +44,7 @@ function computeCharPositions(
 
     const targets: { x: number; y: number; char: string }[] = [];
 
-    // Word wrap
+    // Basic word wrap logic
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';

@@ -73,24 +73,25 @@ export default function RadioTV({
         }));
     }, [tracks]);
 
-    // Reset hover states and cursor when losing focus to prevent stuck visuals on re-entry
+    const [delayedUI, setDelayedUI] = useState(false);
+
+    // Reset UI state when losing focus
     useEffect(() => {
-        if (!isFocused) {
+        if (isFocused) {
+            const t = setTimeout(() => setDelayedUI(true), 900);
+            return () => clearTimeout(t);
+        } else {
+            setDelayedUI(false);
             setStartButtonHovered(false);
             setBackButtonHovered(false);
             setMenuButtonHovered(false);
             setNextButtonHovered(false);
-            document.body.style.cursor = 'auto'; // Reset global cursor
         }
     }, [isFocused]);
 
-    // Figure Transitions
-    // Determines what to show: 
-    // 'menu': Playlist
-    // 'player_[song]': Music Mode (Playing or Paused) - Eye Hidden, Visuals Visible
-    // null: Idle (Stopped) - Eye Visible
+    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : null, 0);
+
     const playerFigure = currentSongName ? `player_${currentSongName}` : 'player';
-    // If not focused, we don't show the menu, we show the player (if playing) or nothing (eye)
     const targetFigure = (isMenuOpen && isFocused) ? 'menu' : (status !== 'stopped' ? playerFigure : null);
 
     // Track transition source to prevent eye flashes
@@ -102,14 +103,12 @@ export default function RadioTV({
         lastTargetRef.current = targetFigure;
     }
 
-    // For Flick Transitions
     const {
         renderedFigure,
         linearOpacity,
         transitionOpacity
     } = useFigureTransition(targetFigure);
 
-    // State for Seek Dragging
     const [isSeekDragging, setIsSeekDragging] = useState(false);
     const [seekDragValue, setSeekDragValue] = useState(0);
 
@@ -186,7 +185,7 @@ export default function RadioTV({
     useFrame((state, delta) => {
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
-            if (dist > 15) return;
+            if (dist > 50) return;
         }
 
         const dt = delta;
@@ -260,19 +259,17 @@ export default function RadioTV({
                 const w = canvas.width;
                 const h = canvas.height;
 
+                // Background and backlight rendering
                 ctx.fillStyle = activeTheme.bgColor;
                 ctx.fillRect(0, 0, w, h);
-
                 const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
                 backlight.addColorStop(0, activeTheme.glowCenter);
                 backlight.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = backlight;
                 ctx.fillRect(0, 0, w, h);
-
                 ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
 
-                // Eye opacity: fade out when player or menu is showing
                 let eyeOpacity = 1.0;
                 const hidesEye = (fig: string | null) => fig === 'menu' || (fig && fig.startsWith('player'));
 
@@ -305,6 +302,7 @@ export default function RadioTV({
                     ctx.restore();
                 }
 
+                // Vignette and glow effects
                 const gradient = ctx.createRadialGradient(w / 2, h / 2, h / 3, w / 2, h / 2, h / 1.1);
                 gradient.addColorStop(0, 'rgba(0,0,0,0)');
                 gradient.addColorStop(0.5, 'rgba(0,0,0,0.1)');
@@ -318,7 +316,6 @@ export default function RadioTV({
                 ctx.fillStyle = glow;
                 ctx.fillRect(0, 0, w, h);
 
-                // Drawing Setup for UI/Visuals (Shared translation)
                 ctx.save();
                 ctx.translate(w / 2, h / 2);
                 if (invertY) {
@@ -326,9 +323,20 @@ export default function RadioTV({
                     ctx.scale(-1, 1);
                 }
 
-                if (isFocused) {
+                const uiOpacityVal = uiOpacityRef.current;
+                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
+
+                if (uiSteppedOpacity > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = uiSteppedOpacity;
+
                     if (focusedText) {
                         ctx.save();
+
+                        const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
+                        const titleAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + titleJitter));
+                        ctx.globalAlpha = titleAlpha;
+
                         const jitterX = (Math.random() - 0.5) * 4;
                         const jitterY = (Math.random() - 0.5) * 4;
                         ctx.font = '900 50px "Courier New", monospace';
@@ -347,6 +355,10 @@ export default function RadioTV({
                     }
 
                     ctx.globalCompositeOperation = 'screen';
+
+                    const btnJitterBase = Math.sin(state.clock.elapsedTime * 12 + 5) > 0.8 ? (Math.random() - 0.5) * 0.3 : 0;
+                    const btnBaseAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + btnJitterBase));
+                    ctx.globalAlpha = btnBaseAlpha;
 
                     if (showStartButton) {
                         const btnX = startButtonPosition ? startButtonPosition.x : RADIO_BUTTON_CONFIG.PLAY.x;
@@ -423,6 +435,8 @@ export default function RadioTV({
                         }
                         drawNextButton(ctx, btnX, btnY, hoverProgress, accent);
                     }
+
+                    ctx.restore();
                 }
 
                 const figureOpacity = transitionOpacity.current;
@@ -432,10 +446,8 @@ export default function RadioTV({
                 const linStepped = Math.floor(linOpacity * 5) / 5;
 
                 // Music Mode Visuals: Progress Bar + Reactive Circle
-                // Reactive Circle is always visible if playing.
-                // Progress Bar and Title only visible when focused.
                 if (renderedFigure && renderedFigure.startsWith('player')) {
-                    // Draw Reactive 3D Circle
+                    // Reactive circle (always visible if playing)
                     if (audioAnalyser && linStepped > 0.01) {
                         drawReactiveCircle(
                             ctx,
@@ -449,7 +461,7 @@ export default function RadioTV({
                         );
                     }
 
-                    // Progress info ONLY when focused (clean look from distance)
+                    // Progress info (only when focused)
                     if (figureStepped > 0.01 && isFocused) {
                         const jitterAmount = (1 - figureStepped) * 20;
                         const jX = (Math.random() - 0.5) * jitterAmount;
@@ -500,7 +512,7 @@ export default function RadioTV({
                 <primitive
                     object={clonedModel}
                     onPointerMove={(e: ThreeEvent<PointerEvent>) => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedUI !== 'ui') return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
 
@@ -567,7 +579,7 @@ export default function RadioTV({
                         }
                     }}
                     onPointerDown={(e: ThreeEvent<PointerEvent>) => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedUI !== 'ui') return;
                         if (e.object.userData.isScreen && e.uv) {
                             const dx = e.uv.x * 512 - 256;
                             let dy = (1 - e.uv.y) * 512 - 256;
@@ -610,15 +622,15 @@ export default function RadioTV({
                         }
                     }}
                     onPointerLeave={() => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedUI !== 'ui') return;
                         setStartButtonHovered(false);
                         setBackButtonHovered(false);
                         setMenuButtonHovered(false);
                         setNextButtonHovered(false);
                         setHoveredTrackIndex(-1);
-                        document.body.style.cursor = 'auto';
                     }}
                     onClick={(e: ThreeEvent<PointerEvent>) => {
+                        if (!isFocused || renderedUI !== 'ui') return;
                         if (e.object.userData.isScreen && e.uv) {
                             if (isSeekDragging) return;
 

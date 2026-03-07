@@ -1,4 +1,4 @@
-import { PolaroidData, getPolaroidImage } from './LifestylePolaroids';
+import { PolaroidData, getPolaroidImage, ZONES } from './LifestylePolaroids';
 
 const SPAWN_INTERVAL = 3.0; // Seconds between each new polaroid
 const MAX_VISIBLE = 5;
@@ -22,8 +22,9 @@ interface ActivePolaroid {
     indexInSequence: number;
 }
 export let activePolaroids: ActivePolaroid[] = [];
-let spawnTimer = SPAWN_INTERVAL; // Force spawn immediately on next wake
+let spawnTimer = SPAWN_INTERVAL - 2.1; // Delay first polaroid by 2.1s (1.05s focus + 1.0s eye fade) to match eye flicker entrance
 let sequenceCounter = 0;
+let availableIndices: number[] = [];
 
 function easeOutBack(x: number): number {
     const c1 = 1.70158;
@@ -48,8 +49,9 @@ function getOffscreen(): CanvasRenderingContext2D | null {
 export function updatePolaroids(dt: number, hoveredId: string | null, zoomedId: string | null, tvFocused: boolean, polaroids: PolaroidData[]) {
     if (!tvFocused) {
         activePolaroids = [];
-        spawnTimer = SPAWN_INTERVAL;
+        spawnTimer = SPAWN_INTERVAL - 2.1;
         sequenceCounter = 0;
+        availableIndices = [];
         return;
     }
 
@@ -60,7 +62,29 @@ export function updatePolaroids(dt: number, hoveredId: string | null, zoomedId: 
         spawnTimer += dt;
         while (spawnTimer >= SPAWN_INTERVAL) {
             spawnTimer -= SPAWN_INTERVAL;
-            const p = polaroids[sequenceCounter % polaroids.length];
+
+            // Pull a unique photo from a shuffled bag to prevent duplicates
+            if (availableIndices.length === 0) {
+                availableIndices = Array.from({ length: polaroids.length }, (_, i) => i);
+                for (let i = availableIndices.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [availableIndices[i], availableIndices[j]] = [availableIndices[j], availableIndices[i]];
+                }
+            }
+            const chosenIndex = availableIndices.pop()!;
+            const basePhoto = polaroids[chosenIndex];
+
+            // Assign it to the next deterministic zone to "respect spacing" without crashing/overlapping!
+            const zone = ZONES[sequenceCounter % ZONES.length];
+            const p: PolaroidData = {
+                ...basePhoto,
+                id: `p_inst_${sequenceCounter}_${basePhoto.id}`, // Unique ID for cache handling
+                targetX: zone.x + (Math.random() - 0.5) * 0.15,
+                targetY: zone.y + (Math.random() - 0.5) * 0.15,
+                targetRot: (Math.random() - 0.5) * 0.6,
+                scale: 0.4 + Math.random() * 0.1
+            };
+
             activePolaroids.push({ p, age: 0, indexInSequence: sequenceCounter });
             sequenceCounter++;
         }
@@ -278,8 +302,14 @@ function drawSinglePolaroid(
     // --- Draw the actual Polaroid shape ---
     ctx.save();
 
+    // Async Flicker Offset so polaroids don't blink globally perfectly in sync
+    // Only apply flicker during the TV focus fade or the Polaroid exit slide phase
+    const isFlickering = globalProgress < 0.99 || exitAlpha < 0.99;
+    const flickerJitter = isFlickering && Math.sin(time * 10 + indexInSequence * 3) > 0.8 ? ((Math.random() - 0.5) * 0.3) : 0;
+    const flickerBase = Math.max(0, Math.min(1, globalAlphaMult + flickerJitter));
+
     // Global TV Focus alpha + Local Exit alpha + Overall Flicker multiplier
-    ctx.globalAlpha = Math.min(globalProgress, exitAlpha) * globalAlphaMult;
+    ctx.globalAlpha = Math.min(globalProgress, exitAlpha) * flickerBase;
 
     // Use smoothed coordinates
     ctx.translate(state.x, state.y);

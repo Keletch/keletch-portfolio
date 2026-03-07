@@ -1,5 +1,5 @@
-import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import MyWorks from '@/components/Television/MyWorks/MyWorks';
+import { InteractiveTVWrapper } from '@/components/Scene/InteractiveTVWrapper';
 
 interface MyWorksSectionProps {
     viewState: string;
@@ -14,15 +14,14 @@ const toxicCollider = { size: [1.05, 0.60, 0.24] as [number, number, number], of
 
 export default function MyWorksSection({ viewState, onNavigate, themeOverride }: MyWorksSectionProps) {
     return (
-        <RigidBody
-            colliders={false}
-            enabledRotations={[true, false, true]}
-            ccd={true}
-            linearDamping={0.5}
-            angularDamping={0.5}
-            position={[tv3Position.x, tv3Position.y, tv3Position.z]}
+        <InteractiveTVWrapper
+            tvPosition={tv3Position}
+            colliderSize={toxicCollider.size}
+            colliderOffset={toxicCollider.offset}
+            viewState={viewState}
+            focusStateName="tv_lcd_focus"
+            resetDelay={1.65}
         >
-            <CuboidCollider args={toxicCollider.size} position={toxicCollider.offset} friction={0.3} restitution={0.1} />
             <MyWorks
                 modelPath="/models/LCDTVFixed.glb"
                 screenNames={LCD_SCREENS}
@@ -55,6 +54,6 @@ export default function MyWorksSection({ viewState, onNavigate, themeOverride }:
                 // Bottom Center: Eye
                 showEyeButton={true}
             />
-        </RigidBody>
+        </InteractiveTVWrapper>
     );
 }

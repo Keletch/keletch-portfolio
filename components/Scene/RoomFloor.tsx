@@ -16,7 +16,6 @@ export function RoomFloor({
 }: RoomFloorProps) {
     const floorTexture = useTexture(texturePath);
 
-    // Ensure texture settings are applied when texture changes
     React.useLayoutEffect(() => {
         floorTexture.wrapS = THREE.RepeatWrapping;
         floorTexture.wrapT = THREE.RepeatWrapping;
@@ -27,7 +26,7 @@ export function RoomFloor({
 
     return (
         <RigidBody type="fixed" colliders={false} position={[0, -2.1, 0]}>
-            <CuboidCollider args={[10, 0.05, 10]} friction={0.8} />
+            <CuboidCollider args={[25, 10, 25]} position={[0, -9.95, 0]} friction={0.8} />
 
             <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
                 <planeGeometry args={[50, 50]} />

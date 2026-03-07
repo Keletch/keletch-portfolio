@@ -1,6 +1,7 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { RigidBody, CuboidCollider } from '@react-three/rapier';
+import { CuboidCollider } from '@react-three/rapier';
+import { ResettableRigidBody } from '@/components/Scene/ResettableRigidBody';
 import * as THREE from 'three';
 
 interface SpeakerProps {
@@ -11,6 +12,7 @@ interface SpeakerProps {
     colliderOffset: [number, number, number];
     analyser?: AnalyserNode;
     isPlaying: boolean;
+    resetDelay?: number;
 }
 
 export default function Speaker({
@@ -20,7 +22,8 @@ export default function Speaker({
     colliderSize,
     colliderOffset,
     analyser,
-    isPlaying
+    isPlaying,
+    resetDelay = 0
 }: SpeakerProps) {
     const groupRef = useRef<THREE.Group>(null);
     const dataArray = useMemo(() => analyser ? new Uint8Array(analyser.frequencyBinCount) : null, [analyser]);
@@ -29,16 +32,13 @@ export default function Speaker({
     useFrame(() => {
         if (!groupRef.current) return;
 
+        // Audio pulsing logic
         let pulse = 1.0;
-
         if (isPlaying && analyser && dataArray) {
             analyser.getByteFrequencyData(dataArray);
-
             let bassSum = 0;
             const bassEnd = 10;
-            for (let i = 0; i < bassEnd; i++) {
-                bassSum += dataArray[i];
-            }
+            for (let i = 0; i < bassEnd; i++) bassSum += dataArray[i];
             const bassAvg = (bassSum / bassEnd) / 255;
             pulse = 1.0 + Math.pow(bassAvg, 2.2) * 0.15;
         }
@@ -47,7 +47,7 @@ export default function Speaker({
     });
 
     return (
-        <RigidBody
+        <ResettableRigidBody
             colliders={false}
             enabledRotations={[true, false, true]}
             ccd={true}
@@ -55,11 +55,12 @@ export default function Speaker({
             angularDamping={0.5}
             position={position}
             rotation={rotation}
+            resetDelay={resetDelay}
         >
             <group ref={groupRef}>
                 <CuboidCollider args={colliderSize} position={colliderOffset} friction={0.5} restitution={0.1} />
                 <primitive object={clonedModel} />
             </group>
-        </RigidBody>
+        </ResettableRigidBody>
     );
 }

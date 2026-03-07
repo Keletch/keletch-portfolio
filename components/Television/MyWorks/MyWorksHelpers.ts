@@ -11,7 +11,7 @@ export {
     drawMenuButton
 } from '../Helpers';
 
-// Hover detection for OSD elements
+// Hover detection for MyWorks OSD
 export function checkButtonHover(
     uv: THREE.Vector2,
     isFocused: boolean,
@@ -122,7 +122,7 @@ export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: 
     return lines;
 }
 
-// Project info display with automatic wrapping
+// Project info display with typewriter effect
 export function drawProjectInfo(
     ctx: CanvasRenderingContext2D,
     w: number,
@@ -141,9 +141,8 @@ export function drawProjectInfo(
     const maxWidth = 380;
     const lineHeight = 20;
     const padding = 15;
-    const fontSize = 15;
 
-    ctx.font = `${fontSize}px "Courier New", monospace`;
+    ctx.font = `15px "Courier New", monospace`;
 
     const numLines = wrappedLines.length;
     const boxHeight = (numLines * lineHeight) + (padding * 2);
@@ -200,7 +199,7 @@ export function drawProjectInfo(
     };
 }
 
-// Eye-conic external link button
+// External link button (Eye icon)
 export function drawEyeButton(
     ctx: CanvasRenderingContext2D,
     x: number,

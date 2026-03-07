@@ -133,7 +133,9 @@ export default function Vision({
 
     const eyeMorphProgress = useRef(0);
     const activeTheme = THEMES[theme] || THEMES.classic;
+    const buttonColor = theme === 'classic' ? '#ffffff' : activeTheme.highlightColor;
 
+    // Focus and zoom lifecycle management
     useEffect(() => {
         let zoomTimer: NodeJS.Timeout;
         let staticTimer: NodeJS.Timeout;
@@ -168,14 +170,22 @@ export default function Vision({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isFocused]);
 
+    const [delayedUI, setDelayedUI] = useState(false);
+
     useEffect(() => {
-        if (!isFocused) {
+        if (isFocused) {
+            const t = setTimeout(() => setDelayedUI(true), 900);
+            return () => clearTimeout(t);
+        } else {
+            setDelayedUI(false);
             setBackButtonHovered(false);
             setMenuButtonHovered(false);
             setPlayButtonHovered(false);
             document.body.style.cursor = 'auto';
         }
     }, [isFocused]);
+
+    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : null, 0);
 
     useEffect(() => {
         if (!storyActive) return;
@@ -338,32 +348,48 @@ export default function Vision({
 
                 if (cache.vignette) { ctx.fillStyle = cache.vignette; ctx.fillRect(0, 0, w, h); }
 
-                if (isFocused && focusedText) {
-                    ctx.save();
-                    ctx.translate(w / 2, h / 2);
-                    if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
-                    const jx = (Math.random() - 0.5) * 2;
-                    const jy = (Math.random() - 0.5) * 2;
-                    ctx.font = '900 42px "Courier New", monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-                    const textY = -h / 2 + textYOffset;
-                    const titleColor = visionColors?.textColor || activeTheme.textColor || '#ffffff';
-                    const s1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                    const s2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-                    ctx.fillStyle = (activeTheme.textShadow1) ? s1 + '80' : s1;
-                    ctx.fillText(focusedText, jx + 4, textY + jy);
-                    ctx.fillStyle = (activeTheme.textShadow2) ? s2 + '80' : s2;
-                    ctx.fillText(focusedText, jx - 4, textY + jy);
-                    ctx.fillStyle = titleColor;
-                    if (Math.random() > 0.1) ctx.fillText(focusedText, jx, textY + jy);
-                    ctx.restore();
-                }
+                // UI Overlay (Focused Text & Buttons)
+                const uiOpacityVal = uiOpacityRef.current;
+                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
 
-                if (isFocused) {
+                if (uiSteppedOpacity > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = uiSteppedOpacity;
+
+                    if (focusedText) {
+                        ctx.save();
+
+                        const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
+                        const titleAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + titleJitter));
+                        ctx.globalAlpha = titleAlpha;
+
+                        ctx.translate(w / 2, h / 2);
+                        if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
+                        const jx = (Math.random() - 0.5) * 2;
+                        const jy = (Math.random() - 0.5) * 2;
+                        ctx.font = '900 42px "Courier New", monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'top';
+                        const textY = -h / 2 + textYOffset;
+                        const titleColor = visionColors?.textColor || activeTheme.textColor || '#ffffff';
+                        const s1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
+                        const s2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
+                        ctx.fillStyle = (activeTheme.textShadow1) ? s1 + '80' : s1;
+                        ctx.fillText(focusedText, jx + 4, textY + jy);
+                        ctx.fillStyle = (activeTheme.textShadow2) ? s2 + '80' : s2;
+                        ctx.fillText(focusedText, jx - 4, textY + jy);
+                        ctx.fillStyle = titleColor;
+                        if (Math.random() > 0.1) ctx.fillText(focusedText, jx, textY + jy);
+                        ctx.restore();
+                    }
+
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
+
+                    const btnJitterBase = Math.sin(state.clock.elapsedTime * 12 + 5) > 0.8 ? (Math.random() - 0.5) * 0.3 : 0;
+                    const btnBaseAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + btnJitterBase));
+                    ctx.globalAlpha = btnBaseAlpha;
 
                     if (galleryState === 'content' || galleryState === 'static') {
                         const bx = VISION_BUTTON_CONFIG.PLAY.x;
@@ -372,28 +398,28 @@ export default function Vision({
                         const mt = storyActive ? 1 : 0;
                         morphProgressRef.current += (mt - morphProgressRef.current) * 0.15;
                         if (Math.abs(morphProgressRef.current - mt) < 0.001) morphProgressRef.current = mt;
-                        drawButtonShockwave(ctx, bx, by, hp, time, '#ffffff');
-                        drawPlayStopButton(ctx, bx, by, hp, morphProgressRef.current, '#ffffff');
+                        drawButtonShockwave(ctx, bx, by, hp, time, buttonColor);
+                        drawPlayStopButton(ctx, bx, by, hp, morphProgressRef.current, buttonColor);
                     }
 
                     if (showBackButton) {
                         const bx = backButtonPosition?.x ?? VISION_BUTTON_CONFIG.BACK.x;
                         const by = backButtonPosition?.y ?? VISION_BUTTON_CONFIG.BACK.y;
                         const hp = updateButtonHoverAnimation(screenTextureRef.current, 'hoverAnimBack', backButtonHovered);
-                        drawBackButton(ctx, bx, by, hp, '#ffffff');
+                        drawBackButton(ctx, bx, by, hp, buttonColor);
                     }
 
                     if (showMenuButton) {
                         const bx = menuButtonPosition?.x ?? VISION_BUTTON_CONFIG.MENU.x;
                         const by = menuButtonPosition?.y ?? VISION_BUTTON_CONFIG.MENU.y;
                         const hp = updateButtonHoverAnimation(screenTextureRef.current, 'hoverAnimMenu', menuButtonHovered);
-                        drawMenuButton(ctx, bx, by, hp, '#ffffff');
+                        drawMenuButton(ctx, bx, by, hp, buttonColor);
                     }
 
                     ctx.restore();
+                    ctx.restore();
                 }
             }
-
             screenTextureRef.current.needsUpdate = true;
         }
     });
@@ -404,9 +430,10 @@ export default function Vision({
                 <primitive
                     object={clonedModel}
                     onPointerMove={(e: ThreeEvent<PointerEvent>) => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedUI !== 'ui') return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
+                            // Button hover detection and cursor management
                             const hit = checkVisionButtonHover(
                                 e.uv, isFocused, invertY,
                                 showBackButton, showMenuButton,
@@ -422,13 +449,14 @@ export default function Vision({
                         }
                     }}
                     onPointerLeave={() => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedUI !== 'ui') return;
                         setBackButtonHovered(false);
                         setMenuButtonHovered(false);
                         setPlayButtonHovered(false);
                         document.body.style.cursor = 'auto';
                     }}
                     onClick={(e: ThreeEvent<PointerEvent>) => {
+                        if (!isFocused || renderedUI !== 'ui') return;
                         if (e.object.userData.isScreen && e.uv) {
                             const hit = checkVisionButtonHover(
                                 e.uv, isFocused, invertY,

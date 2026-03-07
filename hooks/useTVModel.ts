@@ -13,7 +13,6 @@ interface UseTVModelProps {
 export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uvRotation }: UseTVModelProps) {
     const { scene: model } = useGLTF(modelPath);
 
-    // Refs to expose to parent
     const screenTextureRef = useRef<THREE.CanvasTexture | null>(null);
     const screenMeshRef = useRef<THREE.Mesh | null>(null);
     const screenAspect = useRef(1.0);
@@ -24,7 +23,7 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
         const clone = model.clone();
         let screenFound = false;
 
-        // 1. Create shared texture for this instance
+        // 512x512 canvas texture for TV instance
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 512;
@@ -35,7 +34,6 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
         texture.wrapS = THREE.ClampToEdgeWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
         texture.repeat.set(1, 1);
-        texture.offset.set(0, 0);
         texture.rotation = uvRotation;
         texture.center.set(0.5, 0.5);
 
@@ -62,12 +60,12 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
                     child.material = new THREE.MeshBasicMaterial({
                         map: texture,
                         toneMapped: false,
-                        transparent: false,
+                        transparent: true,
                         opacity: 1,
                         side: THREE.DoubleSide,
                     });
                 } else {
-                    // PSX-style nearest-neighbor filtering
+                    // PSX-style filtering for non-screen meshes
                     if (child.material) {
                         const processMaterial = (mat: any) => {
                             if (mat.map) {
@@ -89,9 +87,7 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
             }
         });
 
-        if (!screenFound) {
-            console.warn(`WARNING: No screen found in ${modelPath}`);
-        }
+        if (!screenFound) console.warn(`No screen found in ${modelPath}`);
 
         clone.rotation.x = rotationX;
         clone.position.y = modelYOffset;
@@ -99,7 +95,7 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
         return clone;
     }, [model, modelPath, modelYOffset, rotationX, screenNames, uvRotation]);
 
-    // Resource tracking and cleanup to prevent WebGL memory leaks
+    // Resource cleanup
     useEffect(() => {
         return () => {
             if (screenTextureRef.current) {
@@ -108,11 +104,8 @@ export function useTVModel({ modelPath, screenNames, rotationX, modelYOffset, uv
             }
             if (screenMeshRef.current?.material) {
                 const mat = screenMeshRef.current.material;
-                if (Array.isArray(mat)) {
-                    mat.forEach(m => m.dispose());
-                } else {
-                    mat.dispose();
-                }
+                if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+                else mat.dispose();
             }
         };
     }, [clonedModel]);

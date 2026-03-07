@@ -11,62 +11,41 @@ export function Loader({ onFinished }: LoaderProps) {
     const [dots, setDots] = useState('');
     const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
-    // Enforce minimum 2-second "Boot Sequence"
+    // Minimum boot duration for aesthetics
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setMinTimeElapsed(true);
-        }, 2000);
+        const timer = setTimeout(() => setMinTimeElapsed(true), 2000);
         return () => clearTimeout(timer);
     }, []);
 
-    // Progress Logic
+    // Progress calculation with smooth interpolation
     useEffect(() => {
         const interval = setInterval(() => {
             setDisplayedProgress((old) => {
-                // 1. Calculate the "Real" target based on loading status
                 let realTarget = progress;
 
-                // If inactive, we need to decide if we are "Done" or "Waiting"
                 if (!active) {
-                    // If we have 0 progress and inactive, but we just mounted, 
-                    // it might be "waiting to start" or "cached/done".
-                    // We'll let the "minTime" decide.
                     if (realTarget === 0) realTarget = 0;
                     else if (realTarget === 100) realTarget = 100;
                 }
 
-                // 2. Enforce "Fake" Progress during Boot (0 -> 40% over 2s)
-                // If minTime hasn't passed, ensure we are AT LEAST moving towards 40%
                 let effectiveTarget = realTarget;
                 if (!minTimeElapsed) {
-                    // If real loading is fast, we still show the boot sequence.
-                    // We cap real progress at 99% until minTime passes to prevent premature finish.
                     effectiveTarget = Math.min(realTarget, 99);
-
-                    // Ensure we are at least simulating some activity
                     if (effectiveTarget < 40) effectiveTarget = 40;
                 }
 
-                // 3. Smooth Interpolation
                 if (old >= 100 && effectiveTarget >= 100) return 100;
 
                 const diff = effectiveTarget - old;
-                if (diff === 0) return old;
-
-                // Move constant speed for boot, faster for real load
-                const speed = minTimeElapsed ? 2.0 : 0.5;
-                const step = diff > 0 ? speed : -speed; // Allow backward correction if needed? No, usually forward.
-
-                // Only move forward
                 if (diff <= 0) return old;
 
-                return Math.min(effectiveTarget, old + step);
+                const speed = minTimeElapsed ? 2.0 : 0.5;
+                return Math.min(effectiveTarget, old + speed);
             });
         }, 20);
         return () => clearInterval(interval);
     }, [progress, active, minTimeElapsed]);
 
-    // Blinking dots animation
     useEffect(() => {
         const interval = setInterval(() => {
             setDots(d => d.length >= 3 ? '' : d + '.');
@@ -74,16 +53,9 @@ export function Loader({ onFinished }: LoaderProps) {
         return () => clearInterval(interval);
     }, []);
 
-    // Completion trigger
     useEffect(() => {
-        // Only finish if:
-        // 1. Visually at 100%
-        // 2. Minimum time has passed
-        // 3. (Optional) Actually finished loading (implied by 100%)
         if (displayedProgress >= 100 && minTimeElapsed) {
-            const timeout = setTimeout(() => {
-                onFinished();
-            }, 500);
+            const timeout = setTimeout(() => onFinished(), 500);
             return () => clearTimeout(timeout);
         }
     }, [displayedProgress, minTimeElapsed, onFinished]);
@@ -95,7 +67,7 @@ export function Loader({ onFinished }: LoaderProps) {
             left: 0,
             width: '100vw',
             height: '100vh',
-            background: '#050505', // Deep dark grey (Phosphor "Off" state), not pure black
+            background: '#050505',
             color: '#4af626',
             fontFamily: '"Courier New", Courier, monospace',
             display: 'flex',
@@ -108,7 +80,7 @@ export function Loader({ onFinished }: LoaderProps) {
             opacity: displayedProgress >= 100 ? 0 : 1,
             overflow: 'hidden'
         }}>
-            {/* Screen Container with Curvature */}
+            {/* Screen Container */}
             <div style={{
                 position: 'relative',
                 width: '100%',
@@ -117,14 +89,11 @@ export function Loader({ onFinished }: LoaderProps) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '2rem',
-                // Simulate the physical screen curvature
                 background: '#111',
-                boxShadow: 'inset 0 0 180px rgba(0,0,0,1)', // Deep tube shadow
+                boxShadow: 'inset 0 0 180px rgba(0,0,0,1)',
             }}>
 
-                {/* --- CSS CRT EMULATION LAYERS --- */}
-
-                {/* 1. CURVATURE / VIGNETTE SHADOW */}
+                {/* Vignette */}
                 <div style={{
                     position: 'absolute',
                     top: 0,
@@ -136,7 +105,7 @@ export function Loader({ onFinished }: LoaderProps) {
                     pointerEvents: 'none'
                 }} />
 
-                {/* 2. SCANLINES */}
+                {/* Scanlines */}
                 <div style={{
                     position: 'absolute',
                     top: 0,
@@ -155,7 +124,7 @@ export function Loader({ onFinished }: LoaderProps) {
                     pointerEvents: 'none'
                 }} />
 
-                {/* 3. FLICKER */}
+                {/* Flicker layer */}
                 <div style={{
                     position: 'absolute',
                     top: 0,
@@ -176,7 +145,7 @@ export function Loader({ onFinished }: LoaderProps) {
                     }
                 `}</style>
 
-                {/* --- CONTENT (Below CRT Layers) --- */}
+                {/* Content */}
                 <div style={{
                     width: '100%',
                     maxWidth: '600px',

@@ -5,7 +5,7 @@ export interface TelevisionProps {
     rotation?: [number, number, number];
     scale?: number;
     rotationX?: number;
-    theme?: 'classic' | 'toxic' | 'blood' | 'sulfur' | 'toon' | 'mobile' | 'amber' | 'cyan' | 'magenta' | 'terminal' | 'glitch' | 'holo' | 'hacker' | 'noir' | 'velvet' | 'gold';
+    theme?: 'classic' | 'toxic' | 'blood' | 'amber' | 'glitch' | 'holo' | 'hacker' | 'noir' | 'velvet' | 'gold' | 'sulfur' | 'toon' | 'cyan' | 'magenta' | 'terminal' | 'void' | 'mobile';
     invertY?: boolean;
     gazeOffset?: { x: number; y: number };
     uvRotation?: number;
@@ -62,7 +62,7 @@ export const THEMES: Record<NonNullable<TelevisionProps['theme']>, ThemeColors> 
         lookRange: 32,
         scleraColor: '#ffffff',
         textColor: '#ffffff',
-        highlightColor: '#ffffff'
+        highlightColor: '#00ff44'
     },
     blood: {
         bgColor: '#200000',
@@ -88,7 +88,7 @@ export const THEMES: Record<NonNullable<TelevisionProps['theme']>, ThemeColors> 
         lookRange: 26,
         scleraColor: '#ffffff',
         textColor: '#ffff44',
-        highlightColor: '#aaaaff'
+        highlightColor: '#ffff44'
     },
     toon: {
         bgColor: '#151515',
@@ -101,20 +101,7 @@ export const THEMES: Record<NonNullable<TelevisionProps['theme']>, ThemeColors> 
         lookRange: 26,
         scleraColor: '#ffffff',
         textColor: '#ffffff',
-        highlightColor: '#ffffff'
-    },
-    mobile: {
-        bgColor: '#00051a',
-        baseColor: 'rgba(0, 20, 60, 0.3)',
-        glowCenter: 'rgba(0, 100, 255, 0.2)',
-        irisColor: '#0088ff',
-        lightColor: '#00aaff',
-        lightIntensity: 6.0,
-        vignetteColor: 'rgba(0, 0, 20, 0.95)',
-        lookRange: 15,
-        scleraColor: 'rgba(0, 100, 255, 0.4)',
-        textColor: '#00aaff',
-        highlightColor: '#ffffff'
+        highlightColor: '#dcdcdc'
     },
     amber: {
         bgColor: '#0a0500',
@@ -129,45 +116,6 @@ export const THEMES: Record<NonNullable<TelevisionProps['theme']>, ThemeColors> 
         textColor: '#ffcc00',
         highlightColor: '#ffaa44'
     },
-    cyan: {
-        bgColor: '#000a0f',
-        baseColor: 'rgba(0, 30, 50, 0.3)',
-        glowCenter: 'rgba(0, 238, 255, 0.1)',
-        irisColor: '#00eeff',
-        lightColor: '#00eeff',
-        lightIntensity: 7.0,
-        vignetteColor: 'rgba(0, 8, 15, 0.95)',
-        lookRange: 26,
-        scleraColor: '#ffffff',
-        textColor: '#00aaff',
-        highlightColor: '#00ffff'
-    },
-    magenta: {
-        bgColor: '#0f0005',
-        baseColor: 'rgba(50, 0, 20, 0.3)',
-        glowCenter: 'rgba(255, 0, 119, 0.1)',
-        irisColor: '#ff0077',
-        lightColor: '#ff0077',
-        lightIntensity: 7.0,
-        vignetteColor: 'rgba(15, 0, 8, 0.95)',
-        lookRange: 26,
-        scleraColor: '#ffffff',
-        textColor: '#ff3399',
-        highlightColor: '#ff00cc'
-    },
-    terminal: {
-        bgColor: '#000a02',
-        baseColor: 'rgba(0, 30, 5, 0.3)',
-        glowCenter: 'rgba(0, 255, 68, 0.12)',
-        irisColor: '#00ff44',
-        lightColor: '#00ff44',
-        lightIntensity: 8.0,
-        vignetteColor: 'rgba(0, 8, 0, 0.95)',
-        lookRange: 30,
-        scleraColor: '#ffffff',
-        textColor: '#33ff33',
-        highlightColor: '#00ff00'
-    },
     glitch: {
         bgColor: '#050000',
         baseColor: 'rgba(30, 0, 0, 0.3)',
@@ -180,6 +128,58 @@ export const THEMES: Record<NonNullable<TelevisionProps['theme']>, ThemeColors> 
         scleraColor: '#ffffff',
         textColor: '#ff3333',
         highlightColor: '#ff0000'
+    },
+    cyan: {
+        bgColor: '#000a0f',
+        baseColor: 'rgba(0, 30, 50, 0.3)',
+        glowCenter: 'rgba(0, 238, 255, 0.1)',
+        irisColor: '#00eeff',
+        lightColor: '#00ccff',
+        lightIntensity: 6.0,
+        vignetteColor: 'rgba(0, 8, 15, 0.95)',
+        lookRange: 26,
+        scleraColor: '#ffffff',
+        textColor: '#00aaff',
+        highlightColor: '#00ffff'
+    },
+    magenta: {
+        bgColor: '#0f0005',
+        baseColor: 'rgba(50, 0, 20, 0.3)',
+        glowCenter: 'rgba(255, 0, 119, 0.1)',
+        irisColor: '#ff0077',
+        lightColor: '#ff00cc',
+        lightIntensity: 6.0,
+        vignetteColor: 'rgba(15, 0, 8, 0.95)',
+        lookRange: 26,
+        scleraColor: '#ffffff',
+        textColor: '#ff3399',
+        highlightColor: '#ff00cc'
+    },
+    terminal: {
+        bgColor: '#000a02',
+        baseColor: 'rgba(0, 30, 5, 0.3)',
+        glowCenter: 'rgba(0, 255, 68, 0.12)',
+        irisColor: '#00ff44',
+        lightColor: '#00cc44',
+        lightIntensity: 6.0,
+        vignetteColor: 'rgba(0, 8, 0, 0.95)',
+        lookRange: 26,
+        scleraColor: '#ffffff',
+        textColor: '#33ff33',
+        highlightColor: '#00ff00'
+    },
+    void: {
+        bgColor: '#150020',
+        baseColor: 'rgba(30, 0, 40, 0.3)',
+        glowCenter: 'rgba(100, 0, 255, 0.1)',
+        irisColor: '#9900ff',
+        lightColor: '#a000ff',
+        lightIntensity: 7.0,
+        vignetteColor: 'rgba(10, 0, 20, 0.95)',
+        lookRange: 26,
+        scleraColor: '#ffffff',
+        textColor: '#ffffff',
+        highlightColor: '#9900ff'
     },
 
     holo: {
@@ -248,5 +248,19 @@ export const THEMES: Record<NonNullable<TelevisionProps['theme']>, ThemeColors> 
         scleraColor: '#ffffff',
         textColor: '#ffd700',
         highlightColor: '#ffaa00'
+    },
+    mobile: {
+        bgColor: '#000000',
+        baseColor: 'rgba(0, 50, 20, 0.3)',
+        glowCenter: 'rgba(0, 255, 100, 0.1)',
+        irisColor: '#00ff66',
+        lightColor: '#00ff66',
+        lightIntensity: 5.0,
+        vignetteColor: 'rgba(0, 0, 0, 0.9)',
+        lookRange: 15,
+        scleraColor: '#ffffff',
+        isHologram: true,
+        textColor: '#00ff66',
+        highlightColor: '#00ff66'
     }
 };

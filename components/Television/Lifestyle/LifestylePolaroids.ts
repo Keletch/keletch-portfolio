@@ -33,7 +33,7 @@ const rawPhotos = [
 ];
 
 // Define 5 distinct "zones" on the screen so consecutive photos never overlap fully
-const ZONES = [
+export const ZONES = [
     { x: -0.25, y: -0.20 }, // Top Left
     { x: 0.25, y: 0.20 }, // Bottom Right
     { x: -0.30, y: 0.15 }, // Bottom Left

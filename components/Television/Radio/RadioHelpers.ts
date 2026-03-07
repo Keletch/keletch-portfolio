@@ -17,11 +17,12 @@ export function drawPlayPauseButton(
     color: string = '#ffffff'
 ) {
     const p = hoverProgress;
-    const m = morphProgress; // 0 = play (triangle), 1 = pause (two bars)
+    const m = morphProgress; // play -> pause morph
 
     const r = 8 + (5 * p);
 
-    ctx.globalAlpha = 0.8;
+    const masterAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = 0.8 * masterAlpha;
 
     const startK = 0.77;
     const endK = 0.25;
@@ -121,7 +122,7 @@ export function drawPlayPauseButton(
         }
     }
 
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = masterAlpha;
 }
 
 export function drawNextButton(
@@ -134,7 +135,8 @@ export function drawNextButton(
     const p = hoverProgress;
     const r = 8 + (5 * p);
 
-    ctx.globalAlpha = 0.8;
+    const masterAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = 0.8 * masterAlpha;
 
     let jx = 0;
     let jy = 0;
@@ -146,8 +148,6 @@ export function drawNextButton(
     const cy = btnY + jy;
 
     const baseR = r;
-    const circleK = 0.552284749831;
-
     const chevTip = { x: baseR, y: 0 };
     const chevTop = { x: -baseR * 0.5, y: -baseR };
     const chevBot = { x: -baseR * 0.5, y: baseR };
@@ -163,7 +163,7 @@ export function drawNextButton(
     const v2 = { x: circBot.x * (1 - p) + chevBot.x * p, y: circBot.y * (1 - p) + chevBot.y * p };
     const v3 = { x: circBack.x * (1 - p) + chevInner.x * p, y: circBack.y * (1 - p) + chevInner.y * p };
 
-    const tanLen = (baseR * circleK) * (1 - p);
+    const tanLen = (baseR * 0.55228475) * (1 - p);
 
     ctx.fillStyle = color;
     ctx.globalCompositeOperation = 'source-over';
@@ -191,7 +191,7 @@ export function drawNextButton(
         ctx.roundRect(cx + currentBarX, cy - currentBarHeight / 2, barWidth, currentBarHeight, 2);
         ctx.fill();
     }
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = masterAlpha;
 }
 
 export function drawProgressBar(
@@ -214,23 +214,20 @@ export function drawProgressBar(
     const startX = x + (Math.random() - 0.5) * 2;
     const startY = y + (Math.random() - 0.5) * 2;
 
-    // Draw Song Name
+    // Track progress bar and song title
     ctx.font = 'bold 20px "Courier New", monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(songName, startX, startY + 10);
 
-    // Draw Line (Track)
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(startX + width, startY);
     ctx.stroke();
 
-    // Draw Dot (Thumb)
     const cx = startX + (width * Math.max(0, Math.min(1, progress)));
 
-    // Glitch effect on dot
     const dotJitterX = (Math.random() - 0.5) * 4;
     const dotJitterY = (Math.random() - 0.5) * 4;
 
@@ -238,7 +235,6 @@ export function drawProgressBar(
     ctx.arc(cx + dotJitterX, startY + dotJitterY, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // Sometimes draw a second "ghost" dot very faint
     if (Math.random() > 0.7) {
         ctx.globalAlpha = opacity * 0.3;
         ctx.beginPath();
@@ -249,6 +245,7 @@ export function drawProgressBar(
     ctx.restore();
 }
 
+// Radio track list rendering
 export function drawTrackList(
     ctx: CanvasRenderingContext2D,
     tracks: { displayName: string; path: string }[],
@@ -272,7 +269,6 @@ export function drawTrackList(
     ctx.textBaseline = 'middle';
     ctx.font = 'bold 24px "Courier New", monospace';
 
-    // Clip area
     ctx.beginPath();
     ctx.rect(listX, listY, listWidth, listHeight);
     ctx.clip();
@@ -286,32 +282,25 @@ export function drawTrackList(
         const cleanName = track.displayName;
         const y = listY + (i * itemHeight) - scrollTop + (itemHeight / 2);
 
-        // Highlight if playing or hovered
-        // currentSongName passed from Radio is already cleaned
         const isPlaying = cleanName === currentSongName;
         const isHovered = i === hoveredIndex;
 
-        ctx.fillStyle = color; // Always green as requested
+        ctx.fillStyle = color;
 
         let textX = listX + 10;
         let textY = y;
 
         if (isPlaying || isHovered) {
-            // Jitter effect
             textX += (Math.random() - 0.5) * 4;
             textY += (Math.random() - 0.5) * 4;
         }
 
-        if (isPlaying) {
-            ctx.fillText('> ' + cleanName, textX, textY);
-        } else {
-            ctx.fillText(cleanName, textX, textY);
-        }
+        ctx.fillText(isPlaying ? `> ${cleanName}` : cleanName, textX, textY);
     }
 
     ctx.restore();
 
-    // Scrollbar
+    // Scrollbar logic
     const totalHeight = tracks.length * itemHeight;
     if (totalHeight > listHeight) {
         const scrollBarHeight = (listHeight / totalHeight) * listHeight;
@@ -343,21 +332,17 @@ export function drawReactiveCircle(
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
 
+    // 3D Audio-reactive visualization
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     analyser.getByteFrequencyData(dataArray);
 
-    // Separate Bass and Mid-Highs
-    // Bass (Low frequencies: index 0-10) for Pulse
     let bassSum = 0;
     const bassEnd = 10;
-    for (let i = 0; i < bassEnd; i++) {
-        bassSum += dataArray[i];
-    }
+    for (let i = 0; i < bassEnd; i++) bassSum += dataArray[i];
     const bassAvg = (bassSum / bassEnd) / 255;
     const pulse = 1 + Math.pow(bassAvg, 2.2) * 1.4;
 
-    // 3D Ring
     const segments = 120;
     const ringPoints: { x: number, y: number, z: number }[] = [];
 

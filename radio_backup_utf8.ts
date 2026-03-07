@@ -1,15 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
-import { InteractiveTVWrapper } from '@/components/Scene/InteractiveTVWrapper';
+﻿import { useState, useEffect, useRef } from 'react';
+import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import Radio from './Radio';
 import Speaker from '@/components/Scene/Speaker';
 import { useGLTF } from '@react-three/drei';
-import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 interface RadioSectionProps {
     viewState: string;
     onNavigate: (state: string) => void;
-    accentColor?: string;
-    themeOverride?: { bgColor: string; baseColor: string; glowCenter: string; vignetteColor: string; irisColor: string; scleraColor: string };
 }
 
 const RADIO_TRACKS = [
@@ -17,14 +14,13 @@ const RADIO_TRACKS = [
     '/music/Mashwina.m4a',
     '/music/Mystery_Tape_01.m4a',
     '/music/Spore (GoldTrue).m4a',
-    '/music/Thombstone_of_a_Ghost_Garden.m4a',
-    '/music/LOTUS FLOWER BY KRAKATOA.m4a',
+    '/music/Thombstone_of_a_Ghost_Garden.m4a'
 ];
 
 const RADIO_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'radioscreen'];
 
 const radioCtrl = {
-    pos: [1.50, -0.45, 0.2] as [number, number, number],
+    pos: [1.50, -0.45, 0] as [number, number, number],
     rot: [0, 0, 0] as [number, number, number],
     size: [0.51, 0.14, 0.35] as [number, number, number],
     offset: [-0.03, 0.15, 0] as [number, number, number]
@@ -44,31 +40,19 @@ const rightSpkCtrl = {
     offset: [0.02, 1.60, 0.08] as [number, number, number]
 };
 
-export default function RadioSection({ viewState, onNavigate, accentColor, themeOverride }: RadioSectionProps) {
+export default function RadioSection({ viewState, onNavigate }: RadioSectionProps) {
     const { scene: leftSpeakerModel } = useGLTF('/models/leftSpeaker.glb');
     const { scene: rightSpeakerModel } = useGLTF('/models/rightSpeaker.glb');
 
-    const musicVolume = useSettingsStore(state => state.musicVolume);
-
     const [radioStatus, setRadioStatus] = useState<'playing' | 'paused' | 'stopped'>('stopped');
     const [currentSongName, setCurrentSongName] = useState('');
-    // Optimization: Use Ref for progress to avoid 60fps React re-renders in RadioSection and children
-    const radioProgressRef = useRef(0);
+    const [radioProgress, setRadioProgress] = useState(0);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const resultAnalyserRef = useRef<AnalyserNode | null>(null);
     const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-    const gainNodeRef = useRef<GainNode | null>(null);
     const autoplayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    useEffect(() => {
-        if (gainNodeRef.current) {
-            gainNodeRef.current.gain.setTargetAtTime(musicVolume, audioContextRef.current?.currentTime || 0, 0.05);
-        } else if (audioRef.current) {
-            audioRef.current.volume = Math.min(1.0, musicVolume);
-        }
-    }, [musicVolume]);
 
     // Progress Loop
     useEffect(() => {
@@ -76,7 +60,7 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
         const update = () => {
             if (audioRef.current && radioStatus === 'playing') {
                 const prog = audioRef.current.currentTime / (audioRef.current.duration || 1);
-                radioProgressRef.current = prog;
+                setRadioProgress(prog);
             }
             frame = requestAnimationFrame(update);
         };
@@ -94,12 +78,11 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
 
         if (!audioRef.current) {
             audioRef.current = new Audio();
-            audioRef.current.volume = musicVolume;
         }
 
         const setupAudio = (audio: HTMLAudioElement) => {
             audio.onended = () => {
-                radioProgressRef.current = 1;
+                setRadioProgress(1);
                 const currentIndex = RADIO_TRACKS.indexOf(trackPath);
                 const nextIndex = currentIndex + 1;
 
@@ -109,31 +92,23 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
                     }, 2000);
                 } else {
                     setRadioStatus('stopped');
-                    radioProgressRef.current = 0;
+                    setRadioProgress(0);
                     setCurrentSongName('');
                 }
             };
 
             if (!audioContextRef.current) {
-                audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
             }
 
             if (audioContextRef.current && !sourceNodeRef.current) {
                 const analyser = audioContextRef.current.createAnalyser();
-                const gainNode = audioContextRef.current.createGain();
                 analyser.fftSize = 256;
-                gainNode.gain.value = musicVolume;
-
                 const source = audioContextRef.current.createMediaElementSource(audio);
                 source.connect(analyser);
-                analyser.connect(gainNode);
-                gainNode.connect(audioContextRef.current.destination);
-
+                analyser.connect(audioContextRef.current.destination);
                 sourceNodeRef.current = source;
                 resultAnalyserRef.current = analyser;
-                gainNodeRef.current = gainNode;
-
-                audio.volume = 1.0;
             }
         };
 
@@ -147,7 +122,7 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
         audioRef.current.play();
 
         setCurrentSongName(trackName);
-        radioProgressRef.current = 0;
+        setRadioProgress(0);
         setRadioStatus('playing');
     };
 
@@ -174,7 +149,7 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
             audioRef.current.currentTime = 0;
         }
         setRadioStatus('stopped');
-        radioProgressRef.current = 0;
+        setRadioProgress(0);
         setCurrentSongName('');
     };
 
@@ -199,29 +174,15 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
         if (audioRef.current && radioStatus !== 'stopped') {
             const duration = audioRef.current.duration || 1;
             audioRef.current.currentTime = duration * progress;
-            radioProgressRef.current = progress;
+            setRadioProgress(progress);
         }
     };
 
     return (
         <group>
             {/* RADIO BODY */}
-            <InteractiveTVWrapper
-                tvPosition={{ x: radioCtrl.pos[0], y: radioCtrl.pos[1], z: radioCtrl.pos[2] }}
-                colliderSize={radioCtrl.size}
-                colliderOffset={radioCtrl.offset}
-                density={25}
-                viewState={viewState}
-                focusStateName="radio_focus"
-                mass={20}
-                linearDamping={0.8}
-                angularDamping={0.8}
-                springStiffness={80}
-                springDamping={3.0}
-                camPosOffset={[0, 0.45, 1.8]}
-                camLookAtOffset={[0, 0.25, 0]}
-                resetDelay={1.90}
-            >
+            <RigidBody colliders={false} enabledRotations={[true, false, true]} ccd={true} linearDamping={0.5} angularDamping={0.5} position={radioCtrl.pos} rotation={radioCtrl.rot}>
+                <CuboidCollider args={radioCtrl.size} position={radioCtrl.offset} friction={0.5} restitution={0.1} />
                 <Radio
                     modelPath="/models/radio.glb"
                     screenNames={RADIO_SCREEN_NAMES}
@@ -237,7 +198,7 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
                     onStopClick={handleStop}
                     status={radioStatus}
                     currentSongName={currentSongName}
-                    currentProgress={radioProgressRef}
+                    currentProgress={radioProgress}
                     onSeek={handleSeek}
                     showMenuButton={true}
                     menuButtonPosition={{ x: -200, y: -190 }}
@@ -246,10 +207,8 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
                     tracks={RADIO_TRACKS}
                     onSelectTrack={playTrack}
                     audioAnalyser={resultAnalyserRef.current || undefined}
-                    accentColor={accentColor}
-                    themeOverride={themeOverride}
                 />
-            </InteractiveTVWrapper>
+            </RigidBody>
 
             {/* LEFT SPEAKER */}
             <Speaker
@@ -260,7 +219,6 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
                 colliderOffset={leftSpkCtrl.offset}
                 analyser={resultAnalyserRef.current || undefined}
                 isPlaying={radioStatus === 'playing'}
-                resetDelay={1.95}
             />
 
             {/* RIGHT SPEAKER */}
@@ -272,7 +230,6 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
                 colliderOffset={rightSpkCtrl.offset}
                 analyser={resultAnalyserRef.current || undefined}
                 isPlaying={radioStatus === 'playing'}
-                resetDelay={2.10}
             />
         </group>
     );

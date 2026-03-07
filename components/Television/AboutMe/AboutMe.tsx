@@ -2,7 +2,8 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AboutMeProps, ABOUTME_THEME, ABOUTME_BUTTON_CONFIG } from './AboutMeTypes';
-import { drawPixelEye, drawConcentricCircles, draw3DCube, drawDNAHelix, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave, paginateStory } from './AboutMeHelpers';
+import { THEMES } from '../Types';
+import { drawPixelEye, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave, paginateStory, drawNeuralMesh, drawLiquidMetal, drawHyperPulse, drawAudioWaveform, drawOrbitalRings } from './AboutMeHelpers';
 
 interface ThemeOverride {
     bgColor: string;
@@ -23,6 +24,7 @@ import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 
 const DEFAULT_SCREEN_NAMES = ['screen'];
+const ABOUT_FIGURES = ['neural_mesh', 'architecture', 'hyper_pulse', 'audio_waveform', 'orbital_rings'];
 
 export default function AboutMeTV({
     modelPath,
@@ -53,7 +55,9 @@ export default function AboutMeTV({
     enableStoryMode = false,
     themeOverride
 }: AboutMeProps & { themeOverride?: ThemeOverride }) {
-    const activeTheme = themeOverride ? { ...ABOUTME_THEME, ...themeOverride } : ABOUTME_THEME;
+    const themeBasedDefaults = THEMES[theme as keyof typeof THEMES] || ABOUTME_THEME;
+    const activeTheme = themeOverride ? { ...themeBasedDefaults, ...themeOverride } : themeBasedDefaults;
+    const buttonColor = theme === 'classic' ? '#ffffff' : activeTheme.highlightColor;
     const groupRef = useRef<THREE.Group>(null);
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });
@@ -61,15 +65,23 @@ export default function AboutMeTV({
     const [backButtonHovered, setBackButtonHovered] = useState(false);
     const [menuButtonHovered, setMenuButtonHovered] = useState(false);
 
-    // Reset hover states and cursor when losing focus to prevent stuck visuals on re-entry
+    // Reset UI state when losing focus
+    const [delayedUI, setDelayedUI] = useState(false);
+
     useEffect(() => {
-        if (!isFocused) {
+        if (isFocused) {
+            const t = setTimeout(() => setDelayedUI(true), 900);
+            return () => clearTimeout(t);
+        } else {
+            setDelayedUI(false);
             setStartButtonHovered(false);
             setBackButtonHovered(false);
             setMenuButtonHovered(false);
-            document.body.style.cursor = 'auto'; // Reset global cursor
+            document.body.style.cursor = 'auto';
         }
     }, [isFocused]);
+
+    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : null, 0);
 
     const paginationResult = useMemo(() => {
         if (!enableStoryMode || !storyContent) {
@@ -97,6 +109,13 @@ export default function AboutMeTV({
         storyContent: paginationResult.pages,
         enableStoryMode
     });
+
+    // Reset story if focus is lost while playing
+    useEffect(() => {
+        if (!isFocused && storyMode) {
+            stopStory();
+        }
+    }, [isFocused, storyMode, stopStory]);
 
     const lastCharCountRef = useRef(0);
 
@@ -141,50 +160,38 @@ export default function AboutMeTV({
     });
 
 
-
+    // UV-based interaction check for HUD buttons
     const checkButtonHover = (uv: THREE.Vector2): 'play' | 'back' | 'menu' | 'story_text' | null => {
-        if (!isFocused) return null;
+        if (!isFocused || renderedUI !== 'ui') return null;
 
         const px = uv.x * 512;
         const py = (1 - uv.y) * 512;
         const dx = px - 256;
         let dy = py - 256;
 
-        if (invertY) {
-            dy = -dy;
-        }
+        if (invertY) dy = -dy;
 
         if (showStartButton) {
             const btnX = startButtonPosition ? startButtonPosition.x : ABOUTME_BUTTON_CONFIG.PLAY.x;
             const btnY = startButtonPosition ? startButtonPosition.y : ABOUTME_BUTTON_CONFIG.PLAY.y;
-            const distPlay = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distPlay < ABOUTME_BUTTON_CONFIG.PLAY.radius) return 'play';
+            if (Math.sqrt((dx - btnX) ** 2 + (dy - btnY) ** 2) < ABOUTME_BUTTON_CONFIG.PLAY.radius) return 'play';
         }
 
         if (showBackButton) {
             const btnX = backButtonPosition ? backButtonPosition.x : ABOUTME_BUTTON_CONFIG.BACK.x;
             const btnY = backButtonPosition ? backButtonPosition.y : ABOUTME_BUTTON_CONFIG.BACK.y;
-            const distBack = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distBack < ABOUTME_BUTTON_CONFIG.BACK.radius) return 'back';
+            if (Math.sqrt((dx - btnX) ** 2 + (dy - btnY) ** 2) < ABOUTME_BUTTON_CONFIG.BACK.radius) return 'back';
         }
 
         if (showMenuButton) {
             const btnX = menuButtonPosition ? menuButtonPosition.x : ABOUTME_BUTTON_CONFIG.MENU.x;
             const btnY = menuButtonPosition ? menuButtonPosition.y : ABOUTME_BUTTON_CONFIG.MENU.y;
-            const distMenu = Math.sqrt((dx - btnX) * (dx - btnX) + (dy - btnY) * (dy - btnY));
-            if (distMenu < ABOUTME_BUTTON_CONFIG.MENU.radius) return 'menu';
+            if (Math.sqrt((dx - btnX) ** 2 + (dy - btnY) ** 2) < ABOUTME_BUTTON_CONFIG.MENU.radius) return 'menu';
         }
 
         if (storyMode) {
-            const boxW = 410;
-            const boxH = 86;
-            const boxTopY = 55;
-            const halfW = boxW / 2;
-            if (dx >= -halfW && dx <= halfW) {
-                if (dy >= boxTopY && dy <= boxTopY + boxH) {
-                    return 'story_text';
-                }
-            }
+            const halfW = 410 / 2;
+            if (dx >= -halfW && dx <= halfW && dy >= 55 && dy <= 55 + 86) return 'story_text';
         }
 
         return null;
@@ -195,7 +202,7 @@ export default function AboutMeTV({
     useFrame((state, delta) => {
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
-            if (dist > 15) return;
+            if (dist > 50) return;
         }
 
         const dt = delta;
@@ -269,6 +276,7 @@ export default function AboutMeTV({
                 const h = canvas.height;
                 const time = state.clock.elapsedTime;
 
+                // Background and backlight rendering
                 ctx.fillStyle = activeTheme.bgColor;
                 ctx.fillRect(0, 0, w, h);
                 const backlight = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
@@ -283,15 +291,21 @@ export default function AboutMeTV({
                     ctx.save();
                     ctx.globalAlpha = alpha;
 
-                    if (type === 'circles') {
+                    if (type === 'neural_mesh') {
                         ctx.translate(w / 2, h / 2);
-                        drawConcentricCircles(ctx, time);
-                    } else if (type === 'cube') {
+                        drawNeuralMesh(ctx, time);
+                    } else if (type === 'liquid_metal') {
                         ctx.translate(w / 2, h / 2);
-                        draw3DCube(ctx, time);
-                    } else if (type === 'dna') {
+                        drawLiquidMetal(ctx, time);
+                    } else if (type === 'hyper_pulse') {
                         ctx.translate(w / 2, h / 2);
-                        drawDNAHelix(ctx, time);
+                        drawHyperPulse(ctx, time);
+                    } else if (type === 'audio_waveform') {
+                        ctx.translate(w / 2, h / 2);
+                        drawAudioWaveform(ctx, time);
+                    } else if (type === 'orbital_rings') {
+                        ctx.translate(w / 2, h / 2);
+                        drawOrbitalRings(ctx, time);
                     } else {
                         // Default Eye
                         const scleraMaxOffsetX = 100;
@@ -331,6 +345,7 @@ export default function AboutMeTV({
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, 0, w, h);
 
+                // Story Text Rendering
                 const storyOpacity = storyOpacityRef.current;
                 const storyStepped = Math.floor(storyOpacity * steps) / steps;
 
@@ -345,7 +360,7 @@ export default function AboutMeTV({
                     const maxWidth = 380;
                     const lineHeight = 28;
                     const padding = 15;
-                    const boxHeight = 142; // Expanded height for 4 lines
+                    const boxHeight = 142;
                     const totalWidth = maxWidth + (padding * 2);
 
                     ctx.globalAlpha = storyStepped;
@@ -353,7 +368,6 @@ export default function AboutMeTV({
                     ctx.lineWidth = 2;
                     ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
 
-                    // --- Text Rendering Logic (Time-based) ---
                     const fullText = paginationResult.pages[currentParagraph] || '';
                     if (fullText) {
                         let charsToShow = 0;
@@ -364,14 +378,11 @@ export default function AboutMeTV({
                             const timeSinceStart = (Date.now() - typingStartTime) / 1000;
                             charsToShow = Math.floor(timeSinceStart / charSpeed);
 
-                            if (charsToShow >= fullText.length) {
-                                signalTypingFinished();
-                            }
+                            if (charsToShow >= fullText.length) signalTypingFinished();
                         }
 
                         charsToShow = Math.min(charsToShow, fullText.length);
 
-                        // Typing sound
                         if (charsToShow > lastCharCountRef.current) {
                             playTypewriterSound();
                             lastCharCountRef.current = charsToShow;
@@ -384,9 +395,7 @@ export default function AboutMeTV({
                         ctx.textAlign = 'left';
                         ctx.textBaseline = 'top';
 
-                        const visibleLines = currentVisibleText.split('\n');
-
-                        visibleLines.forEach((txt, i) => {
+                        currentVisibleText.split('\n').forEach((txt, i) => {
                             const baseTextColor = activeTheme.textColor || '#ffffff';
                             // Parse hex to rgb for alpha
                             const r = parseInt(baseTextColor.slice(1, 3), 16);
@@ -397,58 +406,72 @@ export default function AboutMeTV({
                         });
                     }
 
-                    if (waitingForInput) {
-                        if (Math.floor(state.clock.elapsedTime * 2) % 2 === 0) {
-                            ctx.font = '20px "Courier New", monospace';
-                            const arrowColor = activeTheme.highlightColor || '#ffffff';
-                            const r = parseInt(arrowColor.slice(1, 3), 16);
-                            const g = parseInt(arrowColor.slice(3, 5), 16);
-                            const b = parseInt(arrowColor.slice(5, 7), 16);
-                            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${storyStepped})`;
-                            ctx.fillText('▼', (maxWidth / 2) - 15, textBoxY + (lineHeight * 1.5));
+                    if (waitingForInput && Math.floor(state.clock.elapsedTime * 2) % 2 === 0) {
+                        ctx.font = '20px "Courier New", monospace';
+                        const arrowColor = activeTheme.highlightColor || '#ffffff';
+                        const r = parseInt(arrowColor.slice(1, 3), 16);
+                        const g = parseInt(arrowColor.slice(3, 5), 16);
+                        const b = parseInt(arrowColor.slice(5, 7), 16);
+                        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${storyStepped})`;
+                        ctx.fillText('▼', (maxWidth / 2) - 15, textBoxY + (lineHeight * 1.5));
+                    }
+                    ctx.restore();
+                }
+
+                // UI Overlay (Focused Text & Buttons)
+                const uiOpacityVal = uiOpacityRef.current;
+                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
+
+                if (uiSteppedOpacity > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = uiSteppedOpacity;
+
+                    // Focused Text
+                    if (focusedText) {
+                        ctx.save();
+
+                        const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
+                        const titleAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + titleJitter));
+                        ctx.globalAlpha = titleAlpha;
+
+                        ctx.translate(w / 2, h / 2);
+                        if (invertY) {
+                            ctx.rotate(Math.PI);
+                            ctx.scale(-1, 1);
                         }
-                    }
-                    ctx.restore();
-                }
+                        const jitterX = (Math.random() - 0.5) * 4;
+                        const jitterY = (Math.random() - 0.5) * 4;
+                        ctx.font = '900 50px "Courier New", monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'top';
+                        const textY = -h / 2 + textYOffset;
+                        const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
+                        const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
 
-                // Focused Text
-                if (isFocused && focusedText) {
+                        ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
+                        ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
+
+                        ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
+                        ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
+
+                        ctx.fillStyle = activeTheme.textColor || '#ffffff';
+                        if (Math.random() > 0.1) {
+                            ctx.fillText(focusedText, jitterX, textY + jitterY);
+                        }
+                        ctx.restore();
+                    }
+
+                    // Buttons
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
                         ctx.rotate(Math.PI);
                         ctx.scale(-1, 1);
                     }
-                    const jitterX = (Math.random() - 0.5) * 4;
-                    const jitterY = (Math.random() - 0.5) * 4;
-                    ctx.font = '900 50px "Courier New", monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-                    const textY = -h / 2 + textYOffset;
-                    const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                    const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
 
-                    ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
-                    ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
-
-                    ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
-                    ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-
-                    ctx.fillStyle = activeTheme.textColor || '#ffffff';
-                    if (Math.random() > 0.1) {
-                        ctx.fillText(focusedText, jitterX, textY + jitterY);
-                    }
-                    ctx.restore();
-                }
-
-                // Buttons
-                if (isFocused) {
-                    ctx.save();
-                    ctx.translate(w / 2, h / 2);
-                    if (invertY) {
-                        ctx.rotate(Math.PI);
-                        ctx.scale(-1, 1);
-                    }
+                    const btnJitterBase = Math.sin(state.clock.elapsedTime * 12 + 5) > 0.8 ? (Math.random() - 0.5) * 0.3 : 0;
+                    const btnBaseAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + btnJitterBase));
+                    ctx.globalAlpha = btnBaseAlpha;
 
                     if (showStartButton) {
                         const btnX = startButtonPosition ? startButtonPosition.x : ABOUTME_BUTTON_CONFIG.PLAY.x;
@@ -460,14 +483,12 @@ export default function AboutMeTV({
                             if (typeof screenTextureRef.current.userData.hoverAnim === 'undefined') screenTextureRef.current.userData.hoverAnim = 0;
                             const target = isHover ? 1 : 0;
                             screenTextureRef.current.userData.hoverAnim += (target - screenTextureRef.current.userData.hoverAnim) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnim) < 0.001) screenTextureRef.current.userData.hoverAnim = 0;
                             hoverProgress = screenTextureRef.current.userData.hoverAnim;
                         }
-                        const morphTarget = storyMode ? 1 : 0; // Morph only on storyMode
+                        const morphTarget = storyMode ? 1 : 0;
                         morphProgressRef.current += (morphTarget - morphProgressRef.current) * 0.15;
-                        if (Math.abs(morphProgressRef.current - morphTarget) < 0.001) morphProgressRef.current = morphTarget;
-                        drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, '#ffffff');
-                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current, '#ffffff');
+                        drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, buttonColor);
+                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current, buttonColor);
                     }
 
                     if (showBackButton) {
@@ -487,7 +508,7 @@ export default function AboutMeTV({
                             }
                             hoverProgressBack = screenTextureRef.current.userData.hoverAnimBack;
                         }
-                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack);
+                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, buttonColor);
                     }
 
                     if (showMenuButton) {
@@ -507,11 +528,12 @@ export default function AboutMeTV({
                             }
                             hoverProgressMenu = screenTextureRef.current.userData.hoverAnimMenu;
                         }
-                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu);
+                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, buttonColor);
                     }
 
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.restore();
+                    ctx.restore(); // End of UI Overlay save block
                 }
             }
             screenTextureRef.current.needsUpdate = true;
@@ -546,7 +568,6 @@ export default function AboutMeTV({
                         if (startButtonHovered) setStartButtonHovered(false);
                         if (backButtonHovered) setBackButtonHovered(false);
                         if (menuButtonHovered) setMenuButtonHovered(false);
-                        document.body.style.cursor = 'auto';
                     }}
                     onClick={(e: ThreeEvent<MouseEvent>) => {
                         if (e.object.userData.isScreen && e.uv) {

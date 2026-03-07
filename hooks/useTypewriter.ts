@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 interface UseTypewriterProps {
     storyContent?: string[];
@@ -7,19 +8,19 @@ interface UseTypewriterProps {
 }
 
 export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: UseTypewriterProps) {
+    const bubblesVolume = useSettingsStore(state => state.bubblesVolume);
     const [storyMode, setStoryMode] = useState(false);
     const [currentParagraph, setCurrentParagraph] = useState(0);
     const [waitingForInput, setWaitingForInput] = useState(false);
 
-    // Time-based approach for Canvas (no re-renders on every char)
+    // Typing start time for canvas
     const [typingStartTime, setTypingStartTime] = useState(0);
     const isTypingRef = useRef(false);
 
-    // Audio Context & Buffer
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioBufferRef = useRef<AudioBuffer | null>(null);
 
-    // 1. Load typing sound (Web Audio API)
+    // Story sound loading
     useEffect(() => {
         if (enableStoryMode && typeof window !== 'undefined') {
             const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -40,7 +41,7 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
         }
     }, [enableStoryMode]);
 
-    // Helper to play sound with variation
+    // Typewriter bubble sound
     const playTypewriterSound = useCallback(() => {
         const ctx = audioContextRef.current;
         const buffer = audioBufferRef.current;
@@ -57,36 +58,28 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
                 const gainNode = ctx.createGain();
 
                 source.buffer = buffer;
-
-                // Varied Pitch: 0.5 to 2.0 (Deep bubbles to light bubbles)
                 source.playbackRate.value = 0.5 + Math.random() * 1.5;
 
-                // Base volume 0.15 (more audible)
-                const baseVolume = 0.15;
-                const volumeVariation = Math.random() * 0.02;
+                const baseVolume = 0.15 * bubblesVolume;
+                const volumeVariation = Math.random() * 0.02 * bubblesVolume;
                 const volume = baseVolume + volumeVariation;
 
-                // Envelope: Attack -> Hold -> Fade Out
                 const now = ctx.currentTime;
                 const duration = buffer.duration;
-                // Ensure fade out happens before end of file to prevent clicking
                 const fadeDuration = Math.min(duration * 0.5, 0.2);
 
                 gainNode.gain.setValueAtTime(0, now);
-                gainNode.gain.linearRampToValueAtTime(volume, now + 0.01); // Quick attack
+                gainNode.gain.linearRampToValueAtTime(volume, now + 0.01);
                 gainNode.gain.setValueAtTime(volume, now + duration - fadeDuration);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration); // Smooth Fade Out
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
                 source.connect(gainNode);
                 gainNode.connect(ctx.destination);
                 source.start(0);
-            } catch (e) {
-                // Ignore audio errors
-            }
+            } catch (e) { }
         }
-    }, []);
+    }, [bubblesVolume]);
 
-    // 2. Start Story Mode trigger
     const startStory = useCallback(() => {
         if (enableStoryMode && storyContent && storyContent.length > 0) {
             setStoryMode(true);
@@ -97,14 +90,12 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
         }
     }, [enableStoryMode, storyContent]);
 
-    // 3. Stop Story
     const stopStory = useCallback(() => {
         setStoryMode(false);
         setWaitingForInput(false);
         isTypingRef.current = false;
     }, []);
 
-    // 4. Signal from Consumer (Canvas) that typing is finished
     const signalTypingFinished = useCallback(() => {
         if (isTypingRef.current) {
             isTypingRef.current = false;
@@ -112,19 +103,14 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
         }
     }, []);
 
-    // 5. Interaction Handler (Next Paragraph)
     const handleInteraction = useCallback(() => {
         if (!storyMode || !storyContent) return;
 
-        // If currently typing, skip to end
         if (isTypingRef.current) {
-            // Consumer checks `waitingForInput`. If false but `storyMode` true, check `isTypingRef`.
-            // We force finish.
             signalTypingFinished();
             return;
         }
 
-        // If waiting for input (arrow visible), go next
         if (waitingForInput) {
             if (currentParagraph < storyContent.length - 1) {
                 setCurrentParagraph(prev => prev + 1);
@@ -132,14 +118,12 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
                 setTypingStartTime(Date.now());
                 isTypingRef.current = true;
             } else {
-                // End of story
                 stopStory();
                 if (onStoryEnd) onStoryEnd();
             }
         }
     }, [storyMode, storyContent, currentParagraph, waitingForInput, onStoryEnd, stopStory, signalTypingFinished]);
 
-    // Keyboard Listener
     useEffect(() => {
         if (!storyMode) return;
 
@@ -150,8 +134,14 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
             }
         };
 
+        const onMouseDown = () => handleInteraction();
+
         window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
+        window.addEventListener('mousedown', onMouseDown);
+        return () => {
+            window.removeEventListener('keydown', onKeyDown);
+            window.removeEventListener('mousedown', onMouseDown);
+        }
     }, [storyMode, handleInteraction]);
 
     return {

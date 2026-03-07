@@ -28,7 +28,7 @@ export function useScreenInteraction({
 
         const targetPos = targetPosRef.current;
 
-        // 1. Find Screen Mesh (Lazy / Cached)
+        // Cache screen mesh
         if (!screenMeshRef.current) {
             groupRef.current.traverse((child) => {
                 if (child instanceof THREE.Mesh) {
@@ -40,7 +40,7 @@ export function useScreenInteraction({
             });
         }
 
-        // 2. Get World Position of Screen Center
+        // Get screen center in world space
         if (screenMeshRef.current) {
             const mesh = screenMeshRef.current;
             if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
@@ -55,22 +55,25 @@ export function useScreenInteraction({
             groupRef.current.getWorldPosition(targetPos);
         }
 
-        // 3. Project to 2D Screen Space
+        // Project to 2D screen space
         const tvScreenPos = targetPos.project(state.camera);
 
-        // 4. Calculate Mouse Delta
-        const gazeX = state.mouse.x - tvScreenPos.x;
-        const gazeY = state.mouse.y - tvScreenPos.y;
+        let tvX = tvScreenPos.x;
+        let tvY = tvScreenPos.y;
+        if (Number.isNaN(tvX) || !Number.isFinite(tvX)) tvX = 0;
+        if (Number.isNaN(tvY) || !Number.isFinite(tvY)) tvY = 0;
 
-        // 5. Apply Sensitivity and Offset
+        // Calculate screen-relative gaze
+        const gazeX = state.mouse.x - tvX;
+        const gazeY = state.mouse.y - tvY;
+
         const finalX = (gazeX * sensitivity) + gazeOffset.x;
         const finalY = (invertY ? -gazeY : gazeY) * sensitivity * aspectCompensation + gazeOffset.y;
 
-        // 6. Clamp Normalized Values
         normalizedMouse.current.x = Math.max(-1, Math.min(1, finalX));
         normalizedMouse.current.y = Math.max(-1, Math.min(1, finalY));
 
-        // 7. Smooth LookAt Transition
+        // Interpolate gaze position
         const speed = 2.0 * dt;
         currentLookAt.current.x += (normalizedMouse.current.x - currentLookAt.current.x) * speed;
         currentLookAt.current.y += (normalizedMouse.current.y - currentLookAt.current.y) * speed;

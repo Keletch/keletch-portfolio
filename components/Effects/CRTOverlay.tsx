@@ -3,6 +3,7 @@
 import { useMemo, useEffect } from 'react';
 import { useFrame, useThree, createPortal } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 // --- SHADER DEFINITION ---
 const vertexShader = `
@@ -20,42 +21,44 @@ uniform vec2 uResolution;
 
 varying vec2 vUv;
 
-// --- CONFIG UNIFORMS ---
-uniform float uCurveIntensity;
-uniform float uVignetteStr;
-uniform float uScanlineCount;
-uniform float uScanlineOpacity;
-uniform float uNoiseOpacity;
-uniform float uAberrationOffset;
-uniform float uBlurSize;
+    // --- CONFIG UNIFORMS ---
+    uniform float uCurveIntensity;
+    uniform float uVignetteStr;
+    uniform float uScanlineCount;
+    uniform float uScanlineOpacity;
+    uniform float uNoiseOpacity;
+    uniform float uAberrationOffset;
+    uniform float uBlurSize;
+    uniform bool uBarrelScanline;
 
-#define CURVE_INTENSITY uCurveIntensity
-#define VIGNETTE_STR uVignetteStr
-#define SCANLINE_COUNT uScanlineCount
-#define SCANLINE_OPACITY uScanlineOpacity
-#define NOISE_OPACITY uNoiseOpacity
-#define ABERRATION_OFFSET uAberrationOffset
+    #define CURVE_INTENSITY uCurveIntensity
+    #define VIGNETTE_STR uVignetteStr
+    #define SCANLINE_COUNT uScanlineCount
+    #define SCANLINE_OPACITY uScanlineOpacity
+    #define NOISE_OPACITY uNoiseOpacity
+    #define ABERRATION_OFFSET uAberrationOffset
 
-vec2 curve(vec2 uv) {
-    uv = (uv - 0.5) * 2.0;
-    vec2 offset = abs(uv.yx) / vec2(CURVE_INTENSITY, CURVE_INTENSITY);
-    uv = uv + uv * offset * offset;
-    uv = uv * 0.5 + 0.5;
-    return uv;
-}
-
-float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
-}
-
-void main() {
-    vec2 uv = curve(vUv);
-
-    // Bounds check
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
+    vec2 curve(vec2 uv) {
+        uv = (uv - 0.5) * 2.0;
+        vec2 offset = abs(uv.yx) / vec2(CURVE_INTENSITY, CURVE_INTENSITY);
+        uv = uv + uv * offset * offset;
+        uv = uv * 0.5 + 0.5;
+        return uv;
     }
+
+    float random(vec2 st) {
+        return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+    }
+
+    void main() {
+        // --- CURVATURE (Always active, controlled by uCurveIntensity) ---
+        vec2 uv = curve(vUv);
+
+        // Bounds check
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            return;
+        }
 
     // --- ROUNDED CORNERS ---
     float edge = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
@@ -67,22 +70,25 @@ void main() {
 
     // --- GLITCH SWEEP ("Hum Bar") ---
     vec2 distortedUV = uv;
-    float sweepCycle = mod(uTime, 15.0);
     float sweepY = -10.0;
-
-    if (sweepCycle > 10.0) {
-        float phase = sweepCycle - 10.0;
-        sweepY = 1.1 - (phase / 5.0) * 1.2;
-    }
-    
-    float sweepDist = abs(uv.y - sweepY);
+    float sweepDist = 100.0;
     float sweepWidth = 0.04;
-    float edgeFactor = sweepDist / sweepWidth;
 
-    if (sweepDist < sweepWidth) {
-        float strength = smoothstep(sweepWidth, 0.0, sweepDist);
-        distortedUV.x -= 0.02 * strength;
+    if (uBarrelScanline) {
+        float sweepCycle = mod(uTime, 15.0);
+        if (sweepCycle > 10.0) {
+            float phase = sweepCycle - 10.0;
+            sweepY = 1.1 - (phase / 5.0) * 1.2;
+        }
+        sweepDist = abs(uv.y - sweepY);
+        
+        if (sweepDist < sweepWidth) {
+            float strength = smoothstep(sweepWidth, 0.0, sweepDist);
+            distortedUV.x -= 0.02 * strength;
+        }
     }
+
+    float edgeFactor = sweepDist / sweepWidth;
 
     // --- NTSC / VHS COLOR BLEED (SMEAR/BLUR) ---
     // Simulate low horizontal bandwidth of composite video (NTSC/PAL)
@@ -106,7 +112,7 @@ void main() {
     float shift = dist * ABERRATION_OFFSET;
 
     // Extra shift at the hum bar tear
-    if (sweepDist < sweepWidth) {
+    if (uBarrelScanline && sweepDist < sweepWidth) {
         float outerEdge = smoothstep(0.75, 1.0, edgeFactor);
         shift += 0.005 * outerEdge;
     }
@@ -142,6 +148,7 @@ void main() {
 
 export function CRTOverlay() {
     const { scene, camera, size } = useThree();
+    const settings = useSettingsStore();
 
     // 1. Create Render Target (FBO)
     const renderTarget = useMemo(() => {
@@ -167,7 +174,8 @@ export function CRTOverlay() {
                 uScanlineOpacity: { value: 0.05 },
                 uNoiseOpacity: { value: 0.2 },
                 uAberrationOffset: { value: 0.009 },
-                uBlurSize: { value: 0.0005 }
+                uBlurSize: { value: 0.0005 },
+                uBarrelScanline: { value: true }
             },
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
@@ -212,6 +220,14 @@ export function CRTOverlay() {
         // Update uniforms
         material.uniforms.tDiffuse.value = renderTarget.texture;
         material.uniforms.uTime.value = state.clock.elapsedTime;
+        material.uniforms.uCurveIntensity.value = settings.curveIntensity;
+        material.uniforms.uVignetteStr.value = settings.vignetteStrength;
+        material.uniforms.uScanlineCount.value = settings.scanlineCount;
+        material.uniforms.uScanlineOpacity.value = settings.scanlineOpacity;
+        material.uniforms.uNoiseOpacity.value = settings.noiseOpacity;
+        material.uniforms.uAberrationOffset.value = settings.aberrationOffset;
+        material.uniforms.uBlurSize.value = settings.blurSize;
+        material.uniforms.uBarrelScanline.value = settings.barrelScanline;
 
         state.gl.render(screenScene, orthoCamera);
     }, 1);

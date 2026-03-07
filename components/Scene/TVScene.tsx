@@ -5,11 +5,12 @@ import * as THREE from 'three';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import { useGLTF } from '@react-three/drei';
 
-// Lazy Load Heavy Sections
+// Section components
 import Television from '@/components/Television';
 import RadioSection from '@/components/Television/Radio/RadioSection';
 import MyWorksSection from '@/components/Television/MyWorks/MyWorksSection';
 import AboutMeSection from '@/components/Television/AboutMe/AboutMeSection';
+import MobileSection from '@/components/Television/MobileSection';
 import { TVCluster } from '@/components/Scene/TVCluster';
 
 import { CRTOverlay } from '@/components/Effects/CRTOverlay';
@@ -22,10 +23,13 @@ import { BackButton3D } from '@/components/Props/BackButton3D';
 import { LuckyCat } from '@/components/Props/LuckyCat';
 import { RoomFloor } from '@/components/Scene/RoomFloor';
 import { PaletteSelector } from '@/components/UI/PaletteSelector';
+import { TopLeftHUD } from '@/components/UI/TopLeftHUD';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
+import { ResettableRigidBody } from '@/components/Scene/ResettableRigidBody';
 
 RectAreaLightUniformsLib.init();
 
-export type ViewState = 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus';
+export type ViewState = 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus' | 'tv_settings_focus' | 'tv_mobile_focus' | 'tv_typical_gallery';
 
 const MOBILE_SCREENS = ['mobileScreen'];
 
@@ -87,7 +91,7 @@ const GOLD_COLORS: ThemeColors = {
     textColor: '#ffd700', highlightColor: '#ffaa00'
 };
 
-// Vision TV override for Original palette: blood background + white text/sphere
+// Vision TV unique palette
 const VISION_ORIGINAL_COLORS: ThemeColors = {
     bgColor: '#200000', baseColor: 'rgba(60, 0, 0, 0.3)', glowCenter: 'rgba(255, 0, 0, 0.1)',
     vignetteColor: 'rgba(20, 0, 0, 0.95)', irisColor: '#ffffff', scleraColor: '#ffffff',
@@ -199,6 +203,7 @@ const PALETTE_CONFIGS: Record<PaletteId, {
 
 };
 
+
 interface TVSceneProps {
     isLoaded: boolean;
 }
@@ -210,10 +215,14 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
     const [isPhysicsActive, setPhysicsActive] = useState(false);
     const [palette, setPalette] = useState<PaletteId>('current');
 
+    const setGlobalResetTrigger = useSettingsStore(state => state.setGlobalResetTrigger);
+
     const paletteConfig = PALETTE_CONFIGS[palette];
 
     const rectLightRef = useRef<THREE.RectAreaLight>(null);
+    const settings = useSettingsStore();
 
+    // View navigation
     const handleZoom = (e: ThreeEvent<MouseEvent>, targetState: ViewState) => {
         e.stopPropagation();
         document.body.style.cursor = 'auto';
@@ -222,13 +231,31 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
         setTimeout(() => setCameraSettled(true), 1500);
     };
 
-    // Props Config
+    const handleResetScene = () => {
+        setViewState('default');
+        setCameraSettled(true);
+        setGlobalResetTrigger(Date.now());
+    };
+
+    // Sync theme with palette selection
+    useEffect(() => {
+        const themeToPalette: Record<string, PaletteId> = {
+            'amber': 'A', 'glitch': 'D',
+            'gold': 'E', 'holo': 'F', 'hacker': 'G', 'noir': 'H', 'velvet': 'I',
+            'classic': 'current', 'toxic': 'C', 'blood': 'D'
+        };
+        const targetPalette = themeToPalette[settings.theme];
+        if (targetPalette && targetPalette !== palette) {
+            setPalette(targetPalette);
+        }
+    }, [settings.theme, palette]);
+
+    // Physics props and books configuration
     const dvdCtrl = { pos: [0, -0.45, 0.30] as [number, number, number], size: [0.43, 0.08, 0.29] as [number, number, number], offset: [0, 0.08, -0.19] as [number, number, number] };
     const mobileCtrl = { pos: [3.0, 4.0, 0.30] as [number, number, number], rot: [-1.5, 0, -0.30] as [number, number, number], size: [0.09, 0.20, 0.03] as [number, number, number], offset: [0.01, 0.23, 0.00] as [number, number, number] };
     const rubiksGoldCtrl = { pos: [2.00, 6.00, 0.40] as [number, number, number], rot: [0, 0.5, 0] as [number, number, number], scale: 2.45, size: [0.20, 0.20, 0.20] as [number, number, number], offset: [-0.01, 0.20, -0.01] as [number, number, number] };
     const luckyCatCtrl = { pos: [-0.75, -1.0, 0.0] as [number, number, number], scale: 1.0, size: [0.18, 0.20, 0.14] as [number, number, number], offset: [0.01, 0.18, 0.00] as [number, number, number] };
 
-    // Books Config
     const book1Ctrl = { pos: [0.4, -1.3, -0.15] as [number, number, number], rot: [0, 0, 0.2] as [number, number, number], scale: 1.3, size: [0.04, 0.42, 0.30] as [number, number, number], offset: [-1.95, 0.89, 0.11] as [number, number, number] };
     const book2Ctrl = { pos: [0.35, -1.8, -0.15] as [number, number, number], rot: [0, 0, 0.0] as [number, number, number], scale: 1.3, size: [0.06, 0.52, 0.34] as [number, number, number], offset: [-1.84, 1.0, 0.08] as [number, number, number] };
     const book3Ctrl = { pos: [0.3, -1.9, -0.15] as [number, number, number], scale: 1.3, size: [0.07, 0.40, 0.28] as [number, number, number], offset: [-1.69, 0.88, 0.15] as [number, number, number] };
@@ -238,7 +265,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
     const { scene: dvdModel } = useGLTF('/models/dvd.glb');
     const clonedDvd = useMemo(() => dvdModel.clone(), [dvdModel]);
 
-    // Handle Physics Start based on parent prop
+    // Activate physics after load
     useEffect(() => {
         if (isLoaded) {
             setTimeout(() => {
@@ -258,7 +285,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
             >
                 <PerformanceMonitor onIncline={() => setDpr(1.5)} onDecline={() => setDpr(0.7)} >
                     <color attach="background" args={['#000000']} />
-                    <ambientLight intensity={0.7} />
+                    <ambientLight intensity={settings.ambientIntensity} />
                     <directionalLight position={[0, 10, 5]} intensity={2.0} color="#fff0dd" />
                     <spotLight position={[0, 8, 6]} angle={1.2} penumbra={0.4} intensity={80} color="#ffc485" />
                     <pointLight position={[-6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
@@ -269,14 +296,14 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                     <pointLight position={[5.3, 1.9, 0.9]} intensity={10} distance={6.5} decay={2.75} color="#ffaa00" />
                     <rectAreaLight ref={rectLightRef} position={[5.7, 1.4, 1.0]} width={1.0} height={1.2} color="#ffcc00" intensity={5} />
 
-                    <Physics gravity={[0, -9.81, 0]} numSolverIterations={12} paused={!isPhysicsActive}>
+                    <Physics gravity={[0, settings.gravityY, 0]} numSolverIterations={12} paused={!isPhysicsActive}>
                         <RoomFloor
                             texturePath={paletteConfig.floor.texture}
                             overlayColor1={paletteConfig.floor.overlay1}
                             overlayColor2={paletteConfig.floor.overlay2}
                         />
 
-                        <TVCluster viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} clusterThemes={paletteConfig.cluster} visionColors={paletteConfig.vision} />
+                        <TVCluster viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} clusterThemes={paletteConfig.cluster} visionColors={paletteConfig.vision} onShelfZoom={(e) => handleZoom(e, 'shelf_focus')} onBackToRoom={() => setViewState('default')} />
 
                         <RadioSection
                             viewState={viewState}
@@ -297,76 +324,85 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                             themeOverride={paletteConfig.myWorks}
                         />
 
-                        <RigidBody colliders={false} position={dvdCtrl.pos}>
+                        <ResettableRigidBody colliders={false} position={dvdCtrl.pos} resetDelay={2.00}>
                             <CuboidCollider args={dvdCtrl.size} position={dvdCtrl.offset} friction={0.5} restitution={0.1} />
                             <primitive object={clonedDvd} />
-                        </RigidBody>
+                        </ResettableRigidBody>
 
-                        <RigidBody colliders={false} position={mobileCtrl.pos} rotation={mobileCtrl.rot}>
-                            <CuboidCollider args={mobileCtrl.size} position={mobileCtrl.offset} friction={0.5} restitution={0.1} />
-                            <Television modelPath="/models/mobile.glb" screenNames={MOBILE_SCREENS} theme={paletteConfig.mobile as "classic"} invertY={true} />
-                        </RigidBody>
+                        <MobileSection
+                            viewState={viewState}
+                            onNavigate={(st: string) => setViewState(st as ViewState)}
+                            theme={paletteConfig.mobile}
+                        />
 
-                        <RigidBody colliders={false} position={luckyCatCtrl.pos}>
+                        <ResettableRigidBody colliders={false} position={luckyCatCtrl.pos} resetDelay={1.50}>
                             <CuboidCollider args={luckyCatCtrl.size} position={luckyCatCtrl.offset} friction={0.5} restitution={0.1} />
                             <LuckyCat scale={luckyCatCtrl.scale} />
-                        </RigidBody>
+                        </ResettableRigidBody>
 
-                        <AdjustableModel modelPath="/models/rubiksGold.glb" initialPos={rubiksGoldCtrl.pos} initialRot={rubiksGoldCtrl.rot} initialScale={rubiksGoldCtrl.scale} initialColliderSize={rubiksGoldCtrl.size} initialColliderOffset={rubiksGoldCtrl.offset} isInteractive={false} />
+                        <AdjustableModel modelPath="/models/rubiksGold.glb" initialPos={rubiksGoldCtrl.pos} initialRot={rubiksGoldCtrl.rot} initialScale={rubiksGoldCtrl.scale} initialColliderSize={rubiksGoldCtrl.size} initialColliderOffset={rubiksGoldCtrl.offset} isInteractive={false} resetDelay={2.55} />
 
                         <AdjustableModel
                             modelPath="/models/b1.glb" initialPos={book1Ctrl.pos} initialRot={book1Ctrl.rot} initialScale={book1Ctrl.scale} initialColliderSize={book1Ctrl.size} initialColliderOffset={book1Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_red_focus')} label="About me"
                             labelConfig={{ position: [-1.882, 0.96, 0.51], rotation: [0, -0.2, 0], fontSize: 0.1, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                            resetDelay={0.75}
                         />
                         <AdjustableModel
                             modelPath="/models/b2.glb" initialPos={book2Ctrl.pos} initialScale={book2Ctrl.scale} initialColliderSize={book2Ctrl.size} initialColliderOffset={book2Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_lcd_focus')} label="My Works"
                             labelConfig={{ position: [-1.80, 1.05, 0.52], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                            resetDelay={0.90}
                         />
                         <AdjustableModel
                             modelPath="/models/b3.glb" initialPos={book3Ctrl.pos} initialScale={book3Ctrl.scale} initialColliderSize={book3Ctrl.size} initialColliderOffset={book3Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_dirty_focus')} label="Vision"
                             labelConfig={{ position: [-1.65, 0.90, 0.53], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                            resetDelay={1.05}
                         />
                         <AdjustableModel
                             modelPath="/models/b4.glb" initialPos={book4Ctrl.pos} initialScale={book4Ctrl.scale} initialColliderSize={book4Ctrl.size} initialColliderOffset={book4Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_typical_focus')} label="Lifestyle"
                             labelConfig={{ position: [-1.49, 0.92, 0.53], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                            resetDelay={1.20}
                         />
                         <AdjustableModel
                             modelPath="/models/b5.glb" initialPos={book5Ctrl.pos} initialScale={book5Ctrl.scale} initialColliderSize={book5Ctrl.size} initialColliderOffset={book5Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_lowpoly_focus')} label="Extras"
                             labelConfig={{ position: [-1.35, 0.85, 0.51], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
+                            resetDelay={1.35}
                         />
                     </Physics>
 
                     <CameraRig viewState={viewState} />
 
-                    {/* INTERACTION ZONES */}
-                    {viewState === 'default' && (
-                        <>
-                            <mesh position={[-1.3, -0.8, 0.95]} onClick={(e) => handleZoom(e, 'shelf_focus')} onPointerEnter={() => document.body.style.cursor = 'pointer'} onPointerLeave={() => document.body.style.cursor = 'auto'}>
-                                <boxGeometry args={[1.20, 1.30, 0.15]} />
-                                <meshBasicMaterial transparent opacity={0} />
-                            </mesh>
-                            <mesh position={[1.50, -0.60, 0.25]} onClick={(e) => handleZoom(e, 'radio_focus')} onPointerEnter={() => document.body.style.cursor = 'pointer'} onPointerLeave={() => document.body.style.cursor = 'auto'}>
-                                <boxGeometry args={[1.2, 0.3, 0.6]} />
-                                <meshBasicMaterial transparent opacity={0} />
-                            </mesh>
-                        </>
-                    )}
 
-                    <BackButton3D onClick={() => setViewState('default')} visible={viewState === 'shelf_focus'} />
+                    <TopLeftHUD onNavigate={(s) => setViewState(s as ViewState)} />
+                    <PaletteSelector
+                        current={palette}
+                        onChange={(p) => {
+                            setPalette(p as PaletteId);
+                            const paletteToTheme: Record<string, import('@/components/store/useSettingsStore').ThemeName> = {
+                                'A': 'amber', 'D': 'glitch',
+                                'E': 'gold', 'F': 'holo', 'G': 'hacker', 'H': 'noir', 'I': 'velvet',
+                                'current': 'classic'
+                            };
+                            const t = paletteToTheme[p];
+                            if (t) settings.setTheme(t);
+                        }}
+                        onMenuSelect={() => setViewState('shelf_focus')}
+                        onSettingsSelect={() => handleZoom({ stopPropagation: () => { } } as any, 'tv_settings_focus')}
+                        onResetSelect={handleResetScene}
+                        onContactSelect={() => setViewState('tv_mobile_focus')}
+                    />
                     <CRTOverlay />
                 </PerformanceMonitor>
             </Canvas>
-            <PaletteSelector current={palette} onChange={(p) => setPalette(p as PaletteId)} />
         </div>
     );
 }

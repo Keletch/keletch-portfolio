@@ -57,13 +57,14 @@ export function initIcoDeepState(): IcoDeepState {
     };
 }
 
+// Physics and interaction state update
 export function updateIcoDeepState(
     state: IcoDeepState,
     delta: number,
     mouse?: { x: number; y: number },
     mouseVel?: { x: number; y: number }
 ) {
-    // CRITICAL FIX: Clamp delta globally to prevent physics explosions on lag spikes
+    // Clamp delta to prevent physics explosions
     const safeDelta = Math.min(delta, 0.05);
 
     state.angleX += safeDelta * 0.05;
@@ -80,11 +81,11 @@ export function updateIcoDeepState(
         let velX = state.vVelocities[i2];
         let velY = state.vVelocities[i2 + 1];
 
-        // 1. Spring force
+        // Physics forces: Spring and mouse impulse
         const fx = -offX * springK;
         const fy = -offY * springK;
 
-        // 2. Mouse impulse
+        // Mouse impulse
         if (mouse && mouseVel) {
             const vBase = ICO_VERTS[i];
             const scale = 65;
@@ -111,7 +112,7 @@ export function updateIcoDeepState(
             }
         }
 
-        // 3. Integration
+        // Integration
         velX = (velX + fx * safeDelta) * damping;
         velY = (velY + fy * safeDelta) * damping;
 
@@ -121,21 +122,17 @@ export function updateIcoDeepState(
         state.vVelocities[i2 + 1] = velY;
     }
 
-    // Dynamic Color Energy logic
-    // DECOUPLED: Driven purely by mouse velocity, NOT physics stress.
-    // This ensures project transitions / lag spikes never affect color.
+    // Interaction-driven color energy
     let mouseSpeed = 0;
     if (mouseVel) {
         mouseSpeed = Math.sqrt(mouseVel.x * mouseVel.x + mouseVel.y * mouseVel.y);
     }
     const mouseInput = Math.min(mouseSpeed * 0.003, 1.0);
 
-    // Asymmetric: Hard to gain, Easy to lose
+    // Asymmetric buildup and decay
     if (mouseInput > state.chromaEnergy) {
-        // Gaining color: slow buildup
         state.chromaEnergy += (mouseInput - state.chromaEnergy) * (safeDelta * 0.15);
     } else {
-        // Losing color: fast decay back to B&W
         state.chromaEnergy += (mouseInput - state.chromaEnergy) * (safeDelta * 3.0);
     }
     state.chromaEnergy = Math.max(0, Math.min(1, state.chromaEnergy));
@@ -217,7 +214,7 @@ export function drawChaoticIcosahedronVideo(
 
     ctx.save();
     const scale = 65;
-    const { angleX, angleY, chromaEnergy } = state; // Get chroma energy
+    const { angleX, angleY, chromaEnergy } = state;
 
     const cosY = Math.cos(angleY);
     const sinY = Math.sin(angleY);
@@ -298,10 +295,8 @@ export function drawChaoticIcosahedronVideo(
             // Video transition / loading -> Transparent
         }
 
-        // 3. RGB Chromatic Aberration Wireframe
-        // Draw 3 offset lines: Red, Green, Blue
-        const wireAbberation = 2.0; // Pixel offset for wireframe split
-
+        // RGB Chromatic Aberration Wireframe
+        const wireAbberation = 2.0;
         ctx.globalCompositeOperation = 'screen'; // Additive blending for RGB
 
         // RED Channel (Shift Left)

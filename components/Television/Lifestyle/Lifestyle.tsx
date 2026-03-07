@@ -57,24 +57,25 @@ export default function LifestyleTV({
             setMenuButtonHovered(false);
             setHoveredPolaroidId(null);
             setZoomedPolaroidId(null);
-            document.body.style.cursor = 'auto';
         }
     }, [isFocused]);
 
-    const activeTheme = THEMES[theme] || THEMES.sulfur;
+    const activeTheme = THEMES[theme as keyof typeof THEMES] || THEMES.sulfur;
+    const buttonColor = theme === 'classic' ? '#ffffff' : activeTheme.highlightColor;
 
     // Delay the entrance flicker to give the camera time to reach the screen
     const [delayedFocus, setDelayedFocus] = useState(false);
     useEffect(() => {
         if (isFocused) {
-            const t = setTimeout(() => setDelayedFocus(true), 900);
+            const t = setTimeout(() => setDelayedFocus(true), 1050);
             return () => clearTimeout(t);
         } else {
             setDelayedFocus(false);
         }
     }, [isFocused]);
 
-    const { renderedFigure, transitionOpacity } = useFigureTransition(delayedFocus ? 'polaroids' : 'eye');
+    const targetFigure = delayedFocus ? 'polaroids' : 'eye';
+    const { renderedFigure, transitionOpacity } = useFigureTransition(targetFigure);
 
     const {
         clonedModel,
@@ -100,9 +101,11 @@ export default function LifestyleTV({
     });
 
     useFrame((state, delta) => {
+        if (typeof document !== 'undefined' && !document.hasFocus()) return;
+
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
-            if (dist > 15) return;
+            if (dist > 50) return;
         }
 
         const dt = delta;
@@ -174,15 +177,17 @@ export default function LifestyleTV({
             currentLookAt.current.y += (normalizedMouse.current.y - currentLookAt.current.y) * speed;
 
             // Polaroid Animation Progress
+            // Polaroid Animation Progress: lock at 1.0 while rendering so they flicker out instead of smoothly shrinking
             const pSpeed = 1.2 * dt;
-            if (isFocused) {
+            if (isFocused || targetFigure === 'polaroids' || renderedFigure === 'polaroids') {
                 polaroidAnimProgress.current = Math.min(1.0, polaroidAnimProgress.current + pSpeed);
             } else {
                 polaroidAnimProgress.current = Math.max(0.0, polaroidAnimProgress.current - pSpeed);
             }
 
             // Advance the stateful polaroid engine
-            updatePolaroids(dt, hoveredPolaroidId, zoomedPolaroidId, delayedFocus, POLAROIDS);
+            const keepPolaroidsAlive = isFocused || targetFigure === 'polaroids' || renderedFigure === 'polaroids';
+            updatePolaroids(dt, hoveredPolaroidId, zoomedPolaroidId, keepPolaroidsAlive, POLAROIDS);
 
             const blink = blinkState.current;
             blink.blinkTimer += dt;
@@ -245,12 +250,10 @@ export default function LifestyleTV({
                 const figureOpacity = transitionOpacity.current;
                 const figureStepped = Math.floor(figureOpacity * 10) / 10;
 
-                // Fade out the eye if polaroids are animating in
-                const eyeAlpha = Math.max(0, figureStepped * (1.0 - polaroidAnimProgress.current));
-
-                // 1. Draw Eye (Idle state)
-                if (renderedFigure === 'eye' && eyeAlpha > 0.01) {
+                // 1. Draw Eye
+                if (renderedFigure === 'eye') {
                     ctx.save();
+                    ctx.globalAlpha = figureStepped;
 
                     const isLCD = theme === 'toxic';
                     const scleraMaxOffsetX = isLCD ? 150 : 100;
@@ -276,8 +279,6 @@ export default function LifestyleTV({
                     const isHologram = theme === 'mobile' || theme === 'hacker' || theme === 'holo';
                     const scleraColor = activeTheme.scleraColor || '#ffffff';
 
-                    ctx.globalAlpha = eyeAlpha;
-
                     drawPixelEye(
                         ctx,
                         normalizedMouse.current,
@@ -290,7 +291,7 @@ export default function LifestyleTV({
                     ctx.restore();
                 }
 
-                const isContentVisible = isFocused || renderedFigure === 'polaroids';
+                const isContentVisible = renderedFigure === 'polaroids' || (targetFigure === 'polaroids');
 
                 // 2. Focused Text & Polaroid Collage
                 if (isContentVisible) {
@@ -376,13 +377,13 @@ export default function LifestyleTV({
                     if (showBackButton) {
                         const btnX = backButtonPosition ? backButtonPosition.x : LIFESTYLE_BUTTON_CONFIG.BACK.x;
                         const btnY = backButtonPosition ? backButtonPosition.y : LIFESTYLE_BUTTON_CONFIG.BACK.y;
-                        drawBackButton(ctx, btnX, btnY, cache.hoverAnimBack, '#ffffff');
+                        drawBackButton(ctx, btnX, btnY, cache.hoverAnimBack, buttonColor);
                     }
 
                     if (showMenuButton) {
                         const btnX = menuButtonPosition ? menuButtonPosition.x : LIFESTYLE_BUTTON_CONFIG.MENU.x;
                         const btnY = menuButtonPosition ? menuButtonPosition.y : LIFESTYLE_BUTTON_CONFIG.MENU.y;
-                        drawMenuButton(ctx, btnX, btnY, cache.hoverAnimMenu, '#ffffff');
+                        drawMenuButton(ctx, btnX, btnY, cache.hoverAnimMenu, buttonColor);
                     }
 
                     ctx.globalCompositeOperation = 'source-over';
@@ -425,7 +426,7 @@ export default function LifestyleTV({
                 <primitive
                     object={clonedModel}
                     onPointerMove={(e: ThreeEvent<MouseEvent>) => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedFigure !== 'polaroids') return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
 
@@ -470,12 +471,12 @@ export default function LifestyleTV({
                         }
                     }}
                     onPointerLeave={() => {
-                        if (!isFocused) return;
+                        if (!isFocused || renderedFigure !== 'polaroids') return;
                         setBackButtonHovered(false);
                         setMenuButtonHovered(false);
-                        document.body.style.cursor = 'auto';
                     }}
                     onClick={(e: ThreeEvent<MouseEvent>) => {
+                        if (!isFocused || renderedFigure !== 'polaroids') return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
                             // 1. If zoomed, clicking anywhere dismisses it
