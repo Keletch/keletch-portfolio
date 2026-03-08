@@ -24,7 +24,7 @@ import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 
 const DEFAULT_SCREEN_NAMES = ['screen'];
-const ABOUT_FIGURES = ['neural_mesh', 'architecture', 'hyper_pulse', 'audio_waveform', 'orbital_rings'];
+
 
 export default function AboutMeTV({
     modelPath,

@@ -1,14 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { CuboidCollider } from '@react-three/rapier';
 import { ResettableRigidBody } from '@/components/Scene/ResettableRigidBody';
-import { useGLTF, useCursor } from '@react-three/drei';
-import { useFrame, useThree } from '@react-three/fiber';
-import * as THREE from 'three';
+import { useGLTF } from '@react-three/drei';
+import { ThreeEvent } from '@react-three/fiber';
 import Television from '@/components/Television';
 import Vision from '@/components/Television/Vision/Vision';
 import LifestyleTV from '@/components/Television/Lifestyle/Lifestyle';
 import SettingsTV from '@/components/Television/Settings/Settings';
-import { useSettingsStore } from '@/components/store/useSettingsStore';
 import { InteractiveTVWrapper } from './InteractiveTVWrapper';
 import { BackButton3D } from '@/components/Props/BackButton3D';
 
@@ -17,7 +15,7 @@ interface TVClusterProps {
     onNavigate: (state: string) => void;
     clusterThemes?: { toon: string; dirty: string; lowpoly: string; typical: string };
     visionColors?: { irisColor: string; textColor?: string; highlightColor?: string;[key: string]: unknown };
-    onShelfZoom?: (e: any) => void;
+    onShelfZoom?: (e: ThreeEvent<MouseEvent>) => void;
     onBackToRoom?: () => void;
 }
 
@@ -27,7 +25,6 @@ const TYPICAL_SCREENS = ['typicaltvscreen', 'screen', 'typical_tv_screen', 'tipi
 const LOWPOLY_SCREENS = ['screen'];
 
 export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors, onShelfZoom, onBackToRoom }: TVClusterProps) {
-    const activeTheme = useSettingsStore(state => state.theme);
     const themes = clusterThemes || { toon: 'toon', dirty: 'blood', lowpoly: 'classic', typical: 'sulfur' };
     const { scene: tvStandModel } = useGLTF('/models/tvStand.glb');
     const clonedStand = React.useMemo(() => tvStandModel.clone(), [tvStandModel]);

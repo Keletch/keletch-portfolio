@@ -1,10 +1,10 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { SettingsProps, SETTINGS_BUTTON_CONFIG } from './SettingsTypes';
 import { THEMES } from '../Types';
 import { drawPixelEye } from '../Helpers';
-import { drawBackButton, drawMenuButton, drawButtonShockwave, checkButtonHover } from './SettingsHelpers';
+import { drawBackButton, drawMenuButton } from './SettingsHelpers';
 import { useTVModel } from '@/hooks/useTVModel';
 import { updateButtonHoverAnimation } from '../SharedHelpers';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
@@ -64,8 +64,7 @@ export default function SettingsTV({
     backButtonPosition = SETTINGS_BUTTON_CONFIG.BACK,
     showMenuButton = false,
     menuButtonPosition = SETTINGS_BUTTON_CONFIG.MENU,
-    onMenuClick,
-    themeOverride
+    onMenuClick
 }: SettingsProps) {
     const SETTINGS_BOUNDS: Record<string, [number, number]> = {
         curve: [2.0, 10.0],
@@ -156,7 +155,6 @@ export default function SettingsTV({
             // Only hittable if within viewport
             if (rowY < -VIEWPORT_HEIGHT / 2 || rowY > VIEWPORT_HEIGHT / 2 + 20) continue;
 
-            const labelX = -100;
             const controlsX = 130;
 
             // Theme still uses arrows
@@ -225,8 +223,8 @@ export default function SettingsTV({
             const gazeX = state.mouse.x - tvScreenPos.x;
             const gazeY = state.mouse.y - tvScreenPos.y;
 
-            let finalX = (gazeX * 5.0) + gazeOffset.x;
-            let finalY = (invertY ? -gazeY : gazeY) * 5.0 + gazeOffset.y;
+            const finalX = (gazeX * 5.0) + gazeOffset.x;
+            const finalY = (invertY ? -gazeY : gazeY) * 5.0 + gazeOffset.y;
 
             normalizedMouse.current.x = Math.max(-1, Math.min(1, finalX));
             normalizedMouse.current.y = Math.max(-1, Math.min(1, finalY));
@@ -237,17 +235,7 @@ export default function SettingsTV({
             currentLookAt.current.x += (normalizedMouse.current.x - currentLookAt.current.x) * speed;
             currentLookAt.current.y += (normalizedMouse.current.y - currentLookAt.current.y) * speed;
 
-            // Slider dragging
-            if (activeSliderRef.current && isFocused && renderedFigure === 'settings') {
-                const rowId = activeSliderRef.current;
-                const rowIdx = SETTINGS_ROWS.findIndex(r => (r as any).id === rowId);
-                if (rowIdx !== -1) {
-                    const rowY = (-VIEWPORT_HEIGHT / 2 + 30) + 10 + (rowIdx * ROW_HEIGHT) - scrollYRef.current;
-                    const dx = normalizedMouse.current.x * 256 - (currentLookAt.current.x * 100); // Approximate
-                    // Better dx Calculation: use the same projection as gaze but in reverse or just use uv
-                    // Since we're in useFrame, we can update based on uv from the last pointer move
-                }
-            }
+            // Slider dragging (logic removed to fix unused variables error)
 
             const blink = blinkState.current;
             blink.blinkTimer += dt;

@@ -165,7 +165,7 @@ export const useSettingsStore = create<SettingsState>()(
             incBubblesVolume: () => set((state) => ({ bubblesVolume: Math.min(2.5, +(state.bubblesVolume + 0.1).toFixed(1)) })),
             decBubblesVolume: () => set((state) => ({ bubblesVolume: Math.max(0.0, +(state.bubblesVolume - 0.1).toFixed(1)) })),
 
-            setNumericSetting: (id: string, value: number) => set((state) => {
+            setNumericSetting: (id: string, value: number) => set(() => {
                 const map: Record<string, string> = {
                     curve: 'curveIntensity',
                     scanline: 'scanlineOpacity',

@@ -3,7 +3,7 @@ import Television from '@/components/Television';
 
 interface MobileSectionProps {
     viewState: string;
-    onNavigate: (state: string) => void;
+    onNavigate?: (state: string) => void;
     theme?: string;
 }
 
@@ -16,7 +16,7 @@ const mobileCtrl = {
     offset: [0.01, 0.23, 0.00] as [number, number, number]
 };
 
-export default function MobileSection({ viewState, onNavigate, theme = 'mobile' }: MobileSectionProps) {
+export default function MobileSection({ viewState, theme = 'mobile' }: MobileSectionProps) {
     return (
         <InteractiveTVWrapper
             tvPosition={{ x: mobileCtrl.pos[0], y: mobileCtrl.pos[1], z: mobileCtrl.pos[2] }}
@@ -31,16 +31,11 @@ export default function MobileSection({ viewState, onNavigate, theme = 'mobile' 
             angularDamping={0.8}
             springStiffness={80}
             springDamping={3.0}
-            inertiaBoostSize={[0.40, 0.40, 0.40]}
-            inertiaBoostOffset={[0.01, 0.23, 0.00]}
-            camPosOffset={[0, -0.1, 0.5]} // Lower camera position
-            camLookAtOffset={[0, -0.05, 0]} // Look slightly lower
-            resetDelay={2.40}
         >
             <Television
                 modelPath="/models/mobile.glb"
                 screenNames={MOBILE_SCREENS}
-                theme={theme as any}
+                theme={theme as 'classic'}
                 invertY={true}
                 isFocused={viewState === 'tv_mobile_focus'}
             />

@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
-import { useFrame, useThree, createPortal } from '@react-three/fiber';
+import { useFrame, useThree, createPortal, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { drawHUDRadioIcon, drawHUDVisionIcon, drawHUDAboutMeIcon, drawHUDMyWorksIcon, drawHUDLifestyleIcon, drawHUDExtrasIcon, drawHUDTVIcon } from '../Television/Helpers';
 
 interface TopLeftHUDProps {
     onNavigate: (state: string) => void;
 }
+
+type HUDButton = 'tv' | 'radio' | 'about' | 'works' | 'vision' | 'lifestyle' | 'extras';
 
 export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
     const { camera, scene } = useThree();
@@ -24,7 +26,7 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
 
     const [isExpanded, setIsExpanded] = useState(false);
     const expansionProgress = useRef(0);
-    const [hoveredBtn, setHoveredBtn] = useState<'tv' | 'radio' | 'about' | 'works' | 'vision' | 'lifestyle' | 'extras' | null>(null);
+    const [hoveredBtn, setHoveredBtn] = useState<HUDButton | null>(null);
     const hoverProgressRefs = useRef<Record<string, number>>({
         tv: 0, radio: 0, about: 0, works: 0, vision: 0, lifestyle: 0, extras: 0
     });
@@ -45,7 +47,7 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
             cx.imageSmoothingEnabled = false;
         }
         return { canvas: c, ctx: cx };
-    }, []);
+    }, [canvasWidth, canvasHeight]);
 
     useMemo(() => {
         const tex = new THREE.CanvasTexture(canvas);
@@ -55,7 +57,7 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
         textureRef.current = tex;
     }, [canvas]);
 
-    const MENU_ITEMS = [
+    const MENU_ITEMS = useMemo(() => [
         { id: 'tv', draw: drawHUDTVIcon, label: '' },
         { id: 'about', draw: drawHUDAboutMeIcon, state: 'tv_red_focus', label: 'About Me' },
         { id: 'works', draw: drawHUDMyWorksIcon, state: 'tv_lcd_focus', label: 'My Works' },
@@ -63,19 +65,17 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
         { id: 'lifestyle', draw: drawHUDLifestyleIcon, state: 'tv_typical_focus', label: 'Lifestyle' },
         { id: 'extras', draw: drawHUDExtrasIcon, state: 'tv_lowpoly_focus', label: 'Extras' },
         { id: 'radio', draw: drawHUDRadioIcon, state: 'radio_focus', label: 'Music' },
-    ] as const;
+    ] as const, []);
 
     useFrame((state, delta) => {
         if (!ctx) return;
 
-        let changed = false;
         const time = state.clock.elapsedTime;
 
         // Menu expansion
         const targetExp = isExpanded ? 1 : 0;
         if (Math.abs(expansionProgress.current - targetExp) > 0.001) {
             expansionProgress.current = THREE.MathUtils.lerp(expansionProgress.current, targetExp, delta * 10);
-            changed = true;
         }
 
         // Button hover states
@@ -89,7 +89,6 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
                     hoverStartTimeRefs.current[item.id] = time;
                 }
                 hoverProgressRefs.current[item.id] = THREE.MathUtils.lerp(prevProgress, target, delta * 15);
-                changed = true;
             }
         });
 
@@ -157,7 +156,7 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
         if (textureRef.current) textureRef.current.needsUpdate = true;
     });
 
-    const handlePointerMove = (e: any) => {
+    const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
         const rawUv = e.uv;
         if (!rawUv) return;
 
@@ -167,7 +166,7 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
         const xLeft = 15;
         const xRight = 65; // Restricted: hover only on icons, not on text space
 
-        let hit: any = null;
+        let hit: string | null = null;
 
         // TV hit check
         if (px > xLeft && px < 65 && py > 0 && py < slotSize) {
@@ -184,7 +183,7 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
             }
         }
 
-        setHoveredBtn(hit);
+        setHoveredBtn(hit as HUDButton | null);
         document.body.style.cursor = hit ? 'pointer' : 'auto';
     };
 
@@ -193,17 +192,16 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
         document.body.style.cursor = 'auto';
     };
 
-    const handleClick = (e: any) => {
+    const handleClick = (e: ThreeEvent<MouseEvent>) => {
         if (!hoveredBtn) return;
         e.stopPropagation();
 
         if (hoveredBtn === 'tv') {
             setIsExpanded(!isExpanded);
         } else {
-            const item = MENU_ITEMS.find(m => m.id === hoveredBtn);
-            if (item && 'state' in item) {
+            const item = (MENU_ITEMS as readonly { id: string, state?: string }[]).find(m => m.id === hoveredBtn);
+            if (item && item.state) {
                 onNavigate(item.state);
-                // Keep menu open on navigation
             }
         }
     };

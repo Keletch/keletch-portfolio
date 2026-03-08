@@ -200,7 +200,7 @@ export default function Television({
 
                 ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
 
-                let scaleEye = theme === 'mobile' ? 0.6 : 1.0;
+                const scaleEye = theme === 'mobile' ? 0.6 : 1.0;
                 let geoCorrectionX = 1.0;
                 if (theme === 'toxic' && screenAspect.current > 1.2) {
                     geoCorrectionX = 1 / (screenAspect.current * 0.85);

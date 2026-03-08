@@ -2,11 +2,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
-import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
+import { Physics, CuboidCollider } from '@react-three/rapier';
 import { useGLTF } from '@react-three/drei';
 
 // Section components
-import Television from '@/components/Television';
 import RadioSection from '@/components/Television/Radio/RadioSection';
 import MyWorksSection from '@/components/Television/MyWorks/MyWorksSection';
 import AboutMeSection from '@/components/Television/AboutMe/AboutMeSection';
@@ -19,7 +18,6 @@ import { CameraRig } from '@/components/Scene/CameraRig';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib';
 
 import { AdjustableModel } from '@/components/Debug/AdjustableModel';
-import { BackButton3D } from '@/components/Props/BackButton3D';
 import { LuckyCat } from '@/components/Props/LuckyCat';
 import { RoomFloor } from '@/components/Scene/RoomFloor';
 import { PaletteSelector } from '@/components/UI/PaletteSelector';
@@ -31,7 +29,7 @@ RectAreaLightUniformsLib.init();
 
 export type ViewState = 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus' | 'tv_settings_focus' | 'tv_mobile_focus' | 'tv_typical_gallery';
 
-const MOBILE_SCREENS = ['mobileScreen'];
+
 
 type PaletteId = 'current' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I';
 
@@ -252,7 +250,6 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
 
     // Physics props and books configuration
     const dvdCtrl = { pos: [0, -0.45, 0.30] as [number, number, number], size: [0.43, 0.08, 0.29] as [number, number, number], offset: [0, 0.08, -0.19] as [number, number, number] };
-    const mobileCtrl = { pos: [3.0, 4.0, 0.30] as [number, number, number], rot: [-1.5, 0, -0.30] as [number, number, number], size: [0.09, 0.20, 0.03] as [number, number, number], offset: [0.01, 0.23, 0.00] as [number, number, number] };
     const rubiksGoldCtrl = { pos: [2.00, 6.00, 0.40] as [number, number, number], rot: [0, 0.5, 0] as [number, number, number], scale: 2.45, size: [0.20, 0.20, 0.20] as [number, number, number], offset: [-0.01, 0.20, -0.01] as [number, number, number] };
     const luckyCatCtrl = { pos: [-0.75, -1.0, 0.0] as [number, number, number], scale: 1.0, size: [0.18, 0.20, 0.14] as [number, number, number], offset: [0.01, 0.18, 0.00] as [number, number, number] };
 
@@ -396,7 +393,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                             if (t) settings.setTheme(t);
                         }}
                         onMenuSelect={() => setViewState('shelf_focus')}
-                        onSettingsSelect={() => handleZoom({ stopPropagation: () => { } } as any, 'tv_settings_focus')}
+                        onSettingsSelect={() => handleZoom({ stopPropagation: () => { } } as unknown as ThreeEvent<MouseEvent>, 'tv_settings_focus')}
                         onResetSelect={handleResetScene}
                         onContactSelect={() => setViewState('tv_mobile_focus')}
                     />

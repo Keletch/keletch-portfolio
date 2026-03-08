@@ -41,7 +41,7 @@ export function CameraRig({ viewState }: CameraRigProps) {
         // Default camera targets
         let targetPos = defaultPos;
         let targetLookAt = defaultLookAt;
-        let targetUp = new THREE.Vector3(0, 1, 0);
+        const targetUp = new THREE.Vector3(0, 1, 0);
 
         const dynamicTVs = ['shelf_focus', 'radio_focus', 'tv_settings_focus', 'tv_dirty_focus', 'tv_typical_focus', 'tv_typical_gallery', 'tv_lowpoly_focus', 'tv_red_focus', 'tv_lcd_focus', 'tv_mobile_focus'];
 

@@ -56,7 +56,7 @@ let _offCtx: CanvasRenderingContext2D | null = null;
 
 function getOffCtx(width: number, height: number): CanvasRenderingContext2D {
     // Return a mocked dummy fallback for SSR since document does not exist server-side
-    if (typeof document === 'undefined') return null as any;
+    if (typeof document === 'undefined') return null as unknown as CanvasRenderingContext2D;
 
     if (!_offCanvas) {
         _offCanvas = document.createElement('canvas');
@@ -113,17 +113,17 @@ const perspective = 400;
 
 function project3D(x: number, y: number, z: number, rotX: number, rotY: number, rotZ: number) {
     // Rotate Z
-    let x1 = x * Math.cos(rotZ) - y * Math.sin(rotZ);
-    let y1 = x * Math.sin(rotZ) + y * Math.cos(rotZ);
-    let z1 = z;
+    const x1 = x * Math.cos(rotZ) - y * Math.sin(rotZ);
+    const y1 = x * Math.sin(rotZ) + y * Math.cos(rotZ);
+    const z1 = z;
 
     // Rotate X
-    let y2 = y1 * Math.cos(rotX) - z1 * Math.sin(rotX);
-    let z2 = y1 * Math.sin(rotX) + z1 * Math.cos(rotX);
+    const y2 = y1 * Math.cos(rotX) - z1 * Math.sin(rotX);
+    const z2 = y1 * Math.sin(rotX) + z1 * Math.cos(rotX);
 
     // Rotate Y
-    let x3 = x1 * Math.cos(rotY) + z2 * Math.sin(rotY);
-    let z3 = -x1 * Math.sin(rotY) + z2 * Math.cos(rotY);
+    const x3 = x1 * Math.cos(rotY) + z2 * Math.sin(rotY);
+    const z3 = -x1 * Math.sin(rotY) + z2 * Math.cos(rotY);
 
     const scale = perspective / (perspective + z3);
     return {
@@ -134,41 +134,7 @@ function project3D(x: number, y: number, z: number, rotX: number, rotY: number, 
     };
 }
 
-// Applies RGB channel separation to any path geometry to create chromatic aberration
-function withAberration(
-    ctx: CanvasRenderingContext2D,
-    alpha: number,
-    offset: number,
-    lineWidth: number,
-    drawGeometry: () => void,
-    isFill: boolean = false
-) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
 
-    const drawChannel = (color: string, ox: number, oy: number) => {
-        ctx.save();
-        ctx.translate(ox, oy);
-        ctx.globalAlpha = alpha;
-        ctx.beginPath();
-        drawGeometry();
-        if (isFill) {
-            ctx.fillStyle = color;
-            ctx.fill();
-        } else {
-            ctx.lineWidth = lineWidth;
-            ctx.strokeStyle = color;
-            ctx.stroke();
-        }
-        ctx.restore();
-    };
-
-    drawChannel('#ff0000', -offset, 0);
-    drawChannel('#00ff00', 0, 0);
-    drawChannel('#0000ff', offset, 0);
-
-    ctx.restore();
-}
 
 // 1. The Journey: Hyperdimensional Tesseract (4D projection with XOR)
 export function drawNeuralMesh(ctx: CanvasRenderingContext2D, time: number) {
@@ -205,7 +171,6 @@ export function drawNeuralMesh(ctx: CanvasRenderingContext2D, time: number) {
                         }
                     }
                     if (faceNodes.length === 4) {
-                        const f0 = faceNodes[0];
                         const temp = faceNodes[2];
                         faceNodes[2] = faceNodes[3];
                         faceNodes[3] = temp;
@@ -231,11 +196,11 @@ export function drawNeuralMesh(ctx: CanvasRenderingContext2D, time: number) {
                     const th = time * 0.8;
 
                     // Rotate XW
-                    let x = v[0] * Math.cos(th) - v[3] * Math.sin(th);
-                    let w = v[0] * Math.sin(th) + v[3] * Math.cos(th);
+                    const x = v[0] * Math.cos(th) - v[3] * Math.sin(th);
+                    const w = v[0] * Math.sin(th) + v[3] * Math.cos(th);
                     // Rotate YZ
-                    let y = v[1] * Math.cos(th * 0.7) - v[2] * Math.sin(th * 0.7);
-                    let z = v[1] * Math.sin(th * 0.7) + v[2] * Math.cos(th * 0.7);
+                    const y = v[1] * Math.cos(th * 0.7) - v[2] * Math.sin(th * 0.7);
+                    const z = v[1] * Math.sin(th * 0.7) + v[2] * Math.cos(th * 0.7);
 
                     const w_proj = 1.0 / (2.5 - w);
                     const p3x = x * w_proj * 75;
@@ -400,7 +365,7 @@ export function drawAudioWaveform(ctx: CanvasRenderingContext2D, time: number) {
 
                         const envelope = Math.sin((j / pointsPerLine) * Math.PI);
 
-                        let y = Math.sin(xBase * 0.015 + time * freqSpeed + phaseOffset) * amplitude * envelope;
+                        const y = Math.sin(xBase * 0.015 + time * freqSpeed + phaseOffset) * amplitude * envelope;
 
                         const p = project3D(xBase, y - bandThickness / 2, 0, rotX, rotY, 0);
                         if (j === 0) oCtx.moveTo(p.px, p.py);
@@ -411,7 +376,7 @@ export function drawAudioWaveform(ctx: CanvasRenderingContext2D, time: number) {
                         const xBase = (j / pointsPerLine) * 1000 - 500;
                         const envelope = Math.sin((j / pointsPerLine) * Math.PI);
 
-                        let y = Math.sin(xBase * 0.015 + time * freqSpeed + phaseOffset) * amplitude * envelope;
+                        const y = Math.sin(xBase * 0.015 + time * freqSpeed + phaseOffset) * amplitude * envelope;
 
                         const p = project3D(xBase, y + bandThickness / 2, 0, rotX, rotY, 0);
                         oCtx.lineTo(p.px, p.py);

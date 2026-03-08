@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
-import { useFrame, useThree, createPortal } from '@react-three/fiber';
+import { useFrame, useThree, createPortal, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { drawHUDMenuIcon, drawHUDSettingsGear, drawHUDResetIcon, drawHUDLetterIcon } from '../Television/Helpers';
 
@@ -14,8 +14,8 @@ interface PaletteSelectorProps {
     onContactSelect?: () => void;
 }
 
-export function PaletteSelector({ current, onChange, onMenuSelect, onSettingsSelect, onResetSelect, onContactSelect }: PaletteSelectorProps) {
-    const { camera, size, scene } = useThree();
+export function PaletteSelector({ onMenuSelect, onSettingsSelect, onResetSelect, onContactSelect }: PaletteSelectorProps) {
+    const { camera, scene } = useThree();
 
     useEffect(() => {
         // Sync camera with scene for HUD rendering
@@ -82,7 +82,7 @@ export function PaletteSelector({ current, onChange, onMenuSelect, onSettingsSel
         textureRef.current.needsUpdate = true;
     });
 
-    const handlePointerMove = (e: any) => {
+    const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
         const rawUv = e.uv;
         if (!rawUv) return;
 
@@ -120,7 +120,7 @@ export function PaletteSelector({ current, onChange, onMenuSelect, onSettingsSel
         document.body.style.cursor = 'auto';
     };
 
-    const handleClick = (e: any) => {
+    const handleClick = (e: ThreeEvent<MouseEvent>) => {
         if (!hoveredBtn) return;
         e.stopPropagation();
 

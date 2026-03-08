@@ -611,7 +611,6 @@ export function drawHUDLetterIcon(
         const x0 = cx - w / 2;
         const y0 = cy - h / 2;
         const x1 = x0 + w;
-        const y1 = y0 + h;
         // Flap tip: drops about 70% into the body for a larger, more visible triangle
         const flapDepth = h * 0.70;
 
@@ -798,7 +797,6 @@ export function drawHUDMyWorksIcon(
         ctx.globalAlpha = masterAlpha;
 
         // Rock / Stone / Mineral (More jagged, moved DOWN)
-        const rockYScale = 1.0;
         ctx.beginPath();
         ctx.moveTo(cx - 9, cy + 11);
         ctx.lineTo(cx - 11, cy + 7);
@@ -1013,7 +1011,6 @@ export function drawHUDExtrasIcon(
             const rz = x * Math.sin(rot) + z * Math.cos(rot);
             // Rotate X
             const ry = y * Math.cos(0.5) - rz * Math.sin(0.5);
-            const finalZ = y * Math.sin(0.5) + rz * Math.cos(0.5);
 
             // Project
             vertices.push({ x: rx, y: ry });

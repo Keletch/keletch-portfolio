@@ -1,0 +1,65 @@
+﻿
+> crt-tv-installation@0.1.0 build
+> next build
+
+  Ôû▓ Next.js 14.2.35
+
+   Creating an optimized production build ...
+ Ô£ô Compiled successfully
+   Linting and checking validity of types ...
+node.exe : 
+En línea: 1 Carácter: 1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : 
+NotSpecified    : 
+(:String) [], Rem    
+oteException
+    + 
+FullyQualifiedErr    
+orId : NativeComman    
+dError
+ 
+Failed to compile.
+
+./components/Television
+/Settings/SettingsSecti
+on.tsx
+5:54  Error: 
+'_viewState' is 
+defined but never 
+used.  @typescript-esli
+nt/no-unused-vars
+
+./components/UI/TopLeft
+HUD.tsx
+184:30  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-esli
+nt/no-explicit-any
+200:50  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-esli
+nt/no-explicit-any
+200:66  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-esli
+nt/no-explicit-any
+
+info  - Need to 
+disable some ESLint 
+rules? Learn more 
+here: https://nextjs.or
+g/docs/basic-features/e
+slint#disabling-rules

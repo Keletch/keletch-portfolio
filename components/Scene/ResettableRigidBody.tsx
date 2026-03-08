@@ -22,15 +22,7 @@ export const ResettableRigidBody = forwardRef<RapierRigidBody, ResettableRigidBo
         const unregisterResettingItem = useSettingsStore(state => state.unregisterResettingItem);
         const reportItemReady = useSettingsStore(state => state.reportItemReady);
 
-        const isResettingRef = useRef(false);
-        const isReadyRef = useRef(false);
         const isVanishing = useRef(false);
-
-        const posArr = Array.isArray(position) ? position : [0, 0, 0];
-        const rotArr = Array.isArray(rotation) ? rotation : [0, 0, 0];
-
-        const initialPosVec = React.useMemo(() => new THREE.Vector3(posArr[0], posArr[1], posArr[2]), [posArr]);
-        const initialRotQuat = React.useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(rotArr[0], rotArr[1], rotArr[2])), [rotArr]);
 
         const scaleTarget = useRef(1);
         const currentScale = useRef(1);
