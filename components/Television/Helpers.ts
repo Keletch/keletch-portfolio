@@ -649,94 +649,93 @@ export function drawHUDTVIcon(
     color: string = '#ffffff',
     time: number = 0
 ) {
-    const masterAlpha = ctx.globalAlpha;
     const steppedTime = Math.floor(time * 10) / 10;
+    const tvW = 26;
+    const tvH = 18;
+    const cornerR = 4;
+    const scrW = 10;
+    const scrH = 8;
+    const scrXOffset = -2;
 
     applyRetroButtonEffect(ctx, btnX, btnY, hoverProgress, color, (cx, cy, c) => {
+        // Only do the body fill on the main pass
+        const isMainPass = c.toLowerCase() === color.toLowerCase() || c.startsWith('rgba(');
+
         ctx.strokeStyle = c;
         ctx.fillStyle = c;
         ctx.lineWidth = 1.6;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.globalAlpha = masterAlpha;
 
-        // TV Body (CRT Style - slightly larger for better frame)
-        const tvW = 26;
-        const tvH = 20;
-        const cornerR = 5; // Moar round as per drawing
-
+        // 1. Body Outline
         ctx.beginPath();
         drawPixelRoundedRect(ctx, cx - tvW / 2, cy - tvH / 2, tvW, tvH, cornerR);
         ctx.stroke();
 
-        // Screen Area (Smaller, more centered "pantallita")
-        const scrW = 14;
-        const scrH = 10;
-        const scrX = cx - scrW / 2 - 1; // Slightly off-center for dials
-        const scrY = cy - scrH / 2;
+        // 2. Body Fill (Main pass only)
+        if (isMainPass) {
+            ctx.save();
+            ctx.fillStyle = '#101010';
+            ctx.beginPath();
+            drawPixelRoundedRect(ctx, cx - tvW / 2, cy - tvH / 2, tvW, tvH, cornerR);
+            ctx.fill();
+            ctx.restore();
+        }
 
-        // Antennas (More pronounced wiggle as requested)
-        const antLen = 12;
-        const wiggle = Math.sin(time * 4) * 0.35; // Increased frequency and amplitude
-
+        // 3. Antennas (Subtle)
+        const antLen = 10;
+        const wiggle = Math.sin(time * 1.2) * 0.05;
         ctx.beginPath();
         ctx.moveTo(cx - 5, cy - tvH / 2);
-        ctx.lineTo(cx - 5 - Math.cos(0.6 + wiggle) * antLen, cy - tvH / 2 - Math.sin(0.6 + wiggle) * antLen);
+        ctx.lineTo(cx - 5 - Math.cos(0.7 + wiggle) * antLen, cy - tvH / 2 - Math.sin(0.7 + wiggle) * antLen);
         ctx.stroke();
-
         ctx.beginPath();
         ctx.moveTo(cx + 5, cy - tvH / 2);
-        ctx.lineTo(cx + 5 + Math.cos(0.6 - wiggle) * (antLen * 0.9), cy - tvH / 2 - Math.sin(0.6 - wiggle) * (antLen * 0.9));
+        ctx.lineTo(cx + 5 + Math.cos(0.7 - wiggle) * (antLen * 0.85), cy - tvH / 2 - Math.sin(0.7 - wiggle) * (antLen * 0.85));
         ctx.stroke();
 
-        // Dials on the right (part of the wide frame)
+        // 4. Dials
         const dialX = cx + tvW / 2 - 4.5;
-        ctx.fillRect(dialX, cy - 3, 2.5, 2.5);
-        ctx.fillRect(dialX, cy + 1.5, 2.5, 2.5);
+        ctx.fillRect(dialX, cy - 3, 2, 2);
+        ctx.fillRect(dialX, cy + 1, 2, 2);
 
-        // --- IDLE ANIMATION: Static Noise ---
+        // 5. Screen area
+        const sx = cx + scrXOffset - scrW / 2;
+        const sy = cy - scrH / 2;
+
         ctx.save();
         ctx.beginPath();
-        drawPixelRoundedRect(ctx, scrX, scrY, scrW, scrH, 1);
+        drawPixelRoundedRect(ctx, sx, sy, scrW, scrH, 1);
         ctx.clip();
 
-        const noiseCount = 12;
+        // 5a. Noise
+        const noiseCount = 6;
         for (let i = 0; i < noiseCount; i++) {
-            const nx = scrX + (Math.abs(Math.sin(i * 123 + steppedTime * 15)) * scrW);
-            const ny = scrY + (Math.abs(Math.cos(i * 456 + steppedTime * 15)) * scrH);
-            ctx.globalAlpha = masterAlpha * (0.2 + Math.random() * 0.4);
+            const nx = sx + (Math.abs(Math.sin(i * 99 + steppedTime * 12)) * scrW);
+            const ny = sy + (Math.abs(Math.cos(i * 33 + steppedTime * 12)) * scrH);
+            ctx.globalAlpha = 0.2 + Math.random() * 0.3;
+            ctx.fillStyle = c;
             ctx.fillRect(Math.floor(nx), Math.floor(ny), 1, 1);
+        }
+
+        // 5b. The Hole (Transparent Eye)
+        if (hoverProgress > 0.01) {
+            ctx.save();
+            ctx.globalAlpha = hoverProgress;
+            ctx.globalCompositeOperation = 'destination-out';
+            const eyeX = sx + scrW / 2;
+            const eyeY = sy + scrH / 2;
+            const pX = Math.sin(steppedTime * 6) * 1.5;
+            const pY = Math.cos(steppedTime * 4) * 1.2;
+            drawPixelEllipse(ctx, eyeX + pX, eyeY + pY, 4, 3, 1);
+            ctx.restore();
         }
         ctx.restore();
 
-        // Screen Frame Stroke
+        // 6. Screen border
         ctx.beginPath();
-        drawPixelRoundedRect(ctx, scrX, scrY, scrW, scrH, 1);
+        drawPixelRoundedRect(ctx, sx, sy, scrW, scrH, 1);
         ctx.stroke();
-
-        // --- HOVER ANIMATION: The eye ---
-        if (hoverProgress > 0.01) {
-            ctx.save();
-            ctx.globalAlpha = masterAlpha * hoverProgress;
-
-            const eyeX = scrX + scrW / 2;
-            const eyeY = scrY + scrH / 2;
-
-            // Eye Sclera (Filled)
-            ctx.fillStyle = c;
-            drawPixelEllipse(ctx, eyeX, eyeY, 3.5, 2.5, 1);
-
-            // Pupil movement (jittery)
-            const pX = Math.sin(steppedTime * 10) * 1.2;
-            const pY = Math.cos(steppedTime * 7) * 0.8;
-
-            ctx.save();
-            ctx.globalCompositeOperation = 'destination-out';
-            drawPixelCircle(ctx, eyeX + pX, eyeY + pY, 1.2, 1);
-            ctx.restore();
-
-            ctx.restore();
-        }
     });
 }
 

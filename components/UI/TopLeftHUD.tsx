@@ -121,6 +121,7 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
             const localTime = (isLifestyle && hoverProgressRefs.current[item.id] > 0) ? (time - hoverStart) : time;
 
             item.draw(ctx, xPos, y, hoverProgressRefs.current[item.id], '#ffffff', localTime);
+
             ctx.restore();
 
             // Render Label
