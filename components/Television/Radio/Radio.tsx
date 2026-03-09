@@ -625,7 +625,7 @@ export default function RadioTV({
                                 e.stopPropagation();
                                 setIsListDragging(true);
                                 setDragStartY(dy);
-                                setDragStartScroll(targetScrollYRef.current);
+                                setDragStartScroll(scrollYRef.current);
                                 (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                 return;
                             }
@@ -657,10 +657,6 @@ export default function RadioTV({
                         if (e.object.userData.isScreen && e.uv) {
                             if (isSeekDragging) return;
 
-                            const dx = e.uv.x * 512 - 256;
-                            let dy = (1 - e.uv.y) * 512 - 256;
-                            if (invertY) dy = -dy;
-
                             const buttonHit = checkButtonHover(e.uv);
                             if (buttonHit === 'play') {
                                 e.stopPropagation();
@@ -687,15 +683,11 @@ export default function RadioTV({
                                 onNextClick();
                             } else if (isMenuOpen) {
                                 // Check List Click
-                                const listX = -220; const listY = -140; const listW = 440; const listH = 280;
-                                if (dx >= listX && dx <= listX + listW && dy >= listY && dy <= listY + listH) {
-                                    const relativeY = dy - listY + scrollYRef.current;
-                                    const index = Math.floor(relativeY / 40);
-                                    if (index >= 0 && index < tracks.length) {
-                                        if (onSelectTrack) {
-                                            onSelectTrack(tracks[index]);
-                                            setIsMenuOpen(false); // Close on select
-                                        }
+                                if (hoveredTrackIndex >= 0 && hoveredTrackIndex < tracks.length) {
+                                    if (onSelectTrack) {
+                                        e.stopPropagation();
+                                        onSelectTrack(tracks[hoveredTrackIndex]);
+                                        setIsMenuOpen(false); // Close on select
                                     }
                                 }
                             }

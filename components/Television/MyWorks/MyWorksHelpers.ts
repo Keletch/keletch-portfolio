@@ -173,17 +173,22 @@ export function drawProjectInfo(
         charsToShow = Math.floor(timeSinceStart / charSpeed);
     }
 
+    const jitterX = (Math.random() - 0.5) * 3 * (1 - Math.pow(opacity, 2));
+    const jitterY = (Math.random() - 0.5) * 3 * (1 - Math.pow(opacity, 2));
+
     charsToShow = Math.min(charsToShow, fullText.length);
     const currentVisibleText = fullText.slice(0, charsToShow);
 
-    ctx.fillStyle = textColor;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
 
     const visibleLines = currentVisibleText.split('\n');
     visibleLines.forEach((txt, i) => {
-        ctx.fillStyle = `rgba(${textRGB.r}, ${textRGB.g}, ${textRGB.b}, 1.0)`;
-        ctx.fillText(txt, -maxWidth / 2, textBoxY + (i * lineHeight));
+        const x = -maxWidth / 2;
+        const y = textBoxY + (i * lineHeight);
+
+        ctx.fillStyle = `rgba(${textRGB.r}, ${textRGB.g}, ${textRGB.b}, ${opacity})`;
+        ctx.fillText(txt, x + jitterX, y + jitterY);
     });
 
     ctx.restore();
