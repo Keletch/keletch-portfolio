@@ -68,7 +68,7 @@ export default function MyWorks({
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) return { lines: [], fullText: '' };
-        ctx.font = '15px "Courier New", monospace';
+        ctx.font = 'bold 15px "Courier New", monospace';
         const maxWidth = 380;
         const rawLines = [
             currentProject.title,
@@ -289,7 +289,7 @@ export default function MyWorks({
 
 
     const activeTheme = THEMES[theme as keyof typeof THEMES] || THEMES.classic;
-    const buttonColor = theme === 'classic' ? '#ffffff' : activeTheme.highlightColor;
+    const buttonColor = activeTheme.highlightColor || '#ffffff';
 
 
 
@@ -560,7 +560,8 @@ export default function MyWorks({
                         // Async flicker jitter for title
                         const time = state.clock.elapsedTime;
                         const titleJitter = Math.sin(time * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                        const titleAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + titleJitter));
+                        // Increased opacity for titles
+                        const titleAlpha = Math.max(0, Math.min(1.0, uiSteppedOpacity * 1.5 + titleJitter));
                         ctx.globalAlpha = titleAlpha;
 
                         const locJitterX = (Math.random() - 0.5) * 4;
@@ -579,7 +580,7 @@ export default function MyWorks({
                         ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
                         ctx.fillText(focusedText, locJitterX - 4, textY + locJitterY);
 
-                        ctx.fillStyle = activeTheme.textColor || '#ffffff';
+                        ctx.fillStyle = buttonColor;
                         if (Math.random() > 0.1) {
                             ctx.fillText(focusedText, locJitterX, textY + locJitterY);
                         }

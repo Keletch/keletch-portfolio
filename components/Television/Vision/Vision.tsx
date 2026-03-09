@@ -132,8 +132,9 @@ export default function Vision({
     const { transitionOpacity: eyeOpacityRef } = useFigureTransition(eyeTarget, 0);
 
     const eyeMorphProgress = useRef(0);
-    const activeTheme = THEMES[theme] || THEMES.classic;
-    const buttonColor = theme === 'classic' ? '#ffffff' : activeTheme.highlightColor;
+    const themeBasedDefaults = THEMES[theme] || THEMES.classic;
+    const activeTheme = visionColors ? { ...themeBasedDefaults, ...visionColors } : themeBasedDefaults;
+    const buttonColor = activeTheme.highlightColor || '#ffffff';
 
     // Focus and zoom lifecycle management
     useEffect(() => {
@@ -360,25 +361,25 @@ export default function Vision({
                         ctx.save();
 
                         const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                        const titleAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + titleJitter));
+                        // Increased title opacity
+                        const titleAlpha = Math.max(0, Math.min(1.0, uiSteppedOpacity * 1.5 + titleJitter));
                         ctx.globalAlpha = titleAlpha;
 
                         ctx.translate(w / 2, h / 2);
                         if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
-                        const jx = (Math.random() - 0.5) * 2;
-                        const jy = (Math.random() - 0.5) * 2;
+                        const jx = (Math.random() - 0.5) * 4;
+                        const jy = (Math.random() - 0.5) * 4;
                         ctx.font = '900 42px "Courier New", monospace';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'top';
                         const textY = -h / 2 + textYOffset;
-                        const titleColor = visionColors?.textColor || activeTheme.textColor || '#ffffff';
                         const s1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
                         const s2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
                         ctx.fillStyle = (activeTheme.textShadow1) ? s1 + '80' : s1;
                         ctx.fillText(focusedText, jx + 4, textY + jy);
                         ctx.fillStyle = (activeTheme.textShadow2) ? s2 + '80' : s2;
                         ctx.fillText(focusedText, jx - 4, textY + jy);
-                        ctx.fillStyle = titleColor;
+                        ctx.fillStyle = buttonColor || '#ffffff';
                         if (Math.random() > 0.1) ctx.fillText(focusedText, jx, textY + jy);
                         ctx.restore();
                     }

@@ -142,15 +142,13 @@ export function drawProjectInfo(
     const lineHeight = 20;
     const padding = 15;
 
-    ctx.font = `15px "Courier New", monospace`;
+    ctx.font = `bold 15px "Courier New", monospace`;
 
     const numLines = wrappedLines.length;
     const boxHeight = (numLines * lineHeight) + (padding * 2);
     const totalWidth = maxWidth + (padding * 2);
 
-    ctx.globalAlpha = opacity;
-
-    // Hex to RGB conversion for opacity handling
+    // Border with transition opacity
     const hexToRgb = (hex: string) => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result ? {
@@ -162,7 +160,6 @@ export function drawProjectInfo(
 
     const highlightRGB = hexToRgb(highlightColor) || { r: 255, g: 255, b: 255 };
     const textRGB = hexToRgb(textColor) || { r: 255, g: 255, b: 255 };
-
     ctx.strokeStyle = `rgba(${highlightRGB.r}, ${highlightRGB.g}, ${highlightRGB.b}, ${opacity})`;
     ctx.lineWidth = 2;
     ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
@@ -185,7 +182,7 @@ export function drawProjectInfo(
 
     const visibleLines = currentVisibleText.split('\n');
     visibleLines.forEach((txt, i) => {
-        ctx.fillStyle = `rgba(${textRGB.r}, ${textRGB.g}, ${textRGB.b}, ${opacity})`;
+        ctx.fillStyle = `rgba(${textRGB.r}, ${textRGB.g}, ${textRGB.b}, 1.0)`;
         ctx.fillText(txt, -maxWidth / 2, textBoxY + (i * lineHeight));
     });
 

@@ -134,13 +134,9 @@ export function useTypewriter({ storyContent, enableStoryMode, onStoryEnd }: Use
             }
         };
 
-        const onMouseDown = () => handleInteraction();
-
         window.addEventListener('keydown', onKeyDown);
-        window.addEventListener('mousedown', onMouseDown);
         return () => {
             window.removeEventListener('keydown', onKeyDown);
-            window.removeEventListener('mousedown', onMouseDown);
         }
     }, [storyMode, handleInteraction]);
 

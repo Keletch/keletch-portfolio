@@ -57,7 +57,7 @@ export default function AboutMeTV({
 }: AboutMeProps & { themeOverride?: ThemeOverride }) {
     const themeBasedDefaults = THEMES[theme as keyof typeof THEMES] || ABOUTME_THEME;
     const activeTheme = themeOverride ? { ...themeBasedDefaults, ...themeOverride } : themeBasedDefaults;
-    const buttonColor = theme === 'classic' ? '#ffffff' : activeTheme.highlightColor;
+    const buttonColor = activeTheme.highlightColor || '#ffffff';
     const groupRef = useRef<THREE.Group>(null);
     const normalizedMouse = useRef({ x: 0, y: 0 });
     const currentLookAt = useRef({ x: 0, y: 0 });
@@ -91,7 +91,7 @@ export default function AboutMeTV({
             storyContent,
             380,
             4,
-            '20px "Courier New", monospace'
+            'bold 20px "Courier New", monospace'
         );
     }, [storyContent, enableStoryMode]);
 
@@ -362,9 +362,12 @@ export default function AboutMeTV({
                     const padding = 15;
                     const boxHeight = 142;
                     const totalWidth = maxWidth + (padding * 2);
-
-                    ctx.globalAlpha = storyStepped;
-                    ctx.strokeStyle = activeTheme.highlightColor ? `rgba(${parseInt(activeTheme.highlightColor.slice(1, 3), 16)}, ${parseInt(activeTheme.highlightColor.slice(3, 5), 16)}, ${parseInt(activeTheme.highlightColor.slice(5, 7), 16)}, ${storyStepped})` : `rgba(255, 255, 255, ${storyStepped})`;
+                    
+                    const borderColor = activeTheme.highlightColor || '#ffffff';
+                    const br = parseInt(borderColor.slice(1, 3), 16);
+                    const bg = parseInt(borderColor.slice(3, 5), 16);
+                    const bb = parseInt(borderColor.slice(5, 7), 16);
+                    ctx.strokeStyle = `rgba(${br}, ${bg}, ${bb}, ${storyStepped})`;
                     ctx.lineWidth = 2;
                     ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
 
@@ -390,7 +393,7 @@ export default function AboutMeTV({
 
                         const currentVisibleText = fullText.slice(0, charsToShow);
 
-                        ctx.font = '20px "Courier New", monospace';
+                        ctx.font = 'bold 20px "Courier New", monospace';
                         ctx.fillStyle = activeTheme.textColor || '#ffffff';
                         ctx.textAlign = 'left';
                         ctx.textBaseline = 'top';
@@ -401,7 +404,7 @@ export default function AboutMeTV({
                             const r = parseInt(baseTextColor.slice(1, 3), 16);
                             const g = parseInt(baseTextColor.slice(3, 5), 16);
                             const b = parseInt(baseTextColor.slice(5, 7), 16);
-                            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${storyStepped})`;
+                            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 1.0)`;
                             ctx.fillText(txt, -maxWidth / 2, textBoxY + (i * lineHeight));
                         });
                     }
@@ -412,7 +415,7 @@ export default function AboutMeTV({
                         const r = parseInt(arrowColor.slice(1, 3), 16);
                         const g = parseInt(arrowColor.slice(3, 5), 16);
                         const b = parseInt(arrowColor.slice(5, 7), 16);
-                        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${storyStepped})`;
+                        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 1.0)`;
                         ctx.fillText('▼', (maxWidth / 2) - 15, textBoxY + (lineHeight * 1.5));
                     }
                     ctx.restore();
@@ -431,7 +434,8 @@ export default function AboutMeTV({
                         ctx.save();
 
                         const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                        const titleAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + titleJitter));
+                        // Increased opacity: use a more aggressive alpha for the title
+                        const titleAlpha = Math.max(0, Math.min(1.0, uiSteppedOpacity * 1.5 + titleJitter));
                         ctx.globalAlpha = titleAlpha;
 
                         ctx.translate(w / 2, h / 2);
@@ -454,7 +458,7 @@ export default function AboutMeTV({
                         ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
                         ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
 
-                        ctx.fillStyle = activeTheme.textColor || '#ffffff';
+                        ctx.fillStyle = buttonColor;
                         if (Math.random() > 0.1) {
                             ctx.fillText(focusedText, jitterX, textY + jitterY);
                         }

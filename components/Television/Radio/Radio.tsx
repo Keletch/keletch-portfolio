@@ -59,7 +59,8 @@ export default function RadioTV({
 
     // Menu State
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [scrollTop, setScrollTop] = useState(0);
+    const scrollYRef = useRef(0);
+    const targetScrollYRef = useRef(0);
     const [hoveredTrackIndex, setHoveredTrackIndex] = useState(-1);
     const [isListDragging, setIsListDragging] = useState(false);
     const [dragStartY, setDragStartY] = useState(0);
@@ -86,6 +87,8 @@ export default function RadioTV({
             setBackButtonHovered(false);
             setMenuButtonHovered(false);
             setNextButtonHovered(false);
+            scrollYRef.current = 0;
+            targetScrollYRef.current = 0;
         }
     }, [isFocused]);
 
@@ -189,6 +192,16 @@ export default function RadioTV({
         }
 
         const dt = delta;
+
+        // Smooth scroll
+        if (isMenuOpen) {
+            const listHeight = 280;
+            const itemHeight = 40;
+            const maxScroll = Math.max(0, (tracks.length * itemHeight) - listHeight);
+            scrollYRef.current = THREE.MathUtils.lerp(scrollYRef.current, targetScrollYRef.current, dt * 8);
+            // Safety clamp
+            if (targetScrollYRef.current > maxScroll) targetScrollYRef.current = maxScroll;
+        }
 
         if (screenTextureRef.current && groupRef.current) {
 
@@ -334,7 +347,8 @@ export default function RadioTV({
                         ctx.save();
 
                         const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                        const titleAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + titleJitter));
+                        // Increased title opacity
+                        const titleAlpha = Math.max(0, Math.min(1.0, uiSteppedOpacity * 1.5 + titleJitter));
                         ctx.globalAlpha = titleAlpha;
 
                         const jitterX = (Math.random() - 0.5) * 4;
@@ -347,7 +361,7 @@ export default function RadioTV({
                         ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
                         ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
                         ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-                        ctx.fillStyle = '#ffffff';
+                        ctx.fillStyle = accent;
                         if (Math.random() > 0.1) {
                             ctx.fillText(focusedText, jitterX, textY + jitterY);
                         }
@@ -491,7 +505,7 @@ export default function RadioTV({
                     drawTrackList(
                         ctx,
                         formattedTracks,
-                        scrollTop,
+                        scrollYRef.current,
                         hoveredTrackIndex,
                         currentSongName,
                         figureStepped,
@@ -507,7 +521,16 @@ export default function RadioTV({
     });
 
     return (
-        <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
+        <group ref={groupRef} position={position} rotation={rotation} scale={scale}
+            onWheel={(e) => {
+                if (!isFocused || !isMenuOpen) return;
+                e.stopPropagation();
+                const listHeight = 280;
+                const itemHeight = 40;
+                const maxScroll = Math.max(0, (tracks.length * itemHeight) - listHeight);
+                targetScrollYRef.current = Math.max(0, Math.min(maxScroll, targetScrollYRef.current + e.deltaY * 0.5));
+            }}
+        >
             {clonedModel && (
                 <primitive
                     object={clonedModel}
@@ -535,7 +558,7 @@ export default function RadioTV({
                                 const listHeight = 280;
                                 const itemHeight = 40;
                                 const maxScroll = Math.max(0, (tracks.length * itemHeight) - listHeight);
-                                setScrollTop(Math.max(0, Math.min(maxScroll, newScroll)));
+                                targetScrollYRef.current = Math.max(0, Math.min(maxScroll, newScroll));
                                 return;
                             }
 
@@ -554,7 +577,7 @@ export default function RadioTV({
                             const isListHover = isMenuOpen && (dx >= listX && dx <= listX + listW && dy >= listY && dy <= listY + listH);
 
                             if (isListHover) {
-                                const relativeY = dy - listY + scrollTop;
+                                const relativeY = dy - listY + scrollYRef.current;
                                 const index = Math.floor(relativeY / 40);
                                 if (index >= 0 && index < tracks.length) {
                                     setHoveredTrackIndex(index);
@@ -602,7 +625,7 @@ export default function RadioTV({
                                 e.stopPropagation();
                                 setIsListDragging(true);
                                 setDragStartY(dy);
-                                setDragStartScroll(scrollTop);
+                                setDragStartScroll(targetScrollYRef.current);
                                 (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                 return;
                             }
@@ -666,7 +689,7 @@ export default function RadioTV({
                                 // Check List Click
                                 const listX = -220; const listY = -140; const listW = 440; const listH = 280;
                                 if (dx >= listX && dx <= listX + listW && dy >= listY && dy <= listY + listH) {
-                                    const relativeY = dy - listY + scrollTop;
+                                    const relativeY = dy - listY + scrollYRef.current;
                                     const index = Math.floor(relativeY / 40);
                                     if (index >= 0 && index < tracks.length) {
                                         if (onSelectTrack) {

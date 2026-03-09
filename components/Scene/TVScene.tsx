@@ -92,8 +92,8 @@ const GOLD_COLORS: ThemeColors = {
 // Vision TV unique palette
 const VISION_ORIGINAL_COLORS: ThemeColors = {
     bgColor: '#200000', baseColor: 'rgba(60, 0, 0, 0.3)', glowCenter: 'rgba(255, 0, 0, 0.1)',
-    vignetteColor: 'rgba(20, 0, 0, 0.95)', irisColor: '#ffffff', scleraColor: '#ffffff',
-    textColor: '#ffffff', highlightColor: '#ffffff'
+    vignetteColor: 'rgba(20, 0, 0, 0.95)', irisColor: '#ff4444', scleraColor: '#ffffff',
+    textColor: '#ffffff', highlightColor: '#ff4444'
 };
 
 

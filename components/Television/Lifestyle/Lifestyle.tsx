@@ -61,7 +61,7 @@ export default function LifestyleTV({
     }, [isFocused]);
 
     const activeTheme = THEMES[theme as keyof typeof THEMES] || THEMES.sulfur;
-    const buttonColor = theme === 'classic' ? '#ffffff' : activeTheme.highlightColor;
+    const buttonColor = activeTheme.highlightColor || '#ffffff';
 
     // Delay the entrance flicker to give the camera time to reach the screen
     const [delayedFocus, setDelayedFocus] = useState(false);
@@ -320,7 +320,10 @@ export default function LifestyleTV({
                     // Draw the original focused title text ON TOP of the polaroids
                     if (focusedText) {
                         ctx.save();
-                        ctx.globalAlpha *= figureOpacity;
+                        // Increased title opacity with flicker
+                        const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
+                        const titleAlpha = Math.max(0, Math.min(1.0, figureOpacity * 1.5 + titleJitter));
+                        ctx.globalAlpha = titleAlpha;
 
                         ctx.translate(w / 2, h / 2);
                         const jitterX = (Math.random() - 0.5) * 4;
@@ -341,7 +344,7 @@ export default function LifestyleTV({
                         ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
 
                         // Force white on the "Original" (sulfur) theme like other TVs
-                        ctx.fillStyle = theme === 'sulfur' ? '#ffffff' : (activeTheme.textColor || '#ffffff');
+                        ctx.fillStyle = buttonColor;
 
                         if (Math.random() > 0.1) {
                             ctx.fillText(focusedText, jitterX, textY + jitterY);

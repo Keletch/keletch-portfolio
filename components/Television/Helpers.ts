@@ -63,6 +63,28 @@ export function drawPixelRoundedRect(
     ctx.fill();
 }
 
+/**
+ * Just traces the rounded rect path without calling fill() or stroke()
+ */
+export function tracePixelRoundedRect(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+) {
+    if (width < 2 * radius) radius = width / 2;
+    if (height < 2 * radius) radius = height / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + width, y, x + width, y + height, radius);
+    ctx.arcTo(x + width, y + height, x, y + height, radius);
+    ctx.arcTo(x, y + height, x, y, radius);
+    ctx.arcTo(x, y, x + width, y, radius);
+    ctx.closePath();
+}
+
 export function drawPixelEye(
     ctx: CanvasRenderingContext2D,
     mousePos: { x: number; y: number },
@@ -657,7 +679,6 @@ export function drawHUDTVIcon(
     const scrXOffset = -2;
 
     applyRetroButtonEffect(ctx, btnX, btnY, hoverProgress, color, (cx, cy, c) => {
-        // Only do the body fill on the main pass
         const isMainPass = c.toLowerCase() === color.toLowerCase() || c.startsWith('rgba(');
 
         ctx.strokeStyle = c;
@@ -667,23 +688,13 @@ export function drawHUDTVIcon(
         ctx.lineJoin = 'round';
 
         // 1. Body Outline
-        ctx.beginPath();
-        drawPixelRoundedRect(ctx, cx - tvW / 2, cy - tvH / 2, tvW, tvH, cornerR);
+        tracePixelRoundedRect(ctx, cx - tvW / 2, cy - tvH / 2, tvW, tvH, cornerR);
         ctx.stroke();
 
-        // 2. Body Fill (Main pass only)
-        if (isMainPass) {
-            ctx.save();
-            ctx.fillStyle = '#101010';
-            ctx.beginPath();
-            drawPixelRoundedRect(ctx, cx - tvW / 2, cy - tvH / 2, tvW, tvH, cornerR);
-            ctx.fill();
-            ctx.restore();
-        }
 
         // 3. Antennas (Subtle)
         const antLen = 10;
-        const wiggle = Math.sin(time * 1.2) * 0.05;
+        const wiggle = Math.sin(time * 3.5) * 0.15;
         ctx.beginPath();
         ctx.moveTo(cx - 5, cy - tvH / 2);
         ctx.lineTo(cx - 5 - Math.cos(0.7 + wiggle) * antLen, cy - tvH / 2 - Math.sin(0.7 + wiggle) * antLen);
@@ -708,32 +719,41 @@ export function drawHUDTVIcon(
         ctx.clip();
 
         // 5a. Noise
-        const noiseCount = 6;
-        for (let i = 0; i < noiseCount; i++) {
-            const nx = sx + (Math.abs(Math.sin(i * 99 + steppedTime * 12)) * scrW);
-            const ny = sy + (Math.abs(Math.cos(i * 33 + steppedTime * 12)) * scrH);
-            ctx.globalAlpha = 0.2 + Math.random() * 0.3;
-            ctx.fillStyle = c;
-            ctx.fillRect(Math.floor(nx), Math.floor(ny), 1, 1);
+        if (isMainPass) {
+            const noiseCount = 6;
+            for (let i = 0; i < noiseCount; i++) {
+                const nx = sx + (Math.abs(Math.sin(i * 99 + steppedTime * 12)) * scrW);
+                const ny = sy + (Math.abs(Math.cos(i * 33 + steppedTime * 12)) * scrH);
+                ctx.globalAlpha = 0.2 + Math.random() * 0.3;
+                ctx.fillStyle = c;
+                ctx.fillRect(Math.floor(nx), Math.floor(ny), 1, 1);
+            }
         }
 
-        // 5b. The Hole (Transparent Eye)
         if (hoverProgress > 0.01) {
             ctx.save();
             ctx.globalAlpha = hoverProgress;
             ctx.globalCompositeOperation = 'destination-out';
-            const eyeX = sx + scrW / 2;
-            const eyeY = sy + scrH / 2;
-            const pX = Math.sin(steppedTime * 6) * 1.5;
-            const pY = Math.cos(steppedTime * 4) * 1.2;
-            drawPixelEllipse(ctx, eyeX + pX, eyeY + pY, 4, 3, 1);
+            
+            const sweepSpeed = 50;
+            const lineGap = 10;
+            const move = (time * sweepSpeed) % 60;
+
+            for (let i = -2; i < 4; i++) {
+                const offset = move + (i * lineGap);
+                for (let y = 0; y < scrH; y++) {
+                    const x = offset - y;
+                    if (x >= 0 && x < scrW) {
+                        ctx.fillRect(sx + Math.floor(x), sy + y, 2, 1);
+                    }
+                }
+            }
             ctx.restore();
         }
         ctx.restore();
 
         // 6. Screen border
-        ctx.beginPath();
-        drawPixelRoundedRect(ctx, sx, sy, scrW, scrH, 1);
+        tracePixelRoundedRect(ctx, sx, sy, scrW, scrH, 1);
         ctx.stroke();
     });
 }

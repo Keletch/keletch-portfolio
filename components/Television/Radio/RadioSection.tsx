@@ -19,6 +19,8 @@ const RADIO_TRACKS = [
     '/music/Spore (GoldTrue).m4a',
     '/music/Thombstone_of_a_Ghost_Garden.m4a',
     '/music/LOTUS FLOWER BY KRAKATOA.m4a',
+    '/music/Miltthrekc.m4a',
+    '/music/Clouds.m4a',
 ];
 
 const RADIO_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'radioscreen'];
@@ -213,12 +215,11 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
                 density={25}
                 viewState={viewState}
                 focusStateName="radio_focus"
-                mass={20}
+                mass={5}
                 linearDamping={0.8}
                 angularDamping={0.8}
                 springStiffness={80}
-                springDamping={3.0}
-                camPosOffset={[0, 0.45, 1.8]}
+                camPosOffset={[0, 0.45, 1.3]}
                 camLookAtOffset={[0, 0.25, 0]}
                 resetDelay={1.90}
             >

@@ -19,11 +19,11 @@ interface InteractiveTVWrapperProps {
     camLookAtOffset?: [number, number, number];
     resetDelay?: number;
     springStiffness?: number;
-    springDamping?: number;
     density?: number;
     rotation?: [number, number, number];
     inertiaBoostSize?: [number, number, number];
     inertiaBoostOffset?: [number, number, number];
+    flattenDragZ?: boolean;
 }
 
 
@@ -35,18 +35,18 @@ export function InteractiveTVWrapper({
     colliderOffset,
     viewState,
     focusStateName,
-    mass = 15,
+    mass = 5,
     linearDamping = 0.5,
     angularDamping = 0.5,
     camPosOffset = [0, 0.45, 3.2],
     camLookAtOffset = [0, 0.25, 0],
     resetDelay = 0,
     springStiffness = 150,
-    springDamping = 10,
     density = 1.0,
     rotation = [0, 0, 0] as [number, number, number],
     inertiaBoostSize,
-    inertiaBoostOffset = [0, 0, 0] as [number, number, number]
+    inertiaBoostOffset = [0, 0, 0] as [number, number, number],
+    flattenDragZ = false
 }: InteractiveTVWrapperProps) {
     const tvRef = useRef<RapierRigidBody>(null);
     const groupRef = useRef<THREE.Group>(null);
@@ -56,6 +56,7 @@ export function InteractiveTVWrapper({
     const [remountKey, setRemountKey] = useState(0);
 
     const dragPlaneConstant = useRef(0);
+    const initialDamping = useRef({ linear: linearDamping, angular: angularDamping });
 
     const { camera, raycaster, pointer } = useThree();
 
@@ -101,13 +102,17 @@ export function InteractiveTVWrapper({
     // Global drag release
     React.useEffect(() => {
         const handleGlobalUp = () => {
+            if (dragging && tvRef.current) {
+                tvRef.current.setLinearDamping(initialDamping.current.linear);
+                tvRef.current.setAngularDamping(initialDamping.current.angular);
+            }
             setDragging(false);
             setGlobalDragging(false);
         };
 
         window.addEventListener('pointerup', handleGlobalUp);
         return () => window.removeEventListener('pointerup', handleGlobalUp);
-    }, [setGlobalDragging]);
+    }, [dragging, setGlobalDragging]);
 
     const isFocused = viewState === focusStateName || (focusStateName === 'tv_typical_focus' && viewState === 'tv_typical_gallery');
     // If ANY object is focused (incl. this one or another), ALL wrappers should be non-interactive
@@ -134,7 +139,6 @@ export function InteractiveTVWrapper({
     const localDragPoint = React.useMemo(() => new THREE.Vector3(), []);
 
     const k = springStiffness; // Spring stiffness
-    const d = springDamping;  // Spring damping
 
     useFrame((state, delta) => {
         // Vanish/Appear transitions
@@ -196,15 +200,12 @@ export function InteractiveTVWrapper({
             }
 
             if (raycaster.ray.intersectPlane(dragModePlane, intersectionPoint)) {
-                // By projecting against the proper plane, intersectionPoint is already physically accurate
                 const targetPos = intersectionPoint.clone().sub(dragOffset);
 
                 const rb = tvRef.current;
                 const tvPos = rb.translation();
                 const tvQuat = rb.rotation();
 
-                // PHYSICS STABILIZATION: Normalize delta to prevent overshoot on high-FPS machines (e.g., 144Hz+)
-                // We cap delta at ~30fps equivalent to avoid massive force spikes
                 const stableDelta = Math.min(delta, 0.033);
 
                 const pointWorld = localDragPoint.clone().applyQuaternion(tvQuat as THREE.Quaternion).add(tvPos as THREE.Vector3);
@@ -215,10 +216,8 @@ export function InteractiveTVWrapper({
 
                 rb.applyImpulseAtPoint(force, pointWorld, true);
 
-                const linVel = rb.linvel();
                 const angVel = rb.angvel();
 
-                // CLAMP ANGULAR VELOCITY: Prevent wild spinning
                 const maxAngVel = 8.0;
                 if (Math.abs(angVel.x) > maxAngVel || Math.abs(angVel.y) > maxAngVel || Math.abs(angVel.z) > maxAngVel) {
                     rb.setAngvel({
@@ -227,10 +226,6 @@ export function InteractiveTVWrapper({
                         z: THREE.MathUtils.clamp(angVel.z, -maxAngVel, maxAngVel)
                     }, true);
                 }
-
-                // DAMPING: Apply counter-forces to stabilize movement during drag
-                rb.applyImpulse({ x: -linVel.x * d * stableDelta * rbMass, y: -linVel.y * d * stableDelta * rbMass, z: -linVel.z * d * stableDelta * rbMass }, true);
-                rb.applyTorqueImpulse({ x: -angVel.x * d * stableDelta * rbMass, y: -angVel.y * d * stableDelta * rbMass, z: -angVel.z * d * stableDelta * rbMass }, true);
             }
         }
     });
@@ -290,13 +285,19 @@ export function InteractiveTVWrapper({
 
                             dragOffset.copy(intersectionPoint).sub(e.point);
                             localDragPoint.copy(e.point).sub(tvPos).applyQuaternion(tvQuat.invert());
+                            if (flattenDragZ) localDragPoint.z = 0;
+
+                            initialDamping.current.linear = tvRef.current.linearDamping();
+                            initialDamping.current.angular = tvRef.current.angularDamping();
+                            tvRef.current.setLinearDamping(4.0);
+                            tvRef.current.setAngularDamping(15.0);
                         }
                     }}
-                    onPointerMissed={() => {
-                        setDragging(false);
-                        setGlobalDragging(false);
-                    }}
                     onPointerUp={() => {
+                        if (dragging && tvRef.current) {
+                            tvRef.current.setLinearDamping(initialDamping.current.linear);
+                            tvRef.current.setAngularDamping(initialDamping.current.angular);
+                        }
                         setDragging(false);
                         setGlobalDragging(false);
                     }}

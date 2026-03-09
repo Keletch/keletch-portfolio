@@ -281,19 +281,31 @@ export default function SettingsTV({
                     ctx.globalAlpha = steppedOpacity;
 
                     // TITLE
+                    const buttonColor = activeTheme.highlightColor || '#ffffff';
                     const time = state.clock.elapsedTime;
-                    const jitter = (Math.sin(time * 15) > 0.8) ? (Math.random() - 0.5) * 4 : 0;
+                    const titleJitter = Math.sin(time * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
+                    
+                    // Increased title opacity with flicker
+                    const titleAlpha = Math.max(0, Math.min(1.0, steppedOpacity * 1.5 + titleJitter));
+                    ctx.globalAlpha = titleAlpha;
+
+                    const jitterX = (Math.random() - 0.5) * 4;
+                    const jitterY = (Math.random() - 0.5) * 4;
+
                     ctx.font = '900 44px "Courier New", monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     const titleY = -h / 2 + textYOffset - 10;
 
                     ctx.fillStyle = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                    ctx.fillText(focusedText, jitter + 3, titleY + 3);
+                    ctx.fillText(focusedText, jitterX + 3, titleY + jitterY + 3);
                     ctx.fillStyle = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-                    ctx.fillText(focusedText, jitter - 3, titleY - 3);
-                    ctx.fillStyle = activeTheme.textColor || '#ffffff';
-                    ctx.fillText(focusedText, jitter, titleY);
+                    ctx.fillText(focusedText, jitterX - 3, titleY + jitterY - 3);
+                    
+                    ctx.fillStyle = buttonColor;
+                    if (Math.random() > 0.1) {
+                        ctx.fillText(focusedText, jitterX, titleY + jitterY);
+                    }
 
                     // VERTICAL CLIPPING FOR ROWS
                     const viewportStartY = -VIEWPORT_HEIGHT / 2 + 20;
@@ -403,7 +415,6 @@ export default function SettingsTV({
                     ctx.fillStyle = highlightColor;
                     ctx.fillRect(235, barY, 6, barHeight);
 
-                    const buttonColor = theme === 'classic' ? '#ffffff' : highlightColor;
                     if (showBackButton) drawBackButton(ctx, backButtonPosition.x, backButtonPosition.y, hoverProgressRefs.current.back, buttonColor);
                     if (showMenuButton) drawMenuButton(ctx, menuButtonPosition.x, menuButtonPosition.y, hoverProgressRefs.current.menu, buttonColor);
 

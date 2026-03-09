@@ -20,6 +20,7 @@ export default function MyWorksSection({ viewState, onNavigate, themeOverride }:
             colliderOffset={toxicCollider.offset}
             viewState={viewState}
             focusStateName="tv_lcd_focus"
+            camPosOffset={[0, 0.45, 2.4]}
             resetDelay={1.65}
         >
             <MyWorks
