@@ -48,7 +48,7 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors, 
 
     const standPosition = { x: 0, y: -2.0, z: 0 };
 
-    const tv1Position = { x: 2.95, y: 1.1, z: 0.30 };
+    const tv1Position = { x: 2.95, y: 1.1, z: 0 };
     const tv4Position = { x: -0.5, y: 1.5, z: 0 };
     const tv5Position = { x: 1.6, y: 1.1, z: 0 };
     const tv6Position = { x: 0.75, y: 2.1, z: 0 };
@@ -105,6 +105,9 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors, 
                 colliderOffset={colliders.toon.offset}
                 viewState={viewState}
                 focusStateName="tv_settings_focus"
+                linearDamping={1.5}
+                angularDamping={1.5}
+                inertiaBoostSize={[1.2, 0.8, 1.0]} // "Ghost weight" to prevent wild spinning
                 resetDelay={0.60}
             >
                 <SettingsTV

@@ -330,6 +330,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                             viewState={viewState}
                             onNavigate={(st: string) => setViewState(st as ViewState)}
                             theme={paletteConfig.mobile}
+                            resetDelay={2.40}
                         />
 
                         <ResettableRigidBody colliders={false} position={luckyCatCtrl.pos} resetDelay={1.50}>

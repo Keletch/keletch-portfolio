@@ -203,18 +203,34 @@ export function InteractiveTVWrapper({
                 const tvPos = rb.translation();
                 const tvQuat = rb.rotation();
 
+                // PHYSICS STABILIZATION: Normalize delta to prevent overshoot on high-FPS machines (e.g., 144Hz+)
+                // We cap delta at ~30fps equivalent to avoid massive force spikes
+                const stableDelta = Math.min(delta, 0.033);
+
                 const pointWorld = localDragPoint.clone().applyQuaternion(tvQuat as THREE.Quaternion).add(tvPos as THREE.Vector3);
 
                 const displacement = targetPos.sub(pointWorld);
                 const rbMass = rb.mass();
-                const force = displacement.multiplyScalar(k * delta * rbMass);
+                const force = displacement.multiplyScalar(k * stableDelta * rbMass);
 
                 rb.applyImpulseAtPoint(force, pointWorld, true);
 
                 const linVel = rb.linvel();
                 const angVel = rb.angvel();
-                rb.applyImpulse({ x: -linVel.x * d * delta * rbMass, y: -linVel.y * d * delta * rbMass, z: -linVel.z * d * delta * rbMass }, true);
-                rb.applyTorqueImpulse({ x: -angVel.x * d * delta * rbMass, y: -angVel.y * d * delta * rbMass, z: -angVel.z * d * delta * rbMass }, true);
+
+                // CLAMP ANGULAR VELOCITY: Prevent wild spinning
+                const maxAngVel = 8.0;
+                if (Math.abs(angVel.x) > maxAngVel || Math.abs(angVel.y) > maxAngVel || Math.abs(angVel.z) > maxAngVel) {
+                    rb.setAngvel({
+                        x: THREE.MathUtils.clamp(angVel.x, -maxAngVel, maxAngVel),
+                        y: THREE.MathUtils.clamp(angVel.y, -maxAngVel, maxAngVel),
+                        z: THREE.MathUtils.clamp(angVel.z, -maxAngVel, maxAngVel)
+                    }, true);
+                }
+
+                // DAMPING: Apply counter-forces to stabilize movement during drag
+                rb.applyImpulse({ x: -linVel.x * d * stableDelta * rbMass, y: -linVel.y * d * stableDelta * rbMass, z: -linVel.z * d * stableDelta * rbMass }, true);
+                rb.applyTorqueImpulse({ x: -angVel.x * d * stableDelta * rbMass, y: -angVel.y * d * stableDelta * rbMass, z: -angVel.z * d * stableDelta * rbMass }, true);
             }
         }
     });

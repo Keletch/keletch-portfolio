@@ -1,3 +1,5 @@
+﻿'use client';
+
 import { InteractiveTVWrapper } from '@/components/Scene/InteractiveTVWrapper';
 import Television from '@/components/Television';
 
@@ -5,25 +7,28 @@ interface MobileSectionProps {
     viewState: string;
     onNavigate?: (state: string) => void;
     theme?: string;
+    resetDelay?: number;
 }
 
 const MOBILE_SCREENS = ['mobileScreen'];
 
 const mobileCtrl = {
-    pos: [3.0, 4.0, 0.30] as [number, number, number],
+    pos: [3.0, 4.0, 0] as [number, number, number],
     rot: [-1.5, 0, -0.30] as [number, number, number],
-    size: [0.09, 0.20, 0.03] as [number, number, number], // real collision shape
-    offset: [0.01, 0.23, 0.00] as [number, number, number]
+    size: [0.09, 0.20, 0.05] as [number, number, number],
+    offset: [0.01, 0.23, 0.035] as [number, number, number],
+    inertiaBoostSize: [0.15, 0.30, 0.15] as [number, number, number]
 };
 
-export default function MobileSection({ viewState, theme = 'mobile' }: MobileSectionProps) {
+export default function MobileSection({ viewState, theme = 'mobile', resetDelay }: MobileSectionProps) {
     return (
         <InteractiveTVWrapper
             tvPosition={{ x: mobileCtrl.pos[0], y: mobileCtrl.pos[1], z: mobileCtrl.pos[2] }}
             rotation={mobileCtrl.rot}
             colliderSize={mobileCtrl.size}
             colliderOffset={mobileCtrl.offset}
-            density={20} // Lighter than before for more natural feel
+            inertiaBoostSize={mobileCtrl.inertiaBoostSize}
+            density={20.0} // Restored previous density
             viewState={viewState}
             focusStateName="tv_mobile_focus"
             mass={1}
@@ -31,6 +36,9 @@ export default function MobileSection({ viewState, theme = 'mobile' }: MobileSec
             angularDamping={0.8}
             springStiffness={80}
             springDamping={3.0}
+            resetDelay={resetDelay}
+            camPosOffset={[0, 0, 0.6]}
+            camLookAtOffset={[0, 0, 0]}
         >
             <Television
                 modelPath="/models/mobile.glb"

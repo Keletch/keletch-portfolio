@@ -55,13 +55,10 @@ export function CameraRig({ viewState }: CameraRigProps) {
                 targetPos = camPosNode.getWorldPosition(new THREE.Vector3());
                 targetLookAt = lookAtNode.getWorldPosition(new THREE.Vector3());
 
-                if (viewState === 'tv_mobile_focus') {
-                    // Mobile is vertical, camera up needs to rotate with it
-                    const quat = camPosNode.getWorldQuaternion(new THREE.Quaternion());
-                    targetUp.set(0, 1, 0).applyQuaternion(quat);
-                } else {
-                    targetUp.set(0, 1, 0);
-                }
+                // Universal orientation matching: align camera UP with the TV's rotation
+                // This ensures that if the TV is tilted, the camera tilts with it
+                const quat = camPosNode.getWorldQuaternion(new THREE.Quaternion());
+                targetUp.set(0, 1, 0).applyQuaternion(quat);
             }
         } else if (isTopDownView) {
             targetPos = new THREE.Vector3(0, 15, 0);
