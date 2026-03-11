@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { THEMES } from '../Types';
 import { ContactProps, CONTACT_BUTTON_CONFIG } from './ContactTypes';
 import { drawPixelEye } from '../Helpers';
-import { useSettingsStore } from '../../store/useSettingsStore';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 import { updateButtonHoverAnimation } from '../SharedHelpers';
@@ -45,6 +44,7 @@ export default function ContactTV({
     const currentLookAt = useRef({ x: 0, y: 0 });
 
     const [hoveredButton, setHoveredButton] = useState<HitResult>(null);
+    const [emailCopied, setEmailCopied] = useState(false);
 
     const {
         clonedModel,
@@ -273,11 +273,13 @@ export default function ContactTV({
 
                         if (progress > 0) {
                             ctx.fillStyle = buttonColor;
-                            ctx.fillText(`> ${link.label} <`, 0, linkY - 14);
+                            const displayText = link.id === 'email' && emailCopied ? '> COPIED! <' : `> ${link.label} <`;
+                            ctx.fillText(displayText, 0, linkY - 14);
                             ctx.fillText(link.value, 0, linkY + 14);
                         } else {
                             ctx.fillStyle = baseTextColor;
-                            ctx.fillText(link.label, 0, linkY - 14);
+                            const displayText = link.id === 'email' && emailCopied ? 'COPIED!' : link.label;
+                            ctx.fillText(displayText, 0, linkY - 14);
                             ctx.globalAlpha = btnBaseAlpha * 0.6;
                             ctx.fillText(link.value, 0, linkY + 14);
                             ctx.globalAlpha = btnBaseAlpha;
@@ -343,7 +345,11 @@ export default function ContactTV({
 
                             if (hit === 'back' && onBackClick) onBackClick();
                             else if (hit === 'menu' && onMenuClick) onMenuClick();
-                            else if (hit === 'link_email') window.open('mailto:aerocha56@gmail.com');
+                            else if (hit === 'link_email') {
+                                navigator.clipboard.writeText('aerocha56@gmail.com');
+                                setEmailCopied(true);
+                                setTimeout(() => setEmailCopied(false), 2000);
+                            }
                             else if (hit === 'link_linkedin') window.open('https://linkedin.com/in/keletch', '_blank');
                             else if (hit === 'link_github') window.open('https://github.com/keletch', '_blank');
                         }

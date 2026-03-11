@@ -5,8 +5,6 @@ import * as THREE from 'three';
 import { RadioProps, RADIO_THEME, RADIO_BUTTON_CONFIG } from './RadioTypes';
 import { drawPixelEye, drawPlayPauseButton, drawBackButton, drawMenuButton, drawNextButton, drawButtonShockwave, drawProgressBar, drawTrackList, drawReactiveCircle } from './RadioHelpers';
 
-import { useSettingsStore } from '@/components/store/useSettingsStore';
-
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 

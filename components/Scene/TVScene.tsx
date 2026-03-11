@@ -283,10 +283,9 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                 events={(store) => ({
                     ...events(store),
                     compute: (event, rootState) => {
-                        // @ts-ignore
-                        const offsetX = event.offsetX !== undefined ? event.offsetX : event.clientX;
-                        // @ts-ignore
-                        const offsetY = event.offsetY !== undefined ? event.offsetY : event.clientY;
+                        const e = event as unknown as { offsetX?: number; clientX?: number; offsetY?: number; clientY?: number };
+                        const offsetX = e.offsetX !== undefined ? e.offsetX : (e.clientX || 0);
+                        const offsetY = e.offsetY !== undefined ? e.offsetY : (e.clientY || 0);
 
                         // Normalize (-1 to +1)
                         const px = (offsetX / rootState.size.width) * 2 - 1;

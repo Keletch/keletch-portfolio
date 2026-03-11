@@ -11,7 +11,6 @@ import { updateButtonHoverAnimation } from '@/components/Television/SharedHelper
 import { THEMES, ThemeColors } from '@/components/Television/Types';
 import { MyWorksProps, MYWORKS_BUTTON_CONFIG } from './MyWorksTypes';
 import { drawPixelEye } from '@/components/Television/Helpers';
-import { useSettingsStore } from '@/components/store/useSettingsStore';
 import {
     drawPlayStopButton,
     drawBackButton,

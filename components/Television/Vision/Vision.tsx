@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { THEMES } from '../Types';
 import { VisionProps } from './VisionTypes';
 import { drawPixelEye } from '../Helpers';
-import { useSettingsStore } from '@/components/store/useSettingsStore';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 import { useScreenInteraction } from '@/hooks/useScreenInteraction';
