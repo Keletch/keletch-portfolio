@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Canvas, ThreeEvent } from '@react-three/fiber';
+import { Canvas, ThreeEvent, events } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 import { Physics, CuboidCollider } from '@react-three/rapier';
@@ -9,10 +9,11 @@ import { useGLTF } from '@react-three/drei';
 import RadioSection from '@/components/Television/Radio/RadioSection';
 import MyWorksSection from '@/components/Television/MyWorks/MyWorksSection';
 import AboutMeSection from '@/components/Television/AboutMe/AboutMeSection';
-import MobileSection from '@/components/Television/MobileSection';
+import ContactSection from '@/components/Television/Contact/ContactSection';
 import { TVCluster } from '@/components/Scene/TVCluster';
 
 import { CRTOverlay } from '@/components/Effects/CRTOverlay';
+import { applyCRTFunction } from '@/components/Television/Helpers';
 import { CameraRig } from '@/components/Scene/CameraRig';
 // @ts-expect-error - No type definitions available for RectAreaLightUniformsLib
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib';
@@ -279,6 +280,28 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                 camera={{ position: [-3.5, 2.5, 14], fov: 35 }}
                 dpr={dpr}
                 gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0, preserveDrawingBuffer: true }}
+                events={(store) => ({
+                    ...events(store),
+                    compute: (event, rootState) => {
+                        // @ts-ignore
+                        const offsetX = event.offsetX !== undefined ? event.offsetX : event.clientX;
+                        // @ts-ignore
+                        const offsetY = event.offsetY !== undefined ? event.offsetY : event.clientY;
+
+                        // Normalize (-1 to +1)
+                        const px = (offsetX / rootState.size.width) * 2 - 1;
+                        const py = -(offsetY / rootState.size.height) * 2 + 1;
+
+                        const intensity = useSettingsStore.getState().curveIntensity;
+                        const curvedUV = applyCRTFunction(
+                            { x: px / 2 + 0.5, y: py / 2 + 0.5 },
+                            intensity
+                        );
+
+                        rootState.pointer.set((curvedUV.x - 0.5) * 2, (curvedUV.y - 0.5) * 2);
+                        rootState.raycaster.setFromCamera(rootState.pointer, rootState.camera);
+                    }
+                })}
             >
                 <PerformanceMonitor onIncline={() => setDpr(1.5)} onDecline={() => setDpr(0.7)} >
                     <color attach="background" args={['#000000']} />
@@ -326,7 +349,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                             <primitive object={clonedDvd} />
                         </ResettableRigidBody>
 
-                        <MobileSection
+                        <ContactSection
                             viewState={viewState}
                             onNavigate={(st: string) => setViewState(st as ViewState)}
                             theme={paletteConfig.mobile}

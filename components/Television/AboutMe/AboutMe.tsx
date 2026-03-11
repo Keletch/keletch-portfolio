@@ -22,6 +22,7 @@ interface ThemeOverride {
 import { useTypewriter } from '@/hooks/useTypewriter';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 const DEFAULT_SCREEN_NAMES = ['screen'];
 

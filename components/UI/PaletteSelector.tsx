@@ -86,9 +86,9 @@ export function PaletteSelector({ onMenuSelect, onSettingsSelect, onResetSelect,
         const rawUv = e.uv;
         if (!rawUv) return;
 
-        // Coordinate compensation for CRT shader curve
-        const px = (rawUv.x * canvasWidth) + 12;
-        const py = (rawUv.y * canvasHeight) + 2;
+        // The global R3F compute now handles CRT curve, no offsets needed!
+        const px = (rawUv.x * canvasWidth);
+        const py = (rawUv.y * canvasHeight);
 
         const settingsHit = px > canvasWidth - 50 && px < canvasWidth - 10;
         const resetHit = px > canvasWidth - 90 && px < canvasWidth - 50;

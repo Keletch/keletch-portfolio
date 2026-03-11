@@ -1,3 +1,21 @@
+import * as THREE from 'three';
+
+// Applies the CRT barrel distortion math so UV hitboxes match the visual render
+export function applyCRTFunction(uv: THREE.Vector2 | { x: number; y: number }, curveIntensity: number): THREE.Vector2 {
+    let ux = (uv.x - 0.5) * 2.0;
+    let uy = (uv.y - 0.5) * 2.0;
+
+    const offsetX = Math.abs(uy) / curveIntensity;
+    const offsetY = Math.abs(ux) / curveIntensity;
+
+    ux = ux + ux * offsetX * offsetX;
+    uy = uy + uy * offsetY * offsetY;
+
+    ux = ux * 0.5 + 0.5;
+    uy = uy * 0.5 + 0.5;
+
+    return new THREE.Vector2(ux, uy);
+}
 
 // Pixel art helpers and drawing functions
 

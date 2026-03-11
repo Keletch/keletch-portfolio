@@ -1,9 +1,9 @@
-﻿'use client';
+'use client';
 
 import { InteractiveTVWrapper } from '@/components/Scene/InteractiveTVWrapper';
-import Television from '@/components/Television';
+import Contact from './Contact';
 
-interface MobileSectionProps {
+interface ContactSectionProps {
     viewState: string;
     onNavigate?: (state: string) => void;
     theme?: string;
@@ -12,6 +12,7 @@ interface MobileSectionProps {
 
 const MOBILE_SCREENS = ['mobileScreen'];
 
+// We keep the exact same physical constraints as the original MobileSection
 const mobileCtrl = {
     pos: [3.0, 4.0, 0.2] as [number, number, number],
     rot: [-1.5, 0, -0.30] as [number, number, number],
@@ -20,7 +21,7 @@ const mobileCtrl = {
     inertiaBoostSize: [0.15, 0.30, 0.2] as [number, number, number]
 };
 
-export default function MobileSection({ viewState, theme = 'mobile', resetDelay }: MobileSectionProps) {
+export default function ContactSection({ viewState, onNavigate, theme = 'mobile', resetDelay }: ContactSectionProps) {
     return (
         <InteractiveTVWrapper
             tvPosition={{ x: mobileCtrl.pos[0], y: mobileCtrl.pos[1], z: mobileCtrl.pos[2] }}
@@ -40,13 +41,18 @@ export default function MobileSection({ viewState, theme = 'mobile', resetDelay 
             camLookAtOffset={[0, 0.23, 0]}
             flattenDragZ={true}
         >
-            <Television
+            <Contact
                 modelPath="/models/mobile.glb"
                 screenNames={MOBILE_SCREENS}
                 theme={theme as 'classic'}
                 modelYOffset={0}
                 invertY={true}
+                focusedText="Contact"
                 isFocused={viewState === 'tv_mobile_focus'}
+                showBackButton={true}
+                onBackClick={() => onNavigate && onNavigate('default')}
+                showMenuButton={true}
+                onMenuClick={() => onNavigate && onNavigate('shelf_focus')}
             />
         </InteractiveTVWrapper>
     );
