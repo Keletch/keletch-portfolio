@@ -10,6 +10,19 @@ export function Loader({ onFinished }: LoaderProps) {
     const [displayedProgress, setDisplayedProgress] = useState(0);
     const [dots, setDots] = useState('');
     const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    const [needsManualStart, setNeedsManualStart] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => {
+            const userAgent = typeof window.navigator === "undefined" ? "" : navigator.userAgent;
+            const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+            setIsMobile(mobileRegex.test(userAgent) || window.innerWidth <= 1024);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // Minimum boot duration for aesthetics
     useEffect(() => {
@@ -55,10 +68,35 @@ export function Loader({ onFinished }: LoaderProps) {
 
     useEffect(() => {
         if (displayedProgress >= 100 && minTimeElapsed) {
-            const timeout = setTimeout(() => onFinished(), 500);
-            return () => clearTimeout(timeout);
+            if (isMobile) {
+                setNeedsManualStart(true);
+            } else {
+                const timeout = setTimeout(() => onFinished(), 500);
+                return () => clearTimeout(timeout);
+            }
         }
-    }, [displayedProgress, minTimeElapsed, onFinished]);
+    }, [displayedProgress, minTimeElapsed, onFinished, isMobile]);
+
+    const handleManualStart = async () => {
+        if (typeof document !== 'undefined') {
+            const elem = document.documentElement as HTMLElement & {
+                webkitRequestFullscreen?: () => Promise<void>;
+                msRequestFullscreen?: () => Promise<void>;
+            };
+            try {
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) { /* Safari */
+                    await elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { /* IE11 */
+                    await elem.msRequestFullscreen();
+                }
+            } catch (err) {
+                console.warn("Fullscreen request failed or was denied.", err);
+            }
+        }
+        onFinished();
+    };
 
     return (
         <div style={{
@@ -77,7 +115,7 @@ export function Loader({ onFinished }: LoaderProps) {
             zIndex: 9999,
             pointerEvents: 'all',
             transition: 'opacity 0.8s ease-out',
-            opacity: displayedProgress >= 100 ? 0 : 1,
+            opacity: displayedProgress >= 100 && !needsManualStart ? 0 : 1,
             overflow: 'hidden'
         }}>
             {/* Screen Container */}
@@ -205,18 +243,50 @@ export function Loader({ onFinished }: LoaderProps) {
                         <span>{Math.round(displayedProgress)}%</span>
                     </div>
 
-                    {/* Current Asset Log */}
-                    <div style={{
-                        height: '20px',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        textOverflow: 'ellipsis',
-                        fontSize: '12px',
-                        opacity: 0.8,
-                        color: '#33ff33'
-                    }}>
-                        {item ? `> LOADING: ${item}` : '> WAITING_FOR_STREAM...'}
-                    </div>
+                    {needsManualStart ? (
+                        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+                            <button
+                                onClick={handleManualStart}
+                                style={{
+                                    background: 'transparent',
+                                    border: '2px solid #4af626',
+                                    color: '#4af626',
+                                    padding: '10px 20px',
+                                    fontSize: '18px',
+                                    cursor: 'pointer',
+                                    fontFamily: '"Courier New", Courier, monospace',
+                                    fontWeight: 'bold',
+                                    boxShadow: '0 0 10px rgba(74, 246, 38, 0.4)',
+                                    transition: 'all 0.3s ease'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.background = '#4af626';
+                                    e.currentTarget.style.color = '#000';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = '#4af626';
+                                }}
+                            >
+                                [ START EXPERIENCE ]
+                            </button>
+                            <div style={{ fontSize: '11px', marginTop: '10px', opacity: 0.7 }}>
+                                * Best viewed in landscape mode *
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{
+                            height: '20px',
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            fontSize: '12px',
+                            opacity: 0.8,
+                            color: '#33ff33'
+                        }}>
+                            {item ? `> LOADING: ${item}` : '> WAITING_FOR_STREAM...'}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

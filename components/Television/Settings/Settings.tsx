@@ -40,7 +40,7 @@ const VIEWPORT_HEIGHT = VISIBLE_ROWS * ROW_HEIGHT;
 type SettingRow = typeof SETTINGS_ROWS[number];
 type SettingId = Extract<SettingRow, { id: string }>['id'];
 type ActionType = 'inc' | 'dec' | 'slider';
-type HitResult = 'back' | 'menu' | `${SettingId}_${ActionType}` | null;
+type HitResult = 'back' | 'menu' | 'fov_input' | `${SettingId}_${ActionType}` | null;
 
 const DEFAULT_SCREEN_NAMES = ['toonTVScreen', 'screen', 'toontvscreen'];
 
@@ -109,6 +109,18 @@ export default function SettingsTV({
 
     const hoverProgressRefs = useRef({ back: 0, menu: 0 });
 
+    const [isEditingFov, setIsEditingFov] = useState(false);
+    const [fovInputBuffer, setFovInputBuffer] = useState('');
+    const touchStartYRef = useRef<number | null>(null);
+
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth <= 1024);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     const [delayedFocus, setDelayedFocus] = useState(false);
     useEffect(() => {
         if (isFocused) {
@@ -117,8 +129,51 @@ export default function SettingsTV({
         } else {
             setDelayedFocus(false);
             setHoveredButton(null);
+            setIsEditingFov(false);
         }
     }, [isFocused]);
+
+    useEffect(() => {
+        if (!isEditingFov) return;
+
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === 'Escape') {
+                setIsEditingFov(false);
+                const val = parseFloat(fovInputBuffer);
+                if (!isNaN(val)) {
+                    settings.setNumericSetting('fov', THREE.MathUtils.clamp(val, 15, 75));
+                }
+                return;
+            }
+
+            if (e.key === 'Backspace') {
+                setFovInputBuffer(prev => prev.slice(0, -1));
+                return;
+            }
+
+            if (/^[0-9]$/.test(e.key)) {
+                setFovInputBuffer(prev => {
+                    const next = prev + e.key;
+                    if (next.length > 2) return prev; // Limit to 2 digits for FOV
+                    return next;
+                });
+            }
+        };
+
+        const handleGlobalClick = () => {
+            // Give a small delay to avoid closing instantly on the click that opened it
+            setTimeout(() => {
+                if (isEditingFov) setIsEditingFov(false);
+            }, 50);
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        window.addEventListener('click', handleGlobalClick);
+        return () => {
+            window.removeEventListener('keydown', handleGlobalKeyDown);
+            window.removeEventListener('click', handleGlobalClick);
+        };
+    }, [isEditingFov, fovInputBuffer, settings]);
 
     const { renderedFigure, transitionOpacity } = useFigureTransition(delayedFocus ? 'settings' : 'eye', 0);
 
@@ -149,6 +204,7 @@ export default function SettingsTV({
         for (let i = 0; i < SETTINGS_ROWS.length; i++) {
             const row = SETTINGS_ROWS[i];
             if (row.type === 'header') continue;
+            if (isMobile && row.id === 'fov') continue;
 
             const rowY = startY + (i * ROW_HEIGHT) - scrollY;
 
@@ -164,8 +220,10 @@ export default function SettingsTV({
                 continue;
             }
 
-            // Slider area
-            if (row.id !== 'barrel') {
+            // Slider area (Numeric input for FOV)
+            if (row.id === 'fov') {
+                if (Math.abs(dx - 130) < 60 && Math.abs(dy - rowY) < 20) return `fov_input` as const;
+            } else if (row.id !== 'barrel') {
                 if (Math.abs(dx - controlsX) < 80 && Math.abs(dy - rowY) < 20) return `${row.id}_slider` as const;
             } else {
                 // Toggle barrel
@@ -324,6 +382,7 @@ export default function SettingsTV({
                         if (rowY < viewportStartY - ROW_HEIGHT || rowY > viewportEndY + ROW_HEIGHT) return;
 
                         if (row.type === 'header') {
+                            if (isMobile && row.label === '--- CAMERA ---') return;
                             ctx.textAlign = 'center';
                             ctx.fillStyle = highlightColor;
                             ctx.font = '900 20px "Courier New", monospace';
@@ -331,6 +390,9 @@ export default function SettingsTV({
                             ctx.font = '900 18px "Courier New", monospace';
                             return;
                         }
+
+                        // Now TypeScript knows 'row' must have an 'id' property
+                        if (isMobile && row.id === 'fov') return;
 
                         // Selection highlight
                         const isHovered = hoveredButton?.startsWith(row.id);
@@ -380,27 +442,54 @@ export default function SettingsTV({
                                 else if (row.id === 'gravity') currentVal = settings.gravityY;
                                 else if (row.id === 'fov') currentVal = settings.cameraFOV;
 
-                                const range = max - min;
-                                const progress = (currentVal - min) / (range || 1);
-                                const trackStartX = controlsX - sliderWidth / 2;
-                                const thumbX = trackStartX + (progress * sliderWidth);
+                                if (row.id === 'fov') {
+                                    // Numeric input visualization instead of slider
+                                    const rectX = controlsX - 50;
+                                    const rectY = rowY - 18;
+                                    const rectW = 100;
+                                    const rectH = 36;
 
-                                // Track
-                                ctx.fillStyle = textColor + '44';
-                                ctx.fillRect(trackStartX, rowY - 2, sliderWidth, 4);
+                                    if (isEditingFov) {
+                                        ctx.fillStyle = highlightColor + '44';
+                                        ctx.fillRect(rectX, rectY, rectW, rectH);
+                                        ctx.strokeStyle = highlightColor;
+                                        ctx.lineWidth = 2;
+                                        ctx.strokeRect(rectX, rectY, rectW, rectH);
+                                    } else if (hoveredButton === 'fov_input') {
+                                        ctx.fillStyle = textColor + '22';
+                                        ctx.fillRect(rectX, rectY, rectW, rectH);
+                                    }
 
-                                // Thumb
-                                ctx.fillStyle = hoveredButton === `${row.id}_slider` ? highlightColor : textColor;
-                                ctx.fillRect(thumbX - 6, rowY - 10, 12, 20);
+                                    ctx.fillStyle = isEditingFov ? highlightColor : textColor;
+                                    ctx.textAlign = 'center';
+                                    ctx.font = '900 24px "Courier New", monospace';
+                                    const displayStr = isEditingFov ? fovInputBuffer + (Math.floor(state.clock.elapsedTime * 2) % 2 ? '_' : '') : Math.round(currentVal).toString();
+                                    ctx.fillText(displayStr, controlsX, rowY);
+                                    ctx.font = '900 18px "Courier New", monospace';
+                                } else {
+                                    // Standard Slider
+                                    const range = max - min;
+                                    const progress = (currentVal - min) / (range || 1);
+                                    const trackStartX = controlsX - sliderWidth / 2;
+                                    const thumbX = trackStartX + (progress * sliderWidth);
 
-                                // Value display (mini)
-                                ctx.font = '900 12px "Courier New", monospace';
-                                ctx.textAlign = 'left';
-                                let displayVal = currentVal.toFixed(row.id === 'blur' || row.id === 'aberration' ? 4 : 1);
-                                if (row.id === 'musicVolume' || row.id === 'bubblesVolume') displayVal = Math.round(currentVal * 100) + '%';
-                                if (row.id === 'scanlineCount' || row.id === 'fov') displayVal = Math.round(currentVal).toString();
-                                ctx.fillText(displayVal, controlsX + sliderWidth / 2 + 15, rowY);
-                                ctx.font = '900 18px "Courier New", monospace';
+                                    // Track
+                                    ctx.fillStyle = textColor + '44';
+                                    ctx.fillRect(trackStartX, rowY - 2, sliderWidth, 4);
+
+                                    // Thumb
+                                    ctx.fillStyle = hoveredButton === `${row.id}_slider` ? highlightColor : textColor;
+                                    ctx.fillRect(thumbX - 6, rowY - 10, 12, 20);
+
+                                    // Value display (mini)
+                                    ctx.font = '900 12px "Courier New", monospace';
+                                    ctx.textAlign = 'left';
+                                    let displayVal = currentVal.toFixed(row.id === 'blur' || row.id === 'aberration' ? 4 : 1);
+                                    if (row.id === 'musicVolume' || row.id === 'bubblesVolume') displayVal = Math.round(currentVal * 100) + '%';
+                                    if (row.id === 'scanlineCount') displayVal = Math.round(currentVal).toString();
+                                    ctx.fillText(displayVal, controlsX + sliderWidth / 2 + 15, rowY);
+                                    ctx.font = '900 18px "Courier New", monospace';
+                                }
                             }
                         }
                     });
@@ -434,6 +523,25 @@ export default function SettingsTV({
                 const maxScroll = Math.max(0, MENU_HEIGHT - VIEWPORT_HEIGHT);
                 targetScrollYRef.current = Math.max(0, Math.min(maxScroll, targetScrollYRef.current + e.deltaY * 0.5));
             }}
+            onPointerDown={(e) => {
+                if (!isFocused) return;
+                // Only treat as scroll start if not clicking a button area
+                if (!hoveredButton) {
+                    touchStartYRef.current = e.clientY;
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                }
+            }}
+            onPointerMove={(e) => {
+                if (!isFocused || touchStartYRef.current === null) return;
+                const deltaY = touchStartYRef.current - e.clientY;
+                const maxScroll = Math.max(0, MENU_HEIGHT - VIEWPORT_HEIGHT);
+                targetScrollYRef.current = Math.max(0, Math.min(maxScroll, targetScrollYRef.current + deltaY * 2));
+                touchStartYRef.current = e.clientY;
+            }}
+            onPointerUp={(e) => {
+                touchStartYRef.current = null;
+                (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+            }}
         >
             {clonedModel && (
                 <primitive
@@ -446,7 +554,7 @@ export default function SettingsTV({
                             if (buttonHit !== hoveredButton) setHoveredButton(buttonHit);
                             document.body.style.cursor = buttonHit ? 'pointer' : 'auto';
 
-                            if (activeSliderRef.current) {
+                            if (activeSliderRef.current && activeSliderRef.current !== 'fov') {
                                 const px = e.uv.x * 512;
                                 const controlsX = 256 + 130;
                                 const sliderWidth = 120;
@@ -467,6 +575,7 @@ export default function SettingsTV({
                             if (hit && hit.endsWith('_slider')) {
                                 e.stopPropagation();
                                 const rowId = hit.replace('_slider', '') as SettingId;
+                                if (rowId === 'fov') return; // FOV has no slider 
                                 activeSliderRef.current = rowId;
 
                                 // Direct jump on click
@@ -495,6 +604,10 @@ export default function SettingsTV({
                             else if (hit === 'theme_inc') settings.nextTheme();
                             else if (hit === 'theme_dec') settings.prevTheme();
                             else if (hit === 'barrel_inc' || hit === 'barrel_dec') settings.toggleBarrel();
+                            else if (hit === 'fov_input') {
+                                setIsEditingFov(true);
+                                setFovInputBuffer(Math.round(settings.cameraFOV).toString());
+                            }
                         }
                     }}
                 />

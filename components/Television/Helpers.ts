@@ -593,6 +593,59 @@ export function drawHUDSettingsGear(
     });
 }
 
+export function drawHUDFullscreenIcon(
+    ctx: CanvasRenderingContext2D,
+    btnX: number,
+    btnY: number,
+    hoverProgress: number,
+    color: string = '#ffffff'
+) {
+    const masterAlpha = ctx.globalAlpha;
+
+    applyRetroButtonEffect(ctx, btnX, btnY, hoverProgress, color, (cx, cy, c) => {
+        ctx.strokeStyle = c;
+        ctx.fillStyle = c;
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = masterAlpha;
+
+        const size = 6.5; // distance from center to corner
+        const arrow = 3.5; // length of arrow head lines
+
+        ctx.beginPath();
+        // Top-Left
+        ctx.moveTo(cx - size + arrow, cy - size);
+        ctx.lineTo(cx - size, cy - size);
+        ctx.lineTo(cx - size, cy - size + arrow);
+        ctx.moveTo(cx - size, cy - size);
+        ctx.lineTo(cx - 1.5, cy - 1.5);
+
+        // Top-Right
+        ctx.moveTo(cx + size - arrow, cy - size);
+        ctx.lineTo(cx + size, cy - size);
+        ctx.lineTo(cx + size, cy - size + arrow);
+        ctx.moveTo(cx + size, cy - size);
+        ctx.lineTo(cx + 1.5, cy - 1.5);
+
+        // Bottom-Right
+        ctx.moveTo(cx + size - arrow, cy + size);
+        ctx.lineTo(cx + size, cy + size);
+        ctx.lineTo(cx + size, cy + size - arrow);
+        ctx.moveTo(cx + size, cy + size);
+        ctx.lineTo(cx + 1.5, cy + 1.5);
+
+        // Bottom-Left
+        ctx.moveTo(cx - size + arrow, cy + size);
+        ctx.lineTo(cx - size, cy + size);
+        ctx.lineTo(cx - size, cy + size - arrow);
+        ctx.moveTo(cx - size, cy + size);
+        ctx.lineTo(cx - 1.5, cy + 1.5);
+
+        ctx.stroke();
+    });
+}
+
 export function drawHUDResetIcon(
     ctx: CanvasRenderingContext2D,
     btnX: number,
@@ -1162,3 +1215,120 @@ export function drawStaticNoise(
 
 
 
+export function drawZoomTutorial(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    time: number,
+    opacity: number = 1.0,
+    flicker: number = 1.0
+) {
+    if (opacity <= 0.01 || flicker <= 0.01) return;
+
+    ctx.save();
+    
+    const steppedTime = Math.floor(time * 12) / 12;
+    const pinchProgress = (Math.sin(steppedTime * 4) + 1) / 2;
+    // Balanced size for mobile readability
+    ctx.font = 'bold 20px "Courier New", monospace';
+    const textStr = 'Ajusta el zoom con los dedos';
+    const textMetrics = ctx.measureText(textStr);
+    const boxW = textMetrics.width + 85; 
+    const boxH = 64; 
+    const x = (w - boxW) / 2;
+    const y = (h - boxH) / 2;
+
+    const accentColor = '#4af626';
+
+    // Intense Glitch/Flicker effect for transitions
+    let finalFlicker = flicker;
+    if (flicker < 0.9) {
+        if (Math.random() > 0.8) finalFlicker *= (0.3 + Math.random() * 0.5);
+    }
+
+    ctx.globalAlpha = opacity * finalFlicker;
+
+    // Very Subtle Glow - back to original feel
+    ctx.shadowBlur = 0.5 * finalFlicker;
+    ctx.shadowColor = 'rgba(74, 246, 38, 0.2)';
+
+    // Background - Solid black as requested
+    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+    drawPixelRoundedRect(ctx, x, y, boxW, boxH, 4);
+    
+    // Border - Lower width for original look
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, boxW - 2, boxH - 2);
+
+    // Subtle Ghosting during glitch
+    if (flicker < 0.9 && Math.random() > 0.8) {
+        ctx.strokeStyle = 'rgba(74, 246, 38, 0.3)';
+        const gx = (Math.random() - 0.5) * 4;
+        const gy = (Math.random() - 0.5) * 3;
+        ctx.strokeRect(x + 1 + gx, y + 1 + gy, boxW - 2, boxH - 2);
+    }
+
+    ctx.shadowBlur = 0;
+
+    // Text
+    ctx.fillStyle = accentColor;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    
+    // Stable position when not flickering
+    const jitterAmount = flicker < 0.9 ? 2.0 : 0.0;
+    const jitterX = (Math.random() - 0.5) * jitterAmount;
+    const jitterY = (Math.random() - 0.5) * jitterAmount;
+    ctx.fillText(textStr, x + 70 + jitterX, y + boxH / 2 + jitterY);
+
+    // Scanline / Glitch line
+    if (flicker < 0.9 && Math.random() > 0.8) {
+        ctx.fillStyle = 'rgba(74, 246, 38, 0.2)';
+        ctx.fillRect(x, y + Math.random() * boxH, boxW, 2);
+    }
+
+    // Diagonal Arrows Icon (separating and returning)
+    const iconX = x + 35;
+    const iconY = y + boxH / 2;
+
+    ctx.save();
+    ctx.translate(iconX, iconY);
+    
+    const travel = 8;
+    const off = pinchProgress * travel;
+    
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Arrow 1: Top-Right
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(off + 6, -off - 6);
+    ctx.stroke();
+    
+    // Arrow Head 1
+    ctx.beginPath();
+    ctx.moveTo(off + 2, -off - 6);
+    ctx.lineTo(off + 6, -off - 6);
+    ctx.lineTo(off + 6, -off - 2);
+    ctx.stroke();
+
+    // Arrow 2: Bottom-Left
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-off - 6, off + 6);
+    ctx.stroke();
+
+    // Arrow Head 2
+    ctx.beginPath();
+    ctx.moveTo(-off - 2, off + 6);
+    ctx.lineTo(-off - 6, off + 6);
+    ctx.lineTo(-off - 6, off + 2);
+    ctx.stroke();
+
+    ctx.restore();
+    ctx.restore();
+}

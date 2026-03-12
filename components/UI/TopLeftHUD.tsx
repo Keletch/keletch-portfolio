@@ -33,6 +33,13 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
     const hoverStartTimeRefs = useRef<Record<string, number>>({
         tv: 0, radio: 0, about: 0, works: 0, vision: 0, lifestyle: 0, extras: 0
     });
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 1024);
+        handleResize(); // Init
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const canvasWidth = 240; // Expanded to fit labels
     const slotSize = 50;
@@ -154,35 +161,61 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
         });
 
         if (textureRef.current) textureRef.current.needsUpdate = true;
+
+        // Real-time layout stabilization: compensates for FOV changes (zoom)
+        if (meshRef.current) {
+            const zOff = -0.6;
+            const perspectiveCamera = camera as THREE.PerspectiveCamera;
+            const liveFOV = perspectiveCamera.fov;
+            const vFOV = THREE.MathUtils.degToRad(liveFOV);
+            const heightAtZ = 2 * Math.tan(vFOV / 2) * Math.abs(zOff);
+            const widthAtZ = heightAtZ * perspectiveCamera.aspect;
+
+            const sFactor = isMobile ? 1.4 : 1.0;
+            const totalSlots = 7;
+            const pH = heightAtZ * 0.10 * totalSlots * sFactor;
+            const pW = (heightAtZ * 0.10 * sFactor) * (canvasWidth / slotSize);
+
+            const pX = heightAtZ * 0.02;
+            const pY = heightAtZ * 0.02;
+
+            meshRef.current.position.set(
+                -widthAtZ / 2 + pW / 2 + pX,
+                heightAtZ / 2 - pH / 2 - pY,
+                zOff
+            );
+            meshRef.current.scale.set(pW, pH, 1);
+        }
     });
 
-    const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
+    const getHitResult = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
         const rawUv = e.uv;
-        if (!rawUv) return;
+        if (!rawUv) return null;
 
         const px = rawUv.x * canvasWidth;
-        const py = (1 - rawUv.y) * canvasHeight; // Canvas coords: top is 0
+        const py = (1 - rawUv.y) * canvasHeight;
 
         const xLeft = 15;
-        const xRight = 65; // Restricted: hover only on icons, not on text space
-
-        let hit: string | null = null;
+        const xRight = 65;
 
         // TV hit check
         if (px > xLeft && px < 65 && py > 0 && py < slotSize) {
-            hit = 'tv';
+            return 'tv';
         } else if (isExpanded) {
             // Check sub-items
             for (let i = 1; i < MENU_ITEMS.length; i++) {
                 const yTop = i * slotSize * expansionProgress.current;
                 const yBottom = (i + 1) * slotSize * expansionProgress.current;
                 if (px > xLeft && px < xRight && py > yTop && py < yBottom) {
-                    hit = MENU_ITEMS[i].id;
-                    break;
+                    return MENU_ITEMS[i].id;
                 }
             }
         }
+        return null;
+    };
 
+    const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
+        const hit = getHitResult(e);
         setHoveredBtn(hit as HUDButton | null);
         document.body.style.cursor = hit ? 'pointer' : 'auto';
     };
@@ -193,41 +226,28 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
     };
 
     const handleClick = (e: ThreeEvent<MouseEvent>) => {
-        if (!hoveredBtn) return;
+        const hit = getHitResult(e) || hoveredBtn;
+        if (!hit) return;
         e.stopPropagation();
 
-        if (hoveredBtn === 'tv') {
+        if (hit === 'tv') {
             setIsExpanded(!isExpanded);
         } else {
-            const item = (MENU_ITEMS as readonly { id: string, state?: string }[]).find(m => m.id === hoveredBtn);
+            const item = (MENU_ITEMS as readonly { id: string, state?: string }[]).find(m => m.id === hit);
             if (item && item.state) {
                 onNavigate(item.state);
             }
         }
     };
 
-    const zOffset = -0.6;
-    const vFOV = THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov);
-    const heightAtZ = 2 * Math.tan(vFOV / 2) * Math.abs(zOffset);
-    const widthAtZ = heightAtZ * ((camera as THREE.PerspectiveCamera).aspect);
-
-    // HUD Layout
-    const totalSlotCount = 7;
-    const planeHeight = heightAtZ * 0.10 * totalSlotCount; // Slightly smaller slots in 3D
-    const planeWidth = (heightAtZ * 0.10) * (canvasWidth / slotSize);
-
-    const paddingX = heightAtZ * 0.02;
-    const paddingY = heightAtZ * 0.02;
-
     return createPortal(
         <mesh
             ref={meshRef}
-            position={[-widthAtZ / 2 + planeWidth / 2 + paddingX, heightAtZ / 2 - planeHeight / 2 - paddingY, zOffset]}
             onPointerMove={handlePointerMove}
             onPointerOut={handlePointerOut}
             onClick={handleClick}
         >
-            <planeGeometry args={[planeWidth, planeHeight]} />
+            <planeGeometry args={[1, 1]} />
             <meshBasicMaterial
                 map={textureRef.current}
                 transparent

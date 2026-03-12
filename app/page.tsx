@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { Loader } from '@/components/UI/Loader';
+import { OrientationWarning } from '@/components/UI/OrientationWarning';
 
 const TVScene = dynamic(() => import('@/components/Scene/TVScene'), {
     ssr: false,
@@ -14,6 +15,7 @@ export default function Home() {
 
     return (
         <>
+            <OrientationWarning />
             {!isLoaded && <Loader onFinished={() => setIsLoaded(true)} />}
             <TVScene isLoaded={isLoaded} />
         </>

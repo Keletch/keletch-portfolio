@@ -23,6 +23,7 @@ import { LuckyCat } from '@/components/Props/LuckyCat';
 import { RoomFloor } from '@/components/Scene/RoomFloor';
 import { PaletteSelector } from '@/components/UI/PaletteSelector';
 import { TopLeftHUD } from '@/components/UI/TopLeftHUD';
+import { ZoomTutorial } from '@/components/UI/ZoomTutorial';
 import { useSettingsStore } from '@/components/store/useSettingsStore';
 import { ResettableRigidBody } from '@/components/Scene/ResettableRigidBody';
 
@@ -272,20 +273,61 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
         }
     }, [isLoaded]);
 
+    const [fov, setFov] = useState(35);
+
+    useEffect(() => {
+        const calculateFov = () => {
+            const aspect = window.innerWidth / window.innerHeight;
+            // Standard desktop is usually around 16:9 (1.77)
+            // Mobile landscape is often much wider, like 19.5:9 (2.16)
+            if (aspect > 1.8) {
+                // E.g., for very wide phones, increase FOV linearly
+                const extraWide = aspect - 1.8;
+                setFov(35 + (extraWide * 18)); 
+            } else {
+                setFov(35);
+            }
+        };
+
+        // Only run on client
+        if (typeof window !== 'undefined') {
+            calculateFov();
+            window.addEventListener('resize', calculateFov);
+            return () => window.removeEventListener('resize', calculateFov);
+        }
+    }, []);
+
     return (
         <div style={{ width: '100%', height: '100vh', background: '#000000', position: 'relative' }}>
 
             <Canvas
                 shadows={false}
-                camera={{ position: [-3.5, 2.5, 14], fov: 35 }}
+                camera={{ position: [-3.5, 2.5, 14], fov: fov }}
                 dpr={dpr}
                 gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0, preserveDrawingBuffer: true }}
                 events={(store) => ({
                     ...events(store),
                     compute: (event, rootState) => {
-                        const e = event as unknown as { offsetX?: number; clientX?: number; offsetY?: number; clientY?: number };
-                        const offsetX = e.offsetX !== undefined ? e.offsetX : (e.clientX || 0);
-                        const offsetY = e.offsetY !== undefined ? e.offsetY : (e.clientY || 0);
+                        const e = event as unknown as { 
+                            offsetX?: number; clientX?: number; 
+                            offsetY?: number; clientY?: number;
+                            changedTouches?: { clientX: number, clientY: number }[];
+                            touches?: { clientX: number, clientY: number }[];
+                        };
+
+                        let cx = e.clientX || 0;
+                        let cy = e.clientY || 0;
+
+                        if (e.changedTouches && e.changedTouches.length > 0) {
+                            cx = e.changedTouches[0].clientX;
+                            cy = e.changedTouches[0].clientY;
+                        } else if (e.touches && e.touches.length > 0) {
+                            cx = e.touches[0].clientX;
+                            cy = e.touches[0].clientY;
+                        }
+
+                        const offsetX = e.offsetX !== undefined ? e.offsetX : cx;
+                        const offsetY = e.offsetY !== undefined ? e.offsetY : cy;
 
                         // Normalize (-1 to +1)
                         const px = (offsetX / rootState.size.width) * 2 - 1;
@@ -420,6 +462,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                         onResetSelect={handleResetScene}
                         onContactSelect={() => setViewState('tv_mobile_focus')}
                     />
+                    <ZoomTutorial viewState={viewState} />
                     <CRTOverlay />
                 </PerformanceMonitor>
             </Canvas>

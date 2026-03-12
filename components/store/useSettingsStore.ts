@@ -24,6 +24,7 @@ interface SettingsState {
     cameraFOV: number;
     musicVolume: number;
     bubblesVolume: number;
+    hasDoneZoomThisSession: boolean;
 
     globalResetTrigger: number;
     globalUnfreezeTrigger: number;
@@ -70,6 +71,7 @@ interface SettingsState {
     incBubblesVolume: () => void;
     decBubblesVolume: () => void;
     setNumericSetting: (id: string, value: number) => void;
+    setHasDoneZoomThisSession: (val: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -89,6 +91,7 @@ export const useSettingsStore = create<SettingsState>()(
             cameraFOV: 35,
             musicVolume: 0.8,
             bubblesVolume: 0.8,
+            hasDoneZoomThisSession: false,
 
             globalResetTrigger: 0,
             globalUnfreezeTrigger: 0,
@@ -198,6 +201,7 @@ export const useSettingsStore = create<SettingsState>()(
                 const [min, max] = bounds[prop] || [0, 1];
                 return { [prop]: Math.max(min, Math.min(max, value)) };
             }),
+            setHasDoneZoomThisSession: (val: boolean) => set({ hasDoneZoomThisSession: val }),
         }),
         {
             name: 'portfolio-settings',
