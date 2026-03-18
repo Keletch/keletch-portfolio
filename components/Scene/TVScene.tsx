@@ -214,6 +214,15 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
     const [dpr, setDpr] = useState(1.0);
     const [isPhysicsActive, setPhysicsActive] = useState(false);
     const [palette, setPalette] = useState<PaletteId>('current');
+    const [isMobileMode, setIsMobileMode] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobileMode(window.innerWidth < 768);
+        if (typeof window !== 'undefined') {
+            window.addEventListener('resize', handleResize);
+            return () => window.removeEventListener('resize', handleResize);
+        }
+    }, []);
 
     const setGlobalResetTrigger = useSettingsStore(state => state.setGlobalResetTrigger);
 
@@ -344,20 +353,27 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                     }
                 })}
             >
-                <PerformanceMonitor onIncline={() => setDpr(1.5)} onDecline={() => setDpr(0.7)} >
+                <PerformanceMonitor onIncline={() => setDpr(isMobileMode ? 1.0 : 1.5)} onDecline={() => setDpr(0.7)} >
                     <color attach="background" args={['#000000']} />
                     <ambientLight intensity={settings.ambientIntensity} />
                     <directionalLight position={[0, 10, 5]} intensity={2.0} color="#fff0dd" />
                     <spotLight position={[0, 8, 6]} angle={1.2} penumbra={0.4} intensity={80} color="#ffc485" />
-                    <pointLight position={[-6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
-                    <pointLight position={[6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
+                    
+                    {!isMobileMode && (
+                        <>
+                            <pointLight position={[-6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
+                            <pointLight position={[6, 4, 4]} intensity={40} distance={25} decay={2} color="#ffc485" />
+                            <pointLight position={[5.3, 1.9, 0.9]} intensity={10} distance={6.5} decay={2.75} color="#ffaa00" />
+                            <rectAreaLight ref={rectLightRef} position={[5.7, 1.4, 1.0]} width={1.0} height={1.2} color="#ffcc00" intensity={5} />
+                        </>
+                    )}
+
                     <pointLight position={[0, 2.0, -4]} intensity={50} distance={20} decay={2} color="#3050ff" />
                     <pointLight position={[-4.9, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
                     <pointLight position={[5.0, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
-                    <pointLight position={[5.3, 1.9, 0.9]} intensity={10} distance={6.5} decay={2.75} color="#ffaa00" />
-                    <rectAreaLight ref={rectLightRef} position={[5.7, 1.4, 1.0]} width={1.0} height={1.2} color="#ffcc00" intensity={5} />
+                    
 
-                    <Physics gravity={[0, settings.gravityY, 0]} numSolverIterations={12} paused={!isPhysicsActive}>
+                    <Physics gravity={[0, settings.gravityY, 0]} numSolverIterations={12} paused={!isPhysicsActive || (viewState !== 'default' && viewState !== 'shelf_focus')}>
                         <RoomFloor
                             texturePath={paletteConfig.floor.texture}
                             overlayColor1={paletteConfig.floor.overlay1}

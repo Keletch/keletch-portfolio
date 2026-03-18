@@ -100,6 +100,9 @@ export default function LifestyleTV({
         blinkTimer: 0
     });
 
+    const frustumRef = useRef(new THREE.Frustum());
+    const projScreenMatrixRef = useRef(new THREE.Matrix4());
+
     useFrame((state, delta) => {
         if (typeof document !== 'undefined' && !document.hasFocus()) return;
 
@@ -125,6 +128,15 @@ export default function LifestyleTV({
             }
 
             if (screenMeshRef.current) {
+                const frustum = frustumRef.current;
+                const projScreenMatrix = projScreenMatrixRef.current;
+                projScreenMatrix.multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse);
+                frustum.setFromProjectionMatrix(projScreenMatrix);
+
+                if (!frustum.intersectsObject(screenMeshRef.current)) {
+                    return; // Frustum Culling: skip rendering 2D canvas if TV is off-screen
+                }
+
                 const mesh = screenMeshRef.current;
                 if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
                 const box = mesh.geometry.boundingBox;

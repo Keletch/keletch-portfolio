@@ -246,6 +246,7 @@ export default function MyWorks({
     const {
         clonedModel,
         screenTextureRef,
+        screenMeshRef,
         screenAspect
     } = useTVModel({
         modelPath,
@@ -294,6 +295,8 @@ export default function MyWorks({
 
 
     const eyeMorphProgress = useRef(0);
+    const frustumRef = useRef(new THREE.Frustum());
+    const projScreenMatrixRef = useRef(new THREE.Matrix4());
 
     useFrame((state, delta) => {
         if (groupRef.current) {
@@ -303,6 +306,17 @@ export default function MyWorks({
 
 
         if (screenTextureRef.current && groupRef.current) {
+            if (screenMeshRef.current) {
+                const frustum = frustumRef.current;
+                const projScreenMatrix = projScreenMatrixRef.current;
+                projScreenMatrix.multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse);
+                frustum.setFromProjectionMatrix(projScreenMatrix);
+
+                if (!frustum.intersectsObject(screenMeshRef.current)) {
+                    return; // Frustum Culling: skip rendering 2D canvas if TV is off-screen
+                }
+            }
+
             if (galleryState !== 'idle') {
                 const canvas = screenTextureRef.current.image as HTMLCanvasElement;
                 if (canvas) {

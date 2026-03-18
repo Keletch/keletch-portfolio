@@ -103,6 +103,7 @@ export default function Vision({
     const {
         clonedModel,
         screenTextureRef,
+        screenMeshRef,
         screenAspect
     } = useTVModel({
         modelPath,
@@ -227,6 +228,9 @@ export default function Vision({
         setVisionState('reforming');
     }, [storyActive, visionState, currentParagraph, triggerWave]);
 
+    const frustumRef = useRef(new THREE.Frustum());
+    const projScreenMatrixRef = useRef(new THREE.Matrix4());
+
     useFrame((state, delta) => {
         if (groupRef.current) {
             const dist = state.camera.position.distanceTo(groupRef.current.position);
@@ -234,6 +238,17 @@ export default function Vision({
         }
 
         if (screenTextureRef.current && groupRef.current) {
+            if (screenMeshRef.current) {
+                const frustum = frustumRef.current;
+                const projScreenMatrix = projScreenMatrixRef.current;
+                projScreenMatrix.multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse);
+                frustum.setFromProjectionMatrix(projScreenMatrix);
+
+                if (!frustum.intersectsObject(screenMeshRef.current)) {
+                    return; // Frustum Culling: skip rendering 2D canvas if TV is off-screen
+                }
+            }
+
             updateScreenGaze(state, delta);
             updateBlink(delta, state.clock.elapsedTime);
 

@@ -68,7 +68,7 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
         if (gainNodeRef.current) {
             gainNodeRef.current.gain.setTargetAtTime(musicVolume, audioContextRef.current?.currentTime || 0, 0.05);
         } else if (audioRef.current) {
-            audioRef.current.volume = Math.min(1.0, musicVolume);
+            audioRef.current.volume = Math.max(0, Math.min(1.0, musicVolume));
         }
     }, [musicVolume]);
 
@@ -96,7 +96,7 @@ export default function RadioSection({ viewState, onNavigate, accentColor, theme
 
         if (!audioRef.current) {
             audioRef.current = new Audio();
-            audioRef.current.volume = musicVolume;
+            audioRef.current.volume = Math.max(0, Math.min(1.0, musicVolume));
         }
 
         const setupAudio = (audio: HTMLAudioElement) => {

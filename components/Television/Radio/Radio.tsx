@@ -62,9 +62,10 @@ export default function RadioTV({
     const scrollYRef = useRef(0);
     const targetScrollYRef = useRef(0);
     const [hoveredTrackIndex, setHoveredTrackIndex] = useState(-1);
-    const [isListDragging, setIsListDragging] = useState(false);
-    const [dragStartY, setDragStartY] = useState(0);
-    const [dragStartScroll, setDragStartScroll] = useState(0);
+    const isListDraggingRef = useRef(false);
+    const dragStartYRef = useRef(0);
+    const dragStartScrollRef = useRef(0);
+    const dragTotalDistanceRef = useRef(0);
 
     // Optimization: Pre-calculate track names
     const formattedTracks = useMemo(() => {
@@ -184,6 +185,8 @@ export default function RadioTV({
     };
 
     const targetPosRef = useRef(new THREE.Vector3());
+    const frustumRef = useRef(new THREE.Frustum());
+    const projScreenMatrixRef = useRef(new THREE.Matrix4());
 
     useFrame((state, delta) => {
         if (groupRef.current) {
@@ -219,6 +222,15 @@ export default function RadioTV({
             }
 
             if (screenMeshRef.current) {
+                const frustum = frustumRef.current;
+                const projScreenMatrix = projScreenMatrixRef.current;
+                projScreenMatrix.multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse);
+                frustum.setFromProjectionMatrix(projScreenMatrix);
+
+                if (!frustum.intersectsObject(screenMeshRef.current)) {
+                    return; // Frustum Culling: skip rendering 2D canvas if TV is off-screen
+                }
+
                 const mesh = screenMeshRef.current;
                 mesh.geometry.computeBoundingBox();
                 const box = mesh.geometry.boundingBox;
@@ -552,9 +564,10 @@ export default function RadioTV({
                                 return;
                             }
 
-                            if (isListDragging && isMenuOpen) {
-                                const deltaY = dy - dragStartY;
-                                const newScroll = dragStartScroll - deltaY;
+                            if (isListDraggingRef.current && isMenuOpen) {
+                                const deltaY = dy - dragStartYRef.current;
+                                dragTotalDistanceRef.current = Math.max(dragTotalDistanceRef.current, Math.abs(deltaY));
+                                const newScroll = dragStartScrollRef.current - deltaY;
                                 const listHeight = 280;
                                 const itemHeight = 40;
                                 const maxScroll = Math.max(0, (tracks.length * itemHeight) - listHeight);
@@ -623,9 +636,10 @@ export default function RadioTV({
                             const listX = -220; const listY = -140; const listW = 440; const listH = 280;
                             if (isMenuOpen && dx >= listX && dx <= listX + listW && dy >= listY && dy <= listY + listH) {
                                 e.stopPropagation();
-                                setIsListDragging(true);
-                                setDragStartY(dy);
-                                setDragStartScroll(scrollYRef.current);
+                                isListDraggingRef.current = true;
+                                dragStartYRef.current = dy;
+                                dragStartScrollRef.current = scrollYRef.current;
+                                dragTotalDistanceRef.current = 0;
                                 (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                 return;
                             }
@@ -638,9 +652,9 @@ export default function RadioTV({
                             onSeek(seekDragValue);
                             (e.target as HTMLElement).releasePointerCapture(e.pointerId);
                         }
-                        if (isListDragging) {
+                        if (isListDraggingRef.current) {
                             e.stopPropagation();
-                            setIsListDragging(false);
+                            isListDraggingRef.current = false;
                             (e.target as HTMLElement).releasePointerCapture(e.pointerId);
                         }
                     }}
@@ -682,12 +696,25 @@ export default function RadioTV({
                                 e.stopPropagation();
                                 onNextClick();
                             } else if (isMenuOpen) {
-                                // Check List Click
-                                if (hoveredTrackIndex >= 0 && hoveredTrackIndex < tracks.length) {
-                                    if (onSelectTrack) {
-                                        e.stopPropagation();
-                                        onSelectTrack(tracks[hoveredTrackIndex]);
-                                        setIsMenuOpen(false); // Close on select
+                                if (dragTotalDistanceRef.current > 10) return; // Prevent accidental click if user was scrolling
+
+                                // Recalculate List Click for reliable mobile touch
+                                const dx = e.uv.x * 512 - 256;
+                                let dy = (1 - e.uv.y) * 512 - 256;
+                                if (invertY) dy = -dy;
+
+                                const listX = -220; const listY = -140; const listW = 440; const listH = 280;
+                                const isListHit = dx >= listX && dx <= listX + listW && dy >= listY && dy <= listY + listH;
+                                
+                                if (isListHit) {
+                                    const relativeY = dy - listY + scrollYRef.current;
+                                    const index = Math.floor(relativeY / 40);
+                                    if (index >= 0 && index < tracks.length) {
+                                        if (onSelectTrack) {
+                                            e.stopPropagation();
+                                            onSelectTrack(tracks[index]);
+                                            setIsMenuOpen(false);
+                                        }
                                     }
                                 }
                             }
