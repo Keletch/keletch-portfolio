@@ -213,6 +213,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
     const [isCameraSettled, setCameraSettled] = useState(true);
     const [dpr, setDpr] = useState(1.0);
     const [isPhysicsActive, setPhysicsActive] = useState(false);
+    const [shouldPausePhysics, setShouldPausePhysics] = useState(false);
     const [palette, setPalette] = useState<PaletteId>('current');
     const [isMobileMode, setIsMobileMode] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
@@ -245,6 +246,17 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
         setCameraSettled(true);
         setGlobalResetTrigger(Date.now());
     };
+
+    useEffect(() => {
+        if (viewState === 'default' || viewState === 'shelf_focus') {
+            setShouldPausePhysics(false);
+        } else {
+            const timer = setTimeout(() => {
+                setShouldPausePhysics(true);
+            }, 2500);
+            return () => clearTimeout(timer);
+        }
+    }, [viewState]);
 
     // Sync theme with palette selection
     useEffect(() => {
@@ -373,7 +385,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                     <pointLight position={[5.0, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
                     
 
-                    <Physics gravity={[0, settings.gravityY, 0]} numSolverIterations={12} paused={!isPhysicsActive || (viewState !== 'default' && viewState !== 'shelf_focus')}>
+                    <Physics gravity={[0, settings.gravityY, 0]} numSolverIterations={12} paused={!isPhysicsActive || shouldPausePhysics}>
                         <RoomFloor
                             texturePath={paletteConfig.floor.texture}
                             overlayColor1={paletteConfig.floor.overlay1}
