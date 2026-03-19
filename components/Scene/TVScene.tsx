@@ -435,35 +435,35 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                         <AdjustableModel
                             modelPath="/models/b1.glb" initialPos={book1Ctrl.pos} initialRot={book1Ctrl.rot} initialScale={book1Ctrl.scale} initialColliderSize={book1Ctrl.size} initialColliderOffset={book1Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_red_focus')} label="About me"
-                            labelConfig={{ position: [-1.882, 0.96, 0.51], rotation: [0, -0.2, 0], fontSize: 0.1, color: '#ffffff' }}
+                            labelConfig={{ position: [-1.95, 0.98, 0.42], rotation: [0, 0.00, 0], fontSize: 0.1, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             resetDelay={0.75}
                         />
                         <AdjustableModel
                             modelPath="/models/b2.glb" initialPos={book2Ctrl.pos} initialScale={book2Ctrl.scale} initialColliderSize={book2Ctrl.size} initialColliderOffset={book2Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_lcd_focus')} label="My Works"
-                            labelConfig={{ position: [-1.80, 1.05, 0.52], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
+                            labelConfig={{ position: [-1.85, 1.05, 0.43], rotation: [0, 0.00, 0], fontSize: 0.12, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             resetDelay={0.90}
                         />
                         <AdjustableModel
                             modelPath="/models/b3.glb" initialPos={book3Ctrl.pos} initialScale={book3Ctrl.scale} initialColliderSize={book3Ctrl.size} initialColliderOffset={book3Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_dirty_focus')} label="Vision"
-                            labelConfig={{ position: [-1.65, 0.90, 0.53], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
+                            labelConfig={{ position: [-1.69, 0.90, 0.43], rotation: [0, 0.00, 0], fontSize: 0.12, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             resetDelay={1.05}
                         />
                         <AdjustableModel
                             modelPath="/models/b4.glb" initialPos={book4Ctrl.pos} initialScale={book4Ctrl.scale} initialColliderSize={book4Ctrl.size} initialColliderOffset={book4Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_typical_focus')} label="Lifestyle"
-                            labelConfig={{ position: [-1.49, 0.92, 0.53], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
+                            labelConfig={{ position: [-1.54, 0.91, 0.43], rotation: [0, 0.00, 0], fontSize: 0.12, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             resetDelay={1.20}
                         />
                         <AdjustableModel
                             modelPath="/models/b5.glb" initialPos={book5Ctrl.pos} initialScale={book5Ctrl.scale} initialColliderSize={book5Ctrl.size} initialColliderOffset={book5Ctrl.offset}
                             onClick={(e) => handleZoom(e, 'tv_lowpoly_focus')} label="Extras"
-                            labelConfig={{ position: [-1.35, 0.85, 0.51], rotation: [0, -0.2, 0], fontSize: 0.12, color: '#ffffff' }}
+                            labelConfig={{ position: [-1.39, 0.93, 0.41], rotation: [0, 0.00, 0], fontSize: 0.12, color: '#ffffff' }}
                             isInteractive={viewState === 'shelf_focus' && isCameraSettled}
                             resetDelay={1.35}
                         />

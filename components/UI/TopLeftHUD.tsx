@@ -24,7 +24,7 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
     const meshRef = useRef<THREE.Mesh>(null);
     const textureRef = useRef<THREE.CanvasTexture | null>(null);
 
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
     const expansionProgress = useRef(0);
     const [hoveredBtn, setHoveredBtn] = useState<HUDButton | null>(null);
     const hoverProgressRefs = useRef<Record<string, number>>({

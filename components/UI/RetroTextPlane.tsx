@@ -131,6 +131,9 @@ export const RetroTextPlane = React.forwardRef<THREE.Mesh, RetroTextPlaneProps>(
                 opacity={opacity}
                 side={THREE.DoubleSide}
                 blending={THREE.NormalBlending}
+                polygonOffset={true}
+                polygonOffsetFactor={-4}
+                polygonOffsetUnits={-4}
             />
         </mesh>
     );
