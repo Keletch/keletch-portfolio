@@ -3,7 +3,8 @@ import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { THEMES } from '../Types';
 import { VisionProps } from './VisionTypes';
-import { drawPixelEye } from '../Helpers';
+import { drawPixelEye, drawTelevisionHeader } from '../Helpers';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 import { useScreenInteraction } from '@/hooks/useScreenInteraction';
@@ -31,8 +32,8 @@ import { VISION_STORY } from './VisionData';
 
 const DEFAULT_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'monitor', 'glass', 'vidrio', 'cristal', 'tube', 'lcdscreen', 'lcd_screen', 'redtvscreen', 'dirtytvscreen', 'tipicaltvscreen', 'toontvscreen', 'toontv_screen'];
 
-const ZOOM_DURATION = 1800;
-const STATIC_DURATION = 600;
+const ZOOM_DURATION = 600;
+const STATIC_DURATION = 0;
 
 const SPHERE_Y = -260;
 const SPHERE_R = 250;
@@ -57,7 +58,6 @@ export default function Vision({
     modelYOffset = -0.3,
     focusedText,
     isFocused = false,
-    textYOffset = 60,
     showBackButton = false,
     onBackClick,
     backButtonPosition,
@@ -81,6 +81,7 @@ export default function Vision({
     const morphProgressRef = useRef(0);
     const wavesRef = useRef<SphereWave[]>([]);
     const clockTimeRef = useRef(0);
+    const premiumGlowIntensity = useSettingsStore(state => state.premiumGlowIntensity);
 
     // Characters for wave selection
     const WAVE_CHARS = '{}[]<>=/*&|!?;:@#$%^~';
@@ -127,11 +128,6 @@ export default function Vision({
     const { blinkState, updateBlink } = useBlink();
 
     // --- TRANSITIONS ---
-    const sphereTarget = (galleryState === 'content' || galleryState === 'static') ? 'sphere' : null;
-    const { transitionOpacity: sphereOpacityRef } = useFigureTransition(sphereTarget, 0);
-    const eyeTarget = (galleryState === 'idle' || galleryState === 'zooming') ? 'eye' : null;
-    const { transitionOpacity: eyeOpacityRef } = useFigureTransition(eyeTarget, 0);
-
     const eyeMorphProgress = useRef(0);
     const themeBasedDefaults = THEMES[theme] || THEMES.classic;
     const activeTheme = visionColors ? { ...themeBasedDefaults, ...visionColors } : themeBasedDefaults;
@@ -151,14 +147,11 @@ export default function Vision({
             }, startStaticDelay);
         } else {
             if (galleryState === 'content' || galleryState === 'static') {
-                setGalleryState('exiting');
                 if (storyActive) setStoryActive(false);
-                zoomTimer = setTimeout(() => {
-                    setVisionState('sphere');
-                    setCurrentParagraph(0);
-                    if (sphereCharsRef.current) resetAllChars(sphereCharsRef.current);
-                    setGalleryState('idle');
-                }, 1000);
+                setVisionState('sphere');
+                setCurrentParagraph(0);
+                if (sphereCharsRef.current) resetAllChars(sphereCharsRef.current);
+                setGalleryState('idle');
             } else {
                 setGalleryState('idle');
                 if (storyActive) setStoryActive(false);
@@ -187,7 +180,7 @@ export default function Vision({
         }
     }, [isFocused]);
 
-    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : null, 0);
+    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : 'eye', 0);
 
     useEffect(() => {
         if (!storyActive) return;
@@ -288,30 +281,38 @@ export default function Vision({
                 ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
 
-                if (morph < 0.99) {
-                    ctx.save();
-                    const isLCD = theme === 'toxic';
-                    const scleraMaxOffsetX = isLCD ? 150 : 100;
-                    const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
-                    const effectiveScleraY = -currentLookAt.current.y * 100;
-                    ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
-                    const scaleEye = theme === 'mobile' ? 0.6 : 1.0;
-                    let geoCorrectionX = 1.0;
-                    if (theme === 'toxic' && screenAspect.current > 1.2) geoCorrectionX = 1 / (screenAspect.current * 0.85);
-                    ctx.globalAlpha = (1.0 - morph) * eyeOpacityRef.current;
-                    ctx.scale(geoCorrectionX * scaleEye, blinkState.current.openness * scaleEye);
-                    const customLookRange = theme === 'toxic' ? 32 : theme === 'mobile' ? 15 : 26;
-                    const isHologram = theme === 'mobile' || theme === 'hacker' || theme === 'holo';
-                    drawPixelEye(ctx, normalizedMouse.current, activeTheme.irisColor, customLookRange, activeTheme.scleraColor || '#ffffff', isHologram);
-                    ctx.restore();
+                const uiOpacityVal = uiOpacityRef.current;
+                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
+
+                // 1. MASTER TRANSITION: EYE PHASE
+                if (renderedUI === 'eye') {
+                    if (uiSteppedOpacity > 0.05 && morph < 0.99) {
+                        ctx.save();
+                        const isLCD = theme === 'toxic';
+                        const scleraMaxOffsetX = isLCD ? 150 : 100;
+                        const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
+                        const effectiveScleraY = -currentLookAt.current.y * 100;
+                        ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
+                        const scaleEye = theme === 'mobile' ? 0.6 : 1.0;
+                        let geoCorrectionX = 1.0;
+                        if (theme === 'toxic' && screenAspect.current > 1.2) geoCorrectionX = 1 / (screenAspect.current * 0.85);
+
+                        ctx.globalAlpha = uiSteppedOpacity * (1.0 - morph);
+                        ctx.scale(geoCorrectionX * scaleEye, blinkState.current.openness * scaleEye);
+                        const customLookRange = theme === 'toxic' ? 32 : theme === 'mobile' ? 15 : 26;
+                        const isHologram = theme === 'mobile' || theme === 'hacker' || theme === 'holo';
+                        drawPixelEye(ctx, normalizedMouse.current, activeTheme.irisColor, customLookRange, activeTheme.scleraColor || '#ffffff', isHologram);
+                        ctx.restore();
+                    }
                 }
 
-                if (morph > 0.01 && (galleryState === 'content' || galleryState === 'static' || galleryState === 'exiting') && sphereCharsRef.current) {
+                // 2. MASTER TRANSITION: UI/SPHERE PHASE
+                if (renderedUI === 'ui' && morph > 0.01 && sphereCharsRef.current) {
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
 
-                    const sphereOpacity = sphereOpacityRef.current * morph;
+                    const sphereOpacity = uiSteppedOpacity * morph;
                     const sphereColor = visionColors?.irisColor || activeTheme.irisColor;
                     const chars = sphereCharsRef.current;
                     const elapsed = performance.now() / 1000 - actionStartTimeRef.current;
@@ -363,50 +364,18 @@ export default function Vision({
                 }
 
                 if (cache.vignette) { ctx.fillStyle = cache.vignette; ctx.fillRect(0, 0, w, h); }
-
-                // UI Overlay (Focused Text & Buttons)
-                const uiOpacityVal = uiOpacityRef.current;
-                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
-
-                if (uiSteppedOpacity > 0.01) {
+                if (renderedUI === 'ui' && uiSteppedOpacity > 0.01) {
                     ctx.save();
                     ctx.globalAlpha = uiSteppedOpacity;
 
-                    if (focusedText) {
-                        ctx.save();
-
-                        const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                        // Increased title opacity
-                        const titleAlpha = Math.max(0, Math.min(1.0, uiSteppedOpacity * 1.5 + titleJitter));
-                        ctx.globalAlpha = titleAlpha;
-
-                        ctx.translate(w / 2, h / 2);
-                        if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
-                        const jx = (Math.random() - 0.5) * 4;
-                        const jy = (Math.random() - 0.5) * 4;
-                        ctx.font = '900 42px "Courier New", monospace';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'top';
-                        const textY = -h / 2 + textYOffset;
-                        const s1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                        const s2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-                        ctx.fillStyle = (activeTheme.textShadow1) ? s1 + '80' : s1;
-                        ctx.fillText(focusedText, jx + 4, textY + jy);
-                        ctx.fillStyle = (activeTheme.textShadow2) ? s2 + '80' : s2;
-                        ctx.fillText(focusedText, jx - 4, textY + jy);
-                        ctx.fillStyle = buttonColor || '#ffffff';
-                        if (Math.random() > 0.1) ctx.fillText(focusedText, jx, textY + jy);
-                        ctx.restore();
-                    }
-
+                    // 1. HUD ELEMENTS LAYER (Buttons)
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
-                    if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
-
-                    const btnJitterBase = Math.sin(state.clock.elapsedTime * 12 + 5) > 0.8 ? (Math.random() - 0.5) * 0.3 : 0;
-                    const btnBaseAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + btnJitterBase));
-                    ctx.globalAlpha = btnBaseAlpha;
-
+                    if (invertY) {
+                        ctx.rotate(Math.PI);
+                        ctx.scale(-1, 1);
+                    }
+                    
                     if (galleryState === 'content' || galleryState === 'static') {
                         const bx = VISION_BUTTON_CONFIG.PLAY.x;
                         const by = VISION_BUTTON_CONFIG.PLAY.y;
@@ -414,26 +383,42 @@ export default function Vision({
                         const mt = storyActive ? 1 : 0;
                         morphProgressRef.current += (mt - morphProgressRef.current) * 0.15;
                         if (Math.abs(morphProgressRef.current - mt) < 0.001) morphProgressRef.current = mt;
+
                         drawButtonShockwave(ctx, bx, by, hp, time, buttonColor);
-                        drawPlayStopButton(ctx, bx, by, hp, morphProgressRef.current, buttonColor);
+                        drawPlayStopButton(ctx, bx, by, hp, morphProgressRef.current, buttonColor, 0, premiumGlowIntensity);
                     }
 
                     if (showBackButton) {
                         const bx = backButtonPosition?.x ?? VISION_BUTTON_CONFIG.BACK.x;
                         const by = backButtonPosition?.y ?? VISION_BUTTON_CONFIG.BACK.y;
                         const hp = updateButtonHoverAnimation(screenTextureRef.current, 'hoverAnimBack', backButtonHovered);
-                        drawBackButton(ctx, bx, by, hp, buttonColor);
+                        drawBackButton(ctx, bx, by, hp, buttonColor, premiumGlowIntensity);
                     }
 
                     if (showMenuButton) {
                         const bx = menuButtonPosition?.x ?? VISION_BUTTON_CONFIG.MENU.x;
                         const by = menuButtonPosition?.y ?? VISION_BUTTON_CONFIG.MENU.y;
                         const hp = updateButtonHoverAnimation(screenTextureRef.current, 'hoverAnimMenu', menuButtonHovered);
-                        drawMenuButton(ctx, bx, by, hp, buttonColor);
+                        drawMenuButton(ctx, bx, by, hp, buttonColor, premiumGlowIntensity);
                     }
 
-                    ctx.restore();
-                    ctx.restore();
+                    ctx.restore(); // END BUTTONS LAYER
+
+                    // 2. HEADER LAYER (Always on top)
+                    if (focusedText) {
+                        ctx.save();
+                        ctx.translate(w / 2, h / 2);
+                        if (invertY) {
+                            ctx.rotate(Math.PI);
+                            ctx.scale(-1, 1);
+                        }
+                        ctx.translate(-w / 2, -h / 2);
+                        drawTelevisionHeader(ctx, focusedText, w, h, premiumGlowIntensity, uiSteppedOpacity, state.clock.elapsedTime, buttonColor || '#ffffff');
+                        ctx.restore();
+                    }
+
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.restore(); // END UI WRAPPER
                 }
             }
             screenTextureRef.current.needsUpdate = true;

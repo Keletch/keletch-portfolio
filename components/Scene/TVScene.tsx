@@ -26,10 +26,49 @@ import { TopLeftHUD } from '@/components/UI/TopLeftHUD';
 import { ZoomTutorial } from '@/components/UI/ZoomTutorial';
 import { useSettingsStore } from '@/components/store/useSettingsStore';
 import { ResettableRigidBody } from '@/components/Scene/ResettableRigidBody';
+import { GamePromptOverlay } from '@/components/Television/Extras/Games/GamePromptOverlay';
+import { GameSelectionHUD } from '@/components/Television/Extras/Games/GameSelectionHUD';
+import { useFrame, useThree } from '@react-three/fiber';
 
 RectAreaLightUniformsLib.init();
 
-export type ViewState = 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus' | 'tv_settings_focus' | 'tv_mobile_focus' | 'tv_typical_gallery';
+function CinematicLighting() {
+    const dimmer = useSettingsStore(state => state.activeGamePrompt !== null);
+    const dimRef = useRef(1);
+    
+    const { scene } = useThree();
+    const originalIntensities = useRef(new Map<THREE.Light, number>());
+
+    useFrame((_, delta) => {
+        const target = dimmer ? 0.05 : 1;
+        const speed = dimmer ? 4 : 2;
+        dimRef.current = THREE.MathUtils.lerp(dimRef.current, target, delta * speed);
+        
+        scene.traverse((obj) => {
+            if ((obj as THREE.Light).isLight) {
+                const light = obj as THREE.Light;
+                
+                // For AmbientLight, we always use the current store value as "original"
+                // so the settings slider works in real-time.
+                if (light.type === 'AmbientLight') {
+                    const storeIntensity = useSettingsStore.getState().ambientIntensity;
+                    light.intensity = storeIntensity * dimRef.current;
+                    originalIntensities.current.set(light, storeIntensity);
+                    return;
+                }
+
+                if (!originalIntensities.current.has(light)) {
+                    originalIntensities.current.set(light, light.intensity);
+                }
+                const original = originalIntensities.current.get(light)!;
+                light.intensity = original * dimRef.current;
+            }
+        });
+    });
+    return null;
+}
+
+export type ViewState = 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus' | 'tv_settings_focus' | 'tv_mobile_focus' | 'tv_typical_gallery' | 'nes_focus';
 
 
 
@@ -70,7 +109,7 @@ const HOLO_COLORS: ThemeColors = {
     textColor: '#ff88ff', highlightColor: '#ff00ff'
 };
 const HACKER_COLORS: ThemeColors = {
-    bgColor: '#000000', baseColor: '#000000', glowCenter: 'rgba(0, 255, 50, 0.1)',
+    bgColor: '#000000', baseColor: '#000000', glowCenter: 'rgba(0, 0, 0, 0)',
     vignetteColor: '#000000', irisColor: '#4af626', scleraColor: 'rgba(74, 246, 38, 0.15)',
     isHologram: true,
     textColor: '#4af626', highlightColor: '#4af626'
@@ -217,6 +256,46 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
     const [palette, setPalette] = useState<PaletteId>('current');
     const [isMobileMode, setIsMobileMode] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
+    // Buffered navigation: queue viewState changes while game prompt is fading
+    const pendingViewState = useRef<ViewState | null>(null);
+    const pendingCameraSettle = useRef<boolean | null>(null);
+    const isGamePromptFading = useSettingsStore(state => state.isGamePromptFading);
+
+    const bufferedSetViewState = (target: ViewState, settle?: boolean) => {
+        const promptActive = useSettingsStore.getState().activeGamePrompt !== null;
+        if (promptActive) {
+            // Queue the navigation — clear the prompt so fade-out begins
+            pendingViewState.current = target;
+            pendingCameraSettle.current = settle ?? null;
+            useSettingsStore.getState().setActiveGamePrompt(null);
+        } else {
+            setViewState(target);
+            if (settle === false) {
+                setCameraSettled(false);
+                setTimeout(() => setCameraSettled(true), 1500);
+            } else if (settle === true) {
+                setCameraSettled(true);
+            }
+        }
+    };
+
+    // Flush pending viewState once game prompt fade-out completes
+    useEffect(() => {
+        if (!isGamePromptFading && pendingViewState.current !== null) {
+            const target = pendingViewState.current;
+            const settle = pendingCameraSettle.current;
+            pendingViewState.current = null;
+            pendingCameraSettle.current = null;
+            setViewState(target);
+            if (settle === false) {
+                setCameraSettled(false);
+                setTimeout(() => setCameraSettled(true), 1500);
+            } else if (settle === true) {
+                setCameraSettled(true);
+            }
+        }
+    }, [isGamePromptFading]);
+
     useEffect(() => {
         const handleResize = () => setIsMobileMode(window.innerWidth < 768);
         if (typeof window !== 'undefined') {
@@ -236,18 +315,19 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
     const handleZoom = (e: ThreeEvent<MouseEvent>, targetState: ViewState) => {
         e.stopPropagation();
         document.body.style.cursor = 'auto';
-        setViewState(targetState);
-        setCameraSettled(false);
-        setTimeout(() => setCameraSettled(true), 1500);
+        bufferedSetViewState(targetState, false);
     };
 
     const handleResetScene = () => {
-        setViewState('default');
-        setCameraSettled(true);
+        bufferedSetViewState('default', true);
         setGlobalResetTrigger(Date.now());
     };
 
     useEffect(() => {
+        if (viewState !== 'nes_focus') {
+            useSettingsStore.getState().setActiveGamePrompt(null);
+        }
+
         if (viewState === 'default' || viewState === 'shelf_focus') {
             setShouldPausePhysics(false);
         } else {
@@ -383,7 +463,10 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                     <pointLight position={[0, 2.0, -4]} intensity={50} distance={20} decay={2} color="#3050ff" />
                     <pointLight position={[-4.9, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
                     <pointLight position={[5.0, 2.0, 2.0]} intensity={30} distance={8} decay={2} color="#ffc485" />
-                    
+                    {/* Game Launch Prompt & Selection HUDs*/}
+                    <CinematicLighting />
+                    <GamePromptOverlay />
+                    <GameSelectionHUD viewState={viewState} />
 
                     <Physics gravity={[0, settings.gravityY, 0]} numSolverIterations={12} paused={!isPhysicsActive || shouldPausePhysics}>
                         <RoomFloor
@@ -392,24 +475,24 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                             overlayColor2={paletteConfig.floor.overlay2}
                         />
 
-                        <TVCluster viewState={viewState} onNavigate={(st: string) => setViewState(st as ViewState)} clusterThemes={paletteConfig.cluster} visionColors={paletteConfig.vision} onShelfZoom={(e) => handleZoom(e, 'shelf_focus')} onBackToRoom={() => setViewState('default')} />
+                        <TVCluster viewState={viewState} onNavigate={(st: string) => bufferedSetViewState(st as ViewState, false)} clusterThemes={paletteConfig.cluster} visionColors={paletteConfig.vision} onShelfZoom={(e) => handleZoom(e, 'shelf_focus')} onBackToRoom={() => bufferedSetViewState('default', true)} />
 
                         <RadioSection
                             viewState={viewState}
-                            onNavigate={(st: string) => setViewState(st as ViewState)}
+                            onNavigate={(st: string) => bufferedSetViewState(st as ViewState, false)}
                             accentColor={paletteConfig.radio?.accent}
                             themeOverride={paletteConfig.radio?.theme}
                         />
 
                         <AboutMeSection
                             viewState={viewState}
-                            onNavigate={(st: string) => setViewState(st as ViewState)}
+                            onNavigate={(st: string) => bufferedSetViewState(st as ViewState, false)}
                             themeOverride={paletteConfig.aboutMe}
                         />
 
                         <MyWorksSection
                             viewState={viewState}
-                            onNavigate={(st: string) => setViewState(st as ViewState)}
+                            onNavigate={(st: string) => bufferedSetViewState(st as ViewState, false)}
                             themeOverride={paletteConfig.myWorks}
                         />
 
@@ -420,7 +503,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
 
                         <ContactSection
                             viewState={viewState}
-                            onNavigate={(st: string) => setViewState(st as ViewState)}
+                            onNavigate={(st: string) => bufferedSetViewState(st as ViewState, false)}
                             theme={paletteConfig.mobile}
                             resetDelay={2.40}
                         />
@@ -472,7 +555,7 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                     <CameraRig viewState={viewState} />
 
 
-                    <TopLeftHUD onNavigate={(s) => setViewState(s as ViewState)} />
+                    <TopLeftHUD onNavigate={(s) => bufferedSetViewState(s as ViewState, false)} />
                     <PaletteSelector
                         current={palette}
                         onChange={(p) => {
@@ -485,10 +568,10 @@ export default function TVScene({ isLoaded }: TVSceneProps) {
                             const t = paletteToTheme[p];
                             if (t) settings.setTheme(t);
                         }}
-                        onMenuSelect={() => setViewState('shelf_focus')}
+                        onMenuSelect={() => bufferedSetViewState('shelf_focus', false)}
                         onSettingsSelect={() => handleZoom({ stopPropagation: () => { } } as unknown as ThreeEvent<MouseEvent>, 'tv_settings_focus')}
                         onResetSelect={handleResetScene}
-                        onContactSelect={() => setViewState('tv_mobile_focus')}
+                        onContactSelect={() => bufferedSetViewState('tv_mobile_focus', false)}
                     />
                     <ZoomTutorial viewState={viewState} />
                     <CRTOverlay />

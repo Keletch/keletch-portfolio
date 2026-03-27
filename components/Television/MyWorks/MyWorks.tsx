@@ -10,7 +10,8 @@ import { updateButtonHoverAnimation } from '@/components/Television/SharedHelper
 
 import { THEMES, ThemeColors } from '@/components/Television/Types';
 import { MyWorksProps, MYWORKS_BUTTON_CONFIG } from './MyWorksTypes';
-import { drawPixelEye } from '@/components/Television/Helpers';
+import { drawPixelEye, drawTelevisionHeader } from '@/components/Television/Helpers';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 import {
     drawPlayStopButton,
     drawBackButton,
@@ -37,7 +38,6 @@ export default function MyWorks({
     modelYOffset = -0.3,
     focusedText,
     isFocused = false,
-    textYOffset = 60,
     showStartButton = false,
     startButtonPosition,
     showBackButton = false,
@@ -54,6 +54,7 @@ export default function MyWorks({
 }: MyWorksProps) {
     const groupRef = useRef<THREE.Group>(null);
     const [startButtonHovered, setStartButtonHovered] = useState(false);
+    const premiumGlowIntensity = useSettingsStore(state => state.premiumGlowIntensity);
     const [backButtonHovered, setBackButtonHovered] = useState(false);
     const [menuButtonHovered, setMenuButtonHovered] = useState(false);
     const [prevButtonHovered, setPrevButtonHovered] = useState(false);
@@ -61,7 +62,26 @@ export default function MyWorks({
 
     // Project Navigation State
     const [currentProjectIndex, setCurrentProjectIndex] = useState(0);
-    const currentProject = PROJECTS[currentProjectIndex];
+ 
+    const [delayedFocus, setDelayedFocus] = useState(false);
+    const [galleryState, setGalleryState] = useState<'idle' | 'zooming' | 'static' | 'gallery' | 'exiting'>('idle');
+ 
+    // Project Transition Opacity (flickers on project change, at 1.0 during entrance)
+    const projectTarget = `project-${currentProjectIndex}`;
+    const {
+        transitionOpacity: projectOpacityRef,
+        renderedFigure: renderedProjectFigure
+    } = useFigureTransition(projectTarget, 0);
+ 
+    // Derive the displayed project from the transition state to sync flicker order
+    const displayedProjectIndex = useMemo(() => {
+        if (!renderedProjectFigure || !renderedProjectFigure.startsWith('project-')) {
+            return currentProjectIndex;
+        }
+        return parseInt(renderedProjectFigure.split('-')[1]);
+    }, [renderedProjectFigure, currentProjectIndex]);
+ 
+    const displayedProject = PROJECTS[displayedProjectIndex];
 
     const wrappedLines = useMemo(() => {
         if (typeof document === 'undefined') return { lines: [], fullText: '' };
@@ -71,10 +91,10 @@ export default function MyWorks({
         ctx.font = 'bold 15px "Courier New", monospace';
         const maxWidth = 380;
         const rawLines = [
-            currentProject.title,
-            currentProject.stack,
+            displayedProject.title,
+            displayedProject.stack,
             '',
-            currentProject.desc
+            displayedProject.desc
         ];
         const result: string[] = [];
         for (const line of rawLines) {
@@ -85,15 +105,16 @@ export default function MyWorks({
             lines: result,
             fullText: result.join('\n')
         };
-    }, [currentProject]);
+    }, [displayedProject]);
 
-    const [galleryState, setGalleryState] = useState<'idle' | 'zooming' | 'static' | 'gallery' | 'exiting'>('idle');
-    const [isProjectTransition, setIsProjectTransition] = useState(false);
+
 
     const galleryVideosRef = useRef<HTMLVideoElement[]>([]);
     const galleryEnterTime = useRef(0);
     const icoDeepStateRef = useRef<IcoDeepState>(initIcoDeepState());
 
+    const typewriterConfig = useMemo(() => (['dummy']), []);
+ 
     const {
         waitingForInput,
         typingStartTime,
@@ -102,7 +123,7 @@ export default function MyWorks({
         signalTypingFinished,
         playTypewriterSound
     } = useTypewriter({
-        storyContent: ['dummy'],
+        storyContent: typewriterConfig,
         enableStoryMode: true
     });
 
@@ -114,10 +135,8 @@ export default function MyWorks({
         if (galleryState === 'gallery') {
             galleryEnterTime.current = performance.now() / 1000;
             lastTypedCharCount.current = 0;
-            if (!hasStartedTyping.current) {
-                startTyping();
-                hasStartedTyping.current = true;
-            }
+            startTyping();
+            hasStartedTyping.current = true;
         } else {
             hasStartedTyping.current = false;
         }
@@ -137,10 +156,10 @@ export default function MyWorks({
 
 
 
-    // Video Loading Effect
+    // Video Loading Effect (follows displayed project)
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const currentSrc = PROJECTS[currentProjectIndex].videoSrc;
+            const currentSrc = PROJECTS[displayedProjectIndex].videoSrc;
             const NUM_VIDEOS = 1;
 
             // Initialize video array if empty
@@ -165,31 +184,15 @@ export default function MyWorks({
                 }
             }
         }
-    }, [currentProjectIndex]);
+    }, [displayedProjectIndex]);
 
     // Navigation logic with flicker transitions
     const handleNextProject = () => {
-        setIsProjectTransition(true);
-        setGalleryState('static');
-        setTimeout(() => {
-            setCurrentProjectIndex(prev => (prev + 1) % PROJECTS.length);
-        }, 100);
-        setTimeout(() => {
-            setGalleryState('gallery');
-            setIsProjectTransition(false);
-        }, STATIC_DURATION);
+        setCurrentProjectIndex(prev => (prev + 1) % PROJECTS.length);
     };
 
     const handlePrevProject = () => {
-        setIsProjectTransition(true);
-        setGalleryState('static');
-        setTimeout(() => {
-            setCurrentProjectIndex(prev => (prev - 1 + PROJECTS.length) % PROJECTS.length);
-        }, 100);
-        setTimeout(() => {
-            setGalleryState('gallery');
-            setIsProjectTransition(false);
-        }, STATIC_DURATION);
+        setCurrentProjectIndex(prev => (prev - 1 + PROJECTS.length) % PROJECTS.length);
     };
 
 
@@ -210,7 +213,7 @@ export default function MyWorks({
         } else {
             if (galleryState === 'gallery' || galleryState === 'static') {
                 setGalleryState('exiting');
-                zoomTimer = setTimeout(() => setGalleryState('idle'), 1000);
+                setGalleryState('idle');
             } else {
                 setGalleryState('idle');
             }
@@ -223,15 +226,15 @@ export default function MyWorks({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isFocused]);
 
-    const [delayedUI, setDelayedUI] = useState(false);
 
-    // Reset hover states
+
+    // Reset hover states & Delay focus for Eye animation
     useEffect(() => {
         if (isFocused) {
-            const t = setTimeout(() => setDelayedUI(true), 900);
+            const t = setTimeout(() => setDelayedFocus(true), 600);
             return () => clearTimeout(t);
         } else {
-            setDelayedUI(false);
+            setDelayedFocus(false);
             setStartButtonHovered(false);
             setBackButtonHovered(false);
             setMenuButtonHovered(false);
@@ -240,7 +243,10 @@ export default function MyWorks({
         }
     }, [isFocused]);
 
-    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : null, 0);
+    const {
+        transitionOpacity: uiOpacityRef,
+        renderedFigure: renderedUI
+    } = useFigureTransition(!delayedFocus ? 'eye' : 'content', 0);
 
 
     const {
@@ -273,20 +279,10 @@ export default function MyWorks({
         updateBlink
     } = useBlink();
 
-    // --- TRANSITIONS ---
 
-    // OSD Transition Opacity (with flicker effect)
-    const {
-        transitionOpacity: osdOpacityRef
-    } = useFigureTransition(galleryState === 'gallery' ? 'osd' : null, 0);
 
-    // Video Transition Opacity (same smooth flicker as OSD)
-    const {
-        transitionOpacity: videoOpacityRef
-    } = useFigureTransition(galleryState === 'gallery' ? 'video' : null, 0);
-
-    const eyeTarget = (galleryState === 'idle' || galleryState === 'zooming') ? 'eye' : null;
-    useFigureTransition(eyeTarget, 0);
+    // Eye Transition hook is now handled by the Master Hook (uiOpacityRef)
+    // No redundant hook needed here
 
 
     const activeTheme = THEMES[theme as keyof typeof THEMES] || THEMES.classic;
@@ -346,11 +342,11 @@ export default function MyWorks({
             updateScreenGaze(state, delta);
             updateBlink(delta, state.clock.elapsedTime);
 
-            let targetMorph = (galleryState === 'gallery' || galleryState === 'static') ? 1.0 : 0.0;
-            if (galleryState === 'exiting') {
-                const currentTime = performance.now() / 1000;
-                if (currentTime - exitStartTime.current < 0.5) targetMorph = 1.0;
-            }
+                // EYE MORPH: Shrink immediately on focus (0ms), stay small until OSD is gone (Exit)
+                const isHUDActive = renderedUI === 'content' && uiOpacityRef.current > 0.01;
+                const targetMorph = (isFocused || isHUDActive) ? 1.0 : 0.0;
+ 
+                // Smooth lerp for morphing eye size and position
             const morphSpeed = 2.0 * delta;
             eyeMorphProgress.current += (targetMorph - eyeMorphProgress.current) * morphSpeed;
             if (Math.abs(eyeMorphProgress.current - targetMorph) < 0.001) eyeMorphProgress.current = targetMorph;
@@ -381,9 +377,16 @@ export default function MyWorks({
                 if (galleryState === 'gallery' || galleryState === 'exiting') {
                 }
 
-                // 2. RENDER EYE
-                if (morph < 0.99 || galleryState === 'gallery' || galleryState === 'static' || galleryState === 'exiting') {
-                    ctx.save();
+                const uiOpacityVal = uiOpacityRef.current;
+                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
+
+                // 1. MASTER TRANSITION: EYE PHASE (Visible at all times - NON-FLICKERING for MyWorks)
+                const isEyeVisible = renderedUI === 'eye' || renderedUI === 'content';
+                if (isEyeVisible) {
+                    const eyeAlpha = 1.0; 
+                    if (eyeAlpha > 0.05) {
+                        ctx.save();
+                        ctx.globalAlpha = eyeAlpha;
 
                     const isLCD = theme === 'toxic';
                     const scleraMaxOffsetX = isLCD ? 150 : 100;
@@ -485,10 +488,13 @@ export default function MyWorks({
 
                     ctx.restore();
                 }
+            }
 
-                // 3. VIDEO + PROJECT INFO
-                const shouldShowContent = galleryState === 'gallery' || (galleryState === 'static' && isProjectTransition) || galleryState === 'exiting';
-                if (shouldShowContent) {
+                // 2. PROJECT CONTENT PHASE (Project Info & Video)
+                // Use combined opacity to sync content flicker with OSD entrance
+                const projectStepped = Math.floor(projectOpacityRef.current * 10) / 10;
+                const combinedOpacity = uiSteppedOpacity * projectStepped;
+                if (renderedUI === 'content' && combinedOpacity > 0.01) {
 
                     const hasVideos = galleryVideosRef.current.length > 0;
                     if (hasVideos) {
@@ -502,15 +508,20 @@ export default function MyWorks({
                             }
 
                             // 3D Chaotic Video Icosahedron
-                            const videoOpacity = videoOpacityRef.current;
 
                             mouseIcoRef.current.x = currentLookAt.current.x * (w / 2);
                             mouseIcoRef.current.y = (invertY ? currentLookAt.current.y : -currentLookAt.current.y) * (h / 2) + 20;
 
                             ctx.translate(0, -20);
 
-                            drawChaoticIcosahedronVideo(ctx, galleryVideosRef.current, videoOpacity, icoDeepStateRef.current);
-
+                            if (combinedOpacity > 0.1) {
+                                drawChaoticIcosahedronVideo(
+                                    ctx,
+                                    galleryVideosRef.current,
+                                    combinedOpacity,
+                                    icoDeepStateRef.current
+                                );
+                            }
                             ctx.restore();
                         } catch {
                         }
@@ -524,23 +535,22 @@ export default function MyWorks({
                         ctx.scale(-1, 1);
                     }
 
-                    const osdOpacity = osdOpacityRef.current;
                     const typingState = drawProjectInfo(
                         ctx,
                         w,
                         h,
                         wrappedLines.lines,
                         wrappedLines.fullText,
-                        typingStartTime,
                         waitingForInput,
-                        osdOpacity,
+                        typingStartTime,
+                        combinedOpacity,
                         activeTheme.textColor || '#ffffff',
                         activeTheme.highlightColor || '#ffffff'
                     );
 
                     // Sound for typewriter
                     if (typingState && typingState.charsShown > lastTypedCharCount.current) {
-                        if (osdOpacity > 0.1) {
+                        if (combinedOpacity > 0.1) {
                             playTypewriterSound();
                         }
                         lastTypedCharCount.current = typingState.charsShown;
@@ -555,54 +565,11 @@ export default function MyWorks({
                 }
 
                 // UI Overlay (Title & Buttons)
-                const uiOpacityVal = uiOpacityRef.current;
-                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
-
-                if (uiSteppedOpacity > 0.01 && (galleryState === 'gallery' || galleryState === 'static' || galleryState === 'exiting')) {
+                if (renderedUI === 'content' && uiSteppedOpacity > 0.01) {
                     ctx.save();
                     ctx.globalAlpha = uiSteppedOpacity;
 
-                    // 3. TITLE
-                    if (focusedText) {
-                        ctx.save();
-                        ctx.translate(w / 2, h / 2);
-                        if (invertY) {
-                            ctx.rotate(Math.PI);
-                            ctx.scale(-1, 1);
-                        }
-
-                        // Async flicker jitter for title
-                        const time = state.clock.elapsedTime;
-                        const titleJitter = Math.sin(time * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                        // Increased opacity for titles
-                        const titleAlpha = Math.max(0, Math.min(1.0, uiSteppedOpacity * 1.5 + titleJitter));
-                        ctx.globalAlpha = titleAlpha;
-
-                        const locJitterX = (Math.random() - 0.5) * 4;
-                        const locJitterY = (Math.random() - 0.5) * 4;
-                        ctx.font = '900 50px "Courier New", monospace';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'top';
-                        const textY = -h / 2 + textYOffset;
-
-                        const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                        const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-
-                        ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
-                        ctx.fillText(focusedText, locJitterX + 4, textY + locJitterY);
-
-                        ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
-                        ctx.fillText(focusedText, locJitterX - 4, textY + locJitterY);
-
-                        ctx.fillStyle = buttonColor;
-                        if (Math.random() > 0.1) {
-                            ctx.fillText(focusedText, locJitterX, textY + locJitterY);
-                        }
-
-                        ctx.restore();
-                    }
-
-                    // 4. BUTTONS
+                    // 1. HUD ELEMENTS LAYER (Buttons)
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
@@ -610,63 +577,64 @@ export default function MyWorks({
                         ctx.scale(-1, 1);
                     }
 
-                    // Async flicker jitter base for buttons
-                    const btnJitterBase = Math.sin(state.clock.elapsedTime * 12 + 5) > 0.8 ? (Math.random() - 0.5) * 0.3 : 0;
-                    const btnBaseAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + btnJitterBase));
-                    ctx.globalAlpha = btnBaseAlpha;
+                    // buttons alpha follows master hook
+                    ctx.globalAlpha = uiSteppedOpacity;
+                    ctx.globalCompositeOperation = 'screen';
 
                     // Use shared helper for hover animations
                     if (showStartButton) {
                         const btnX = startButtonPosition ? startButtonPosition.x : MYWORKS_BUTTON_CONFIG.PLAY.x;
                         const btnY = startButtonPosition ? startButtonPosition.y : MYWORKS_BUTTON_CONFIG.PLAY.y;
-
                         const hoverProgress = updateButtonHoverAnimation(
                             screenTextureRef.current, 'hoverAnim', startButtonHovered
                         );
-
                         if (!disableStartPulse) {
                             drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, buttonColor);
                         }
-                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, 0, buttonColor);
+                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, 0, buttonColor, 0, premiumGlowIntensity);
                     }
 
                     if (showPrevButton) {
                         const btnPrevX = prevButtonPosition ? prevButtonPosition.x : MYWORKS_BUTTON_CONFIG.PREV.x;
                         const btnPrevY = prevButtonPosition ? prevButtonPosition.y : MYWORKS_BUTTON_CONFIG.PREV.y;
-
-                        const hoverProgressPrev = updateButtonHoverAnimation(
-                            screenTextureRef.current, 'hoverAnimPrev', prevButtonHovered
-                        );
-
-                        drawPlayStopButton(ctx, btnPrevX, btnPrevY, hoverProgressPrev, 0, buttonColor, Math.PI);
+                        const hoverProgressPrev = updateButtonHoverAnimation(screenTextureRef.current, 'hoverAnimPrev', prevButtonHovered);
+                        drawPlayStopButton(ctx, btnPrevX, btnPrevY, hoverProgressPrev, 0, buttonColor, Math.PI, premiumGlowIntensity);
                     }
 
                     if (showBackButton) {
                         const btnBackX = backButtonPosition ? backButtonPosition.x : MYWORKS_BUTTON_CONFIG.BACK.x;
                         const btnBackY = backButtonPosition ? backButtonPosition.y : MYWORKS_BUTTON_CONFIG.BACK.y;
-
-                        const hoverProgressBack = updateButtonHoverAnimation(
-                            screenTextureRef.current, 'hoverAnimBack', backButtonHovered
-                        );
-
-                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, buttonColor);
+                        const hoverProgressBack = updateButtonHoverAnimation(screenTextureRef.current, 'hoverAnimBack', backButtonHovered);
+                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, buttonColor, premiumGlowIntensity);
                     }
 
                     if (showMenuButton) {
                         const btnMenuX = menuButtonPosition ? menuButtonPosition.x : MYWORKS_BUTTON_CONFIG.MENU.x;
                         const btnMenuY = menuButtonPosition ? menuButtonPosition.y : MYWORKS_BUTTON_CONFIG.MENU.y;
-
                         const hoverProgressMenu = updateButtonHoverAnimation(
                             screenTextureRef.current, 'hoverAnimMenu', menuButtonHovered
                         );
-
-                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, buttonColor);
+                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, buttonColor, premiumGlowIntensity);
                     }
 
                     // Eye button is part of the morphing eye
 
+                    ctx.restore(); // END BUTTONS LAYER
+
+                    // 2. HEADER LAYER (Always on top)
+                    if (focusedText) {
+                        ctx.save();
+                        ctx.translate(w / 2, h / 2);
+                        if (invertY) {
+                            ctx.rotate(Math.PI);
+                            ctx.scale(-1, 1);
+                        }
+                        ctx.translate(-w / 2, -h / 2);
+                        drawTelevisionHeader(ctx, focusedText, w, h, premiumGlowIntensity, uiSteppedOpacity, state.clock.elapsedTime, buttonColor);
+                        ctx.restore();
+                    }
+
                     ctx.globalCompositeOperation = 'source-over';
-                    ctx.restore();
                     ctx.restore(); // End UI overlay
                 }
 
@@ -683,7 +651,7 @@ export default function MyWorks({
                 <primitive
                     object={clonedModel}
                     onPointerMove={(e: ThreeEvent<MouseEvent>) => {
-                        if (!isFocused || renderedUI !== 'ui') return;
+                        if (!isFocused || renderedUI !== 'content') return;
                         if (e.object.userData.isScreen && e.uv) {
                             e.stopPropagation();
                             const buttonHit = checkButtonHover(
@@ -721,7 +689,7 @@ export default function MyWorks({
                         }
                     }}
                     onPointerLeave={() => {
-                        if (!isFocused || renderedUI !== 'ui') return;
+                        if (!isFocused || renderedUI !== 'content') return;
                         if (startButtonHovered) setStartButtonHovered(false);
                         if (backButtonHovered) setBackButtonHovered(false);
                         if (menuButtonHovered) setMenuButtonHovered(false);
@@ -729,7 +697,7 @@ export default function MyWorks({
                         if (eyeButtonHovered) setEyeButtonHovered(false);
                     }}
                     onClick={(e: ThreeEvent<MouseEvent>) => {
-                        if (!isFocused || renderedUI !== 'ui') return;
+                        if (!isFocused || renderedUI !== 'content') return;
                         if (e.object.userData.isScreen && e.uv) {
                             // Ensure click hits the button
                             const buttonHit = checkButtonHover(

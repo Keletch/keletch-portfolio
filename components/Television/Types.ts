@@ -12,7 +12,6 @@ export interface TelevisionProps {
     modelYOffset?: number;
     focusedText?: string;
     isFocused?: boolean;
-    textYOffset?: number;
     isHologram?: boolean;
     textColor?: string;
     highlightColor?: string;
@@ -199,7 +198,7 @@ export const THEMES: Record<NonNullable<TelevisionProps['theme']>, ThemeColors> 
     hacker: {
         bgColor: '#000000',
         baseColor: '#000000',
-        glowCenter: 'rgba(0, 255, 50, 0.1)',
+        glowCenter: 'rgba(0, 0, 0, 0)',
         irisColor: '#4af626',
         lightColor: '#4af626',
         lightIntensity: 8.0,

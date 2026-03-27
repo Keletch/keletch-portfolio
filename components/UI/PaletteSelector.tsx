@@ -138,17 +138,24 @@ export function PaletteSelector({ onMenuSelect, onSettingsSelect, onResetSelect,
     const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
         const hit = getHitResult(e);
         if (hit) {
-            setHoveredBtn(hit as 'settings' | 'reset' | 'letter' | 'menu' | 'expand');
-            document.body.style.cursor = 'pointer';
+            e.stopPropagation();
+            if (hoveredBtn !== hit) {
+                setHoveredBtn(hit as 'settings' | 'reset' | 'letter' | 'menu' | 'expand');
+                document.body.style.cursor = 'pointer';
+            }
         } else {
-            setHoveredBtn(null);
-            document.body.style.cursor = 'auto';
+            if (hoveredBtn !== null) {
+                setHoveredBtn(null);
+                document.body.style.cursor = 'auto';
+            }
         }
     };
 
     const handlePointerOut = () => {
-        setHoveredBtn(null);
-        document.body.style.cursor = 'auto';
+        if (hoveredBtn !== null) {
+            setHoveredBtn(null);
+            document.body.style.cursor = 'auto';
+        }
     };
 
     const handleClick = (e: ThreeEvent<MouseEvent>) => {

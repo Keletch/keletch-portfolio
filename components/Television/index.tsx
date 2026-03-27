@@ -2,8 +2,9 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { TelevisionProps, THEMES } from './Types';
-import { drawPixelEye } from './Helpers';
+import { drawPixelEye, drawTelevisionHeader } from './Helpers';
 import { useTVModel } from '@/hooks/useTVModel';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 const DEFAULT_SCREEN_NAMES = ['screen', 'pantalla', 'display', 'monitor', 'glass', 'vidrio', 'cristal', 'tube', 'lcdscreen', 'lcd_screen', 'redtvscreen', 'dirtytvscreen', 'tipicaltvscreen', 'toontvscreen', 'toontv_screen'];
 
@@ -19,9 +20,7 @@ export default function Television({
     gazeOffset = { x: 0, y: 0 },
     uvRotation = 0,
     modelYOffset = -0.3,
-    focusedText,
-    isFocused = false,
-    textYOffset = 60
+    focusedText
 }: TelevisionProps) {
     const groupRef = useRef<THREE.Group>(null);
     const normalizedMouse = useRef({ x: 0, y: 0 });
@@ -225,37 +224,30 @@ export default function Television({
                 }
 
                 // Render focused center text if applicable
-                if (isFocused && focusedText) {
+                    const ctxW = w;
+                    const ctxH = h;
+                    const premiumGlowIntensity = useSettingsStore.getState().premiumGlowIntensity;
+                    
+                    // Draw Header in stable visual context (Top Center)
                     ctx.save();
-                    ctx.translate(w / 2, h / 2);
+                    ctx.translate(ctxW / 2, ctxH / 2);
+                    if (invertY) {
+                        ctx.rotate(Math.PI);
+                        ctx.scale(-1, 1);
+                    }
+                    ctx.translate(-ctxW / 2, -ctxH / 2);
+                    drawTelevisionHeader(ctx, focusedText!, ctxW, ctxH, premiumGlowIntensity, 1.0, state.clock.elapsedTime, activeTheme.baseColor);
+                    ctx.restore();
+
+                    ctx.save();
+                    ctx.translate(ctxW / 2, ctxH / 2);
 
                     if (invertY) {
                         ctx.rotate(Math.PI);
                         ctx.scale(-1, 1);
                     }
-
-                    const jitterX = (Math.random() - 0.5) * 4;
-                    const jitterY = (Math.random() - 0.5) * 4;
-
-                    ctx.font = '900 50px "Courier New", monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-
-                    const textY = -h / 2 + textYOffset;
-                    const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                    const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-
-                    ctx.fillStyle = activeTheme.textShadow1 ? shadow1 + '80' : shadow1;
-                    ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
-
-                    ctx.fillStyle = activeTheme.textShadow2 ? shadow2 + '80' : shadow2;
-                    ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-
-                    ctx.fillStyle = activeTheme.textColor || '#ffffff';
-                    if (Math.random() > 0.1) ctx.fillText(focusedText, jitterX, textY + jitterY);
-
+                    
                     ctx.restore();
-                }
             }
             screenTextureRef.current.needsUpdate = true;
         }

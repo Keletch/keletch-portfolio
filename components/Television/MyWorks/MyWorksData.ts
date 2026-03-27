@@ -1,16 +1,30 @@
 // Project data and configuration for the interactive gallery
 export const PROJECTS = [
     {
-        title: "Infinite Gallery 2025",
+        title: "Infinite 3D Gallery",
         stack: "Next.js / React Three Fiber / Supabase",
-        desc: "Interactive 3D Gallery",
+        desc: "Interactive WebGL gallery with real-time DB & moderation.",
         videoSrc: "/works/InfiniteGallery.webm",
-        link: "https://galeria.chu.mx/gallery"
+        link: "https://galeria.chu.mx/"
     },
     {
-        title: "Food landing 2025",
-        stack: "Wordpress / GLSL / HTML",
-        desc: "Made with Elementor and animated with GLSL",
+        title: "HUC E-Commerce System",
+        stack: "WooCommerce / PayU API / ManyChat",
+        desc: "Automated payment gateway & asynchronous webhook routing.",
+        videoSrc: "/works/tiendaHUC.webm",
+        link: "https://tienda.hyenukchu.com/"
+    },
+    {
+        title: "Campus HUC (LMS)",
+        stack: "Cloudflare Workers / KV Storage / Notion API",
+        desc: "Edge-computed frontend with cached API data for ultra-low latency.",
+        videoSrc: "/works/campusHUC.webm",
+        link: "https://campus.elclubdeinversionistas.com/"
+    },
+    {
+        title: "Laredos Parrillita",
+        stack: "WordPress / Elementor / GLSL / JS",
+        desc: "Commercial UI maquetation animated with custom GLSL shaders.",
         videoSrc: "/works/parrillita.webm",
         link: "https://laredosparrillita.com/"
     }

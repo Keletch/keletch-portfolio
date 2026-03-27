@@ -4,6 +4,7 @@ import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RadioProps, RADIO_THEME, RADIO_BUTTON_CONFIG } from './RadioTypes';
 import { drawPixelEye, drawPlayPauseButton, drawBackButton, drawMenuButton, drawNextButton, drawButtonShockwave, drawProgressBar, drawTrackList, drawReactiveCircle } from './RadioHelpers';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
@@ -46,6 +47,7 @@ export default function RadioTV({
     accentColor,
     themeOverride
 }: RadioProps & { accentColor?: string; themeOverride?: { bgColor: string; baseColor: string; glowCenter: string; vignetteColor: string; irisColor: string; scleraColor: string } }) {
+    const settings = useSettingsStore();
     const accent = accentColor || '#00ff44';
     const activeTheme = themeOverride ? { ...RADIO_THEME, ...themeOverride } : RADIO_THEME;
     const groupRef = useRef<THREE.Group>(null);
@@ -80,7 +82,7 @@ export default function RadioTV({
     // Reset UI state when losing focus
     useEffect(() => {
         if (isFocused) {
-            const t = setTimeout(() => setDelayedUI(true), 900);
+            const t = setTimeout(() => setDelayedUI(true), 600);
             return () => clearTimeout(t);
         } else {
             setDelayedUI(false);
@@ -93,10 +95,10 @@ export default function RadioTV({
         }
     }, [isFocused]);
 
-    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : null, 0);
+    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : 'eye', 0);
 
     const playerFigure = currentSongName ? `player_${currentSongName}` : 'player';
-    const targetFigure = (isMenuOpen && isFocused) ? 'menu' : (status !== 'stopped' ? playerFigure : null);
+    const targetFigure = (isMenuOpen && isFocused) ? 'menu' : (status !== 'stopped' ? playerFigure : 'eye');
 
     // Track transition source to prevent eye flashes
     const lastTargetRef = useRef<string | null>(null);
@@ -109,9 +111,8 @@ export default function RadioTV({
 
     const {
         renderedFigure,
-        linearOpacity,
         transitionOpacity
-    } = useFigureTransition(targetFigure);
+    } = useFigureTransition(targetFigure, 0, 1.5);
 
     const [isSeekDragging, setIsSeekDragging] = useState(false);
     const [seekDragValue, setSeekDragValue] = useState(0);
@@ -295,36 +296,32 @@ export default function RadioTV({
                 ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
 
-                let eyeOpacity = 1.0;
-                const hidesEye = (fig: string | null) => fig === 'menu' || (fig && fig.startsWith('player'));
+                const uiOpacityVal = uiOpacityRef.current;
+                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
 
-                if (renderedFigure) {
-                    const sourceHides = hidesEye(transitionSourceRef.current);
-                    const targetHides = hidesEye(targetFigure);
+                // 1. MASTER TRANSITION: EYE PHASE (Visible based on current transition state)
+                if (renderedFigure === 'eye') {
+                    const figureSteppedLocal = Math.floor(transitionOpacity.current * 10) / 10;
+                    // Keep the eye solid (no flicker) during transition phases; only the HUD buttons should flicker.
+                    const eyeAlpha = figureSteppedLocal;
 
-                    if (sourceHides && targetHides) {
-                        eyeOpacity = 0;
-                    } else {
-                        eyeOpacity = Math.max(0, 1.0 - (transitionOpacity.current || 0));
+                    if (eyeAlpha > 0.05) {
+                        ctx.save();
+                        ctx.globalAlpha = eyeAlpha;
+                        const scleraMaxOffsetX = 100;
+                        const scleraMaxOffsetY = 100;
+                        const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
+                        const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
+                        ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
+                        const scaleEye = 0.6;
+                        ctx.scale(scaleEye, blink.openness * scaleEye);
+                        const irisColor = accent;
+                        const customLookRange = 15;
+                        const isHologram = true;
+                        const scleraColor = activeTheme.scleraColor;
+                        drawPixelEye(ctx, normalizedMouse.current, irisColor, customLookRange, scleraColor, isHologram);
+                        ctx.restore();
                     }
-                }
-
-                if (eyeOpacity > 0.01) {
-                    ctx.save();
-                    ctx.globalAlpha = eyeOpacity;
-                    const scleraMaxOffsetX = 100;
-                    const scleraMaxOffsetY = 100;
-                    const scleraX = currentLookAt.current.x * scleraMaxOffsetX;
-                    const effectiveScleraY = -currentLookAt.current.y * scleraMaxOffsetY;
-                    ctx.translate(w / 2 + scleraX, h / 2 + effectiveScleraY);
-                    const scaleEye = 0.6;
-                    ctx.scale(scaleEye, blink.openness * scaleEye);
-                    const irisColor = accent;
-                    const customLookRange = 15;
-                    const isHologram = true;
-                    const scleraColor = activeTheme.scleraColor;
-                    drawPixelEye(ctx, normalizedMouse.current, irisColor, customLookRange, scleraColor, isHologram);
-                    ctx.restore();
                 }
 
                 // Vignette and glow effects
@@ -348,10 +345,7 @@ export default function RadioTV({
                     ctx.scale(-1, 1);
                 }
 
-                const uiOpacityVal = uiOpacityRef.current;
-                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
-
-                if (uiSteppedOpacity > 0.01) {
+                if (renderedUI === 'ui' && uiSteppedOpacity > 0.01) {
                     ctx.save();
                     ctx.globalAlpha = uiSteppedOpacity;
 
@@ -386,6 +380,8 @@ export default function RadioTV({
                     const btnBaseAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + btnJitterBase));
                     ctx.globalAlpha = btnBaseAlpha;
 
+                    const premiumGlow = settings.premiumGlowIntensity;
+ 
                     if (showStartButton) {
                         const btnX = startButtonPosition ? startButtonPosition.x : RADIO_BUTTON_CONFIG.PLAY.x;
                         const btnY = startButtonPosition ? startButtonPosition.y : RADIO_BUTTON_CONFIG.PLAY.y;
@@ -403,9 +399,9 @@ export default function RadioTV({
                         morphProgressRef.current += (morphTarget - morphProgressRef.current) * 0.15;
                         if (Math.abs(morphProgressRef.current - morphTarget) < 0.001) morphProgressRef.current = morphTarget;
                         drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, accent);
-                        drawPlayPauseButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current, accent);
+                        drawPlayPauseButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current, accent, premiumGlow);
                     }
-
+ 
                     if (showBackButton) {
                         const btnX = backButtonPosition ? backButtonPosition.x : RADIO_BUTTON_CONFIG.BACK.x;
                         const btnY = backButtonPosition ? backButtonPosition.y : RADIO_BUTTON_CONFIG.BACK.y;
@@ -419,9 +415,9 @@ export default function RadioTV({
                             if (Math.abs(screenTextureRef.current.userData.hoverAnimBack) < 0.001) screenTextureRef.current.userData.hoverAnimBack = 0;
                             hoverProgress = screenTextureRef.current.userData.hoverAnimBack;
                         }
-                        drawBackButton(ctx, btnX, btnY, hoverProgress, accent);
+                        drawBackButton(ctx, btnX, btnY, hoverProgress, accent, premiumGlow);
                     }
-
+ 
                     if (showMenuButton) {
                         const btnX = menuButtonPosition ? menuButtonPosition.x : RADIO_BUTTON_CONFIG.MENU.x;
                         const btnY = menuButtonPosition ? menuButtonPosition.y : RADIO_BUTTON_CONFIG.MENU.y;
@@ -439,9 +435,9 @@ export default function RadioTV({
                             }
                             hoverProgress = screenTextureRef.current.userData.hoverAnimMenu;
                         }
-                        drawMenuButton(ctx, btnX, btnY, hoverProgress, accent);
+                        drawMenuButton(ctx, btnX, btnY, hoverProgress, accent, premiumGlow);
                     }
-
+ 
                     if (showNextButton) {
                         const btnX = nextButtonPosition ? nextButtonPosition.x : 200;
                         const btnY = nextButtonPosition ? nextButtonPosition.y : 190;
@@ -459,22 +455,22 @@ export default function RadioTV({
                             }
                             hoverProgress = screenTextureRef.current.userData.hoverAnimNext;
                         }
-                        drawNextButton(ctx, btnX, btnY, hoverProgress, accent);
+                        drawNextButton(ctx, btnX, btnY, hoverProgress, accent, premiumGlow);
                     }
 
                     ctx.restore();
                 }
 
                 const figureOpacity = transitionOpacity.current;
-                const figureStepped = Math.floor(figureOpacity * 5) / 5;
+                const figureStepped = Math.floor(figureOpacity * 10) / 10;
 
-                const linOpacity = linearOpacity.current;
-                const linStepped = Math.floor(linOpacity * 5) / 5;
+
 
                 // Music Mode Visuals: Progress Bar + Reactive Circle
+                // (Visible in both eye/ui phases so it persists on focus loss)
                 if (renderedFigure && renderedFigure.startsWith('player')) {
                     // Reactive circle (always visible if playing)
-                    if (audioAnalyser && linStepped > 0.01) {
+                    if (audioAnalyser && figureStepped > 0.01) {
                         drawReactiveCircle(
                             ctx,
                             0, // Center X
@@ -483,23 +479,24 @@ export default function RadioTV({
                             audioAnalyser,
                             state.clock.elapsedTime,
                             accent,
-                            linStepped
+                            figureStepped
                         );
                     }
 
-                    // Progress info (only when focused)
-                    if (figureStepped > 0.01 && isFocused) {
-                        const jitterAmount = (1 - figureStepped) * 20;
+                    // Progress info (only when focused/UI phase)
+                    if (figureStepped > 0.01 && renderedUI === 'ui') {
+                        const playerHudAlpha = uiSteppedOpacity * figureStepped;
+                        const jitterAmount = (1 - playerHudAlpha) * 20;
                         const jX = (Math.random() - 0.5) * jitterAmount;
                         const jY = (Math.random() - 0.5) * jitterAmount;
-
+ 
                         const barX = -150 + jX;
                         const barY = 190 + jY;
                         const barWidth = 300;
                         const actualProgress = isSeekDragging
                             ? seekDragValue
                             : (typeof currentProgress === 'number' ? currentProgress : currentProgress.current);
-
+ 
                         drawProgressBar(
                             ctx,
                             barX,
@@ -507,20 +504,20 @@ export default function RadioTV({
                             barWidth,
                             actualProgress,
                             currentSongName,
-                            figureStepped,
+                            playerHudAlpha,
                             accent
                         );
                     }
                 }
 
-                if (renderedFigure === 'menu' && figureStepped > 0.01 && isFocused) {
+                if (renderedUI === 'ui' && renderedFigure === 'menu' && figureStepped > 0.01 && isFocused) {
                     drawTrackList(
                         ctx,
                         formattedTracks,
                         scrollYRef.current,
                         hoveredTrackIndex,
                         currentSongName,
-                        figureStepped,
+                        uiSteppedOpacity * figureStepped,
                         accent
                     );
                 }

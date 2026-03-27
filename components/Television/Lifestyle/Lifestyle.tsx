@@ -7,7 +7,8 @@ import {
     drawBackButton,
     drawMenuButton,
     checkButtonHover,
-    drawPixelEye
+    drawPixelEye,
+    drawTelevisionHeader
 } from './LifestyleHelpers';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
@@ -30,7 +31,6 @@ export default function LifestyleTV({
     modelYOffset = -0.3,
     focusedText,
     isFocused = false,
-    textYOffset = 60,
     showBackButton = false,
     backButtonPosition,
     onBackClick,
@@ -67,7 +67,7 @@ export default function LifestyleTV({
     const [delayedFocus, setDelayedFocus] = useState(false);
     useEffect(() => {
         if (isFocused) {
-            const t = setTimeout(() => setDelayedFocus(true), 1050);
+            const t = setTimeout(() => setDelayedFocus(true), 600);
             return () => clearTimeout(t);
         } else {
             setDelayedFocus(false);
@@ -303,13 +303,14 @@ export default function LifestyleTV({
                     ctx.restore();
                 }
 
-                const isContentVisible = renderedFigure === 'polaroids' || (targetFigure === 'polaroids');
+                const isContentVisible = renderedFigure === 'polaroids';
 
                 // 2. Focused Text & Polaroid Collage
-                if (isContentVisible) {
-                    ctx.save();
-
+                if (isContentVisible && figureStepped > 0.01) {
+                    const premiumGlowIntensity = cache.premiumGlowIntensity || 1.0;
+                    
                     // Center rendering context and handle hardware-specific UV inversions
+                    ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
                         ctx.rotate(Math.PI);
@@ -317,7 +318,7 @@ export default function LifestyleTV({
                     }
                     ctx.translate(-w / 2, -h / 2);
 
-                    // Draw the dynamic interactive polaroid collage behind the title
+                    // Draw the dynamic interactive polaroid collage
                     drawPolaroids(
                         ctx,
                         w,
@@ -326,51 +327,21 @@ export default function LifestyleTV({
                         zoomedPolaroidId,
                         polaroidAnimProgress.current,
                         state.clock.elapsedTime,
-                        figureOpacity
+                        figureStepped
                     );
 
-                    // Draw the original focused title text ON TOP of the polaroids
+                    // Draw Header ON TOP of polaroids
                     if (focusedText) {
-                        ctx.save();
-                        // Increased title opacity with flicker
-                        const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                        const titleAlpha = Math.max(0, Math.min(1.0, figureOpacity * 1.5 + titleJitter));
-                        ctx.globalAlpha = titleAlpha;
-
-                        ctx.translate(w / 2, h / 2);
-                        const jitterX = (Math.random() - 0.5) * 4;
-                        const jitterY = (Math.random() - 0.5) * 4;
-                        ctx.font = '900 50px "Courier New", monospace';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'top';
-                        // Keep text visibly below center so polaroids overlap it mostly
-                        const textY = -h / 2 + textYOffset;
-
-                        const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                        const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-
-                        ctx.fillStyle = activeTheme.textShadow1 ? shadow1 + '80' : shadow1;
-                        ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
-
-                        ctx.fillStyle = activeTheme.textShadow2 ? shadow2 + '80' : shadow2;
-                        ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-
-                        // Force white on the "Original" (sulfur) theme like other TVs
-                        ctx.fillStyle = buttonColor;
-
-                        if (Math.random() > 0.1) {
-                            ctx.fillText(focusedText, jitterX, textY + jitterY);
-                        }
-                        ctx.restore();
+                        drawTelevisionHeader(ctx, focusedText, w, h, premiumGlowIntensity, figureStepped, state.clock.elapsedTime, buttonColor);
                     }
-
+                    
                     ctx.restore();
                 }
 
                 // 3. UI Buttons
-                if (isContentVisible) {
+                if (isContentVisible && figureStepped > 0.01) {
                     ctx.save();
-                    ctx.globalAlpha *= figureOpacity;
+                    ctx.globalAlpha = figureStepped;
 
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
@@ -425,7 +396,7 @@ export default function LifestyleTV({
                         zoomedPolaroidId,
                         polaroidAnimProgress.current,
                         state.clock.elapsedTime,
-                        figureOpacity
+                        figureStepped
                     );
                     ctx.restore();
                 }

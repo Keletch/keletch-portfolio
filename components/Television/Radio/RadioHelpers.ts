@@ -1,3 +1,14 @@
+import {
+    drawPixelCircle,
+    drawPixelEllipse,
+    drawPixelRoundedRect,
+    drawPixelEye,
+    drawButtonShockwave,
+    drawBackButton,
+    drawMenuButton,
+    applyRetroButtonEffect
+} from '../Helpers';
+
 export {
     drawPixelCircle,
     drawPixelEllipse,
@@ -5,8 +16,9 @@ export {
     drawPixelEye,
     drawButtonShockwave,
     drawBackButton,
-    drawMenuButton
-} from '../Helpers';
+    drawMenuButton,
+    applyRetroButtonEffect
+};
 
 export function drawPlayPauseButton(
     ctx: CanvasRenderingContext2D,
@@ -14,7 +26,8 @@ export function drawPlayPauseButton(
     btnY: number,
     hoverProgress: number,
     morphProgress: number,
-    color: string = '#ffffff'
+    color: string = '#ffffff',
+    intensity: number = 1.0
 ) {
     const p = hoverProgress;
     const m = morphProgress; // play -> pause morph
@@ -22,105 +35,95 @@ export function drawPlayPauseButton(
     const r = 8 + (5 * p);
 
     const masterAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = 0.8 * masterAlpha;
 
-    const startK = 0.77;
-    const endK = 0.25;
-    const k = startK * (1 - p) + endK * p;
+    applyRetroButtonEffect(ctx, btnX, btnY, hoverProgress, color, (cx, cy, c) => {
+        ctx.fillStyle = c;
+        ctx.globalAlpha = 0.8 * masterAlpha;
 
-    let jx = 0;
-    let jy = 0;
-    if (p > 0.8) {
-        jx = (Math.random() - 0.5) * 3 * p;
-        jy = (Math.random() - 0.5) * 3 * p;
-    }
-    const cx = btnX + jx;
-    const cy = btnY + jy;
+        const startK = 0.77;
+        const endK = 0.25;
+        const k = startK * (1 - p) + endK * p;
 
-    ctx.fillStyle = color;
-    ctx.globalCompositeOperation = 'source-over';
+        const barWidth = r * 0.6;
+        const barHeight = r * 2.2;
+        const barSpacing = r * 0.8;
 
-    const barWidth = r * 0.6;
-    const barHeight = r * 2.2;
-    const barSpacing = r * 0.8;
+        // Phase 1: Triangle morphs to single bar
 
-    // Phase 1: Triangle morphs to single bar
+        const triV0 = { x: r, y: 0 };
+        const triV1 = { x: -0.5 * r, y: -0.866 * r };
+        const triV2 = { x: -0.5 * r, y: 0.866 * r };
 
-    const triV0 = { x: r, y: 0 };
-    const triV1 = { x: -0.5 * r, y: -0.866 * r };
-    const triV2 = { x: -0.5 * r, y: 0.866 * r };
+        // Left bar target vertices (centered bar phase)
+        const rectV0 = { x: barWidth / 2, y: -barHeight / 2 };
+        const rectV1 = { x: -barWidth / 2, y: -barHeight / 2 };
+        const rectV2 = { x: -barWidth / 2, y: barHeight / 2 };
+        const rectV3 = { x: barWidth / 2, y: barHeight / 2 };
 
-    // Left bar target vertices (centered bar phase)
-    const rectV0 = { x: barWidth / 2, y: -barHeight / 2 };
-    const rectV1 = { x: -barWidth / 2, y: -barHeight / 2 };
-    const rectV2 = { x: -barWidth / 2, y: barHeight / 2 };
-    const rectV3 = { x: barWidth / 2, y: barHeight / 2 };
+        // Morph Logic
+        if (m <= 0.5) {
+            // Phase 1: Triangle -> Single Center Bar
+            const t = m * 2;
 
-    // Morph Logic
-    if (m <= 0.5) {
-        // Phase 1: Triangle -> Single Center Bar
-        const t = m * 2;
+            const cV0 = { x: triV0.x * (1 - t) + rectV0.x * t, y: triV0.y * (1 - t) + rectV0.y * t };
+            const cV1 = { x: triV1.x * (1 - t) + rectV1.x * t, y: triV1.y * (1 - t) + rectV1.y * t };
+            const cV2 = { x: triV2.x * (1 - t) + rectV2.x * t, y: triV2.y * (1 - t) + rectV2.y * t };
+            const cV3 = { x: triV0.x * (1 - t) + rectV3.x * t, y: triV0.y * (1 - t) + rectV3.y * t };
 
-        // Interpolate triangle -> rect vertices
-
-        const cV0 = { x: triV0.x * (1 - t) + rectV0.x * t, y: triV0.y * (1 - t) + rectV0.y * t };
-        const cV1 = { x: triV1.x * (1 - t) + rectV1.x * t, y: triV1.y * (1 - t) + rectV1.y * t };
-        const cV2 = { x: triV2.x * (1 - t) + rectV2.x * t, y: triV2.y * (1 - t) + rectV2.y * t };
-        const cV3 = { x: triV0.x * (1 - t) + rectV3.x * t, y: triV0.y * (1 - t) + rectV3.y * t };
-
-        // Bezier control points flatten as t -> 1
-        const t0 = { x: 0, y: -r * k * (1 - t) };
-        const t1 = { x: -0.866 * r * k * (1 - t), y: 0.5 * r * k * (1 - t) };
-        const t2 = { x: 0.866 * r * k * (1 - t), y: 0.5 * r * k * (1 - t) };
-
-        ctx.beginPath();
-        ctx.moveTo(cx + cV0.x, cy + cV0.y);
-        ctx.bezierCurveTo(
-            cx + cV0.x + t0.x, cy + cV0.y + t0.y,
-            cx + cV1.x - t1.x, cy + cV1.y - t1.y,
-            cx + cV1.x, cy + cV1.y
-        );
-
-        ctx.bezierCurveTo(
-            cx + cV1.x + t1.x, cy + cV1.y + t1.y,
-            cx + cV2.x - t2.x, cy + cV2.y - t2.y,
-            cx + cV2.x, cy + cV2.y
-        );
-
-        ctx.bezierCurveTo(
-            cx + cV2.x + t2.x, cy + cV2.y + t2.y,
-            cx + cV3.x - t0.x, cy + cV3.y - t0.y,
-            cx + cV3.x, cy + cV3.y
-        );
-
-        ctx.lineTo(cx + cV0.x, cy + cV0.y);
-
-        ctx.closePath();
-        ctx.fill();
-
-    } else {
-        // Phase 2: Single Bar -> Double Bar
-        const t = (m - 0.5) * 2;
-        const ease = t * (2 - t);
-
-        const offset = barSpacing * ease;
-
-        // Left bar
-        const leftX = cx - offset / 2;
-
-        ctx.beginPath();
-        ctx.roundRect(leftX - barWidth / 2, cy - barHeight / 2, barWidth, barHeight, 2);
-        ctx.fill();
-
-        // Right bar (slides out)
-        if (t > 0) {
-            const rightX = cx + offset / 2;
+            // Bezier control points flatten as t -> 1
+            const t0 = { x: 0, y: -r * k * (1 - t) };
+            const t1 = { x: -0.866 * r * k * (1 - t), y: 0.5 * r * k * (1 - t) };
+            const t2 = { x: 0.866 * r * k * (1 - t), y: 0.5 * r * k * (1 - t) };
 
             ctx.beginPath();
-            ctx.roundRect(rightX - barWidth / 2, cy - barHeight / 2, barWidth, barHeight, 2);
+            ctx.moveTo(cx + cV0.x, cy + cV0.y);
+            ctx.bezierCurveTo(
+                cx + cV0.x + t0.x, cy + cV0.y + t0.y,
+                cx + cV1.x - t1.x, cy + cV1.y - t1.y,
+                cx + cV1.x, cy + cV1.y
+            );
+
+            ctx.bezierCurveTo(
+                cx + cV1.x + t1.x, cy + cV1.y + t1.y,
+                cx + cV2.x - t2.x, cy + cV2.y - t2.y,
+                cx + cV2.x, cy + cV2.y
+            );
+
+            ctx.bezierCurveTo(
+                cx + cV2.x + t2.x, cy + cV2.y + t2.y,
+                cx + cV3.x - t0.x, cy + cV3.y - t0.y,
+                cx + cV3.x, cy + cV3.y
+            );
+
+            ctx.lineTo(cx + cV0.x, cy + cV0.y);
+
+            ctx.closePath();
             ctx.fill();
+
+        } else {
+            // Phase 2: Single Bar -> Double Bar
+            const t = (m - 0.5) * 2;
+            const ease = t * (2 - t);
+
+            const offset = barSpacing * ease;
+
+            // Left bar
+            const leftX = cx - offset / 2;
+
+            ctx.beginPath();
+            ctx.roundRect(leftX - barWidth / 2, cy - barHeight / 2, barWidth, barHeight, 2);
+            ctx.fill();
+
+            // Right bar (slides out)
+            if (t > 0) {
+                const rightX = cx + offset / 2;
+
+                ctx.beginPath();
+                ctx.roundRect(rightX - barWidth / 2, cy - barHeight / 2, barWidth, barHeight, 2);
+                ctx.fill();
+            }
         }
-    }
+    }, intensity);
 
     ctx.globalAlpha = masterAlpha;
 }
@@ -130,67 +133,61 @@ export function drawNextButton(
     btnX: number,
     btnY: number,
     hoverProgress: number,
-    color: string = '#ffffff'
+    color: string = '#ffffff',
+    intensity: number = 1.0
 ) {
     const p = hoverProgress;
     const r = 8 + (5 * p);
 
     const masterAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = 0.8 * masterAlpha;
 
-    let jx = 0;
-    let jy = 0;
-    if (p > 0.8) {
-        jx = (Math.random() - 0.5) * 3 * p;
-        jy = (Math.random() - 0.5) * 3 * p;
-    }
-    const cx = btnX + jx;
-    const cy = btnY + jy;
+    applyRetroButtonEffect(ctx, btnX, btnY, hoverProgress, color, (cx, cy, c) => {
+        ctx.fillStyle = c;
+        ctx.globalAlpha = 0.8 * masterAlpha;
 
-    const baseR = r;
-    const chevTip = { x: baseR, y: 0 };
-    const chevTop = { x: -baseR * 0.5, y: -baseR };
-    const chevBot = { x: -baseR * 0.5, y: baseR };
-    const chevInner = { x: 0, y: 0 };
+        const baseR = r;
+        const chevTip = { x: baseR, y: 0 };
+        const chevTop = { x: -baseR * 0.5, y: -baseR };
+        const chevBot = { x: -baseR * 0.5, y: baseR };
+        const chevInner = { x: 0, y: 0 };
 
-    const circTip = { x: baseR, y: 0 };
-    const circTop = { x: 0, y: -baseR };
-    const circBot = { x: 0, y: baseR };
-    const circBack = { x: -baseR, y: 0 };
+        const circTip = { x: baseR, y: 0 };
+        const circTop = { x: 0, y: -baseR };
+        const circBot = { x: 0, y: baseR };
+        const circBack = { x: -baseR, y: 0 };
 
-    const v0 = { x: circTip.x * (1 - p) + chevTip.x * p, y: circTip.y * (1 - p) + chevTip.y * p };
-    const v1 = { x: circTop.x * (1 - p) + chevTop.x * p, y: circTop.y * (1 - p) + chevTop.y * p };
-    const v2 = { x: circBot.x * (1 - p) + chevBot.x * p, y: circBot.y * (1 - p) + chevBot.y * p };
-    const v3 = { x: circBack.x * (1 - p) + chevInner.x * p, y: circBack.y * (1 - p) + chevInner.y * p };
+        const v0 = { x: circTip.x * (1 - p) + chevTip.x * p, y: circTip.y * (1 - p) + chevTip.y * p };
+        const v1 = { x: circTop.x * (1 - p) + chevTop.x * p, y: circTop.y * (1 - p) + chevTop.y * p };
+        const v2 = { x: circBot.x * (1 - p) + chevBot.x * p, y: circBot.y * (1 - p) + chevBot.y * p };
+        const v3 = { x: circBack.x * (1 - p) + chevInner.x * p, y: circBack.y * (1 - p) + chevInner.y * p };
 
-    const tanLen = (baseR * 0.55228475) * (1 - p);
+        const tanLen = (baseR * 0.55228475) * (1 - p);
 
-    ctx.fillStyle = color;
-    ctx.globalCompositeOperation = 'source-over';
-
-    ctx.beginPath();
-    ctx.moveTo(cx + v0.x, cy + v0.y); // Tip
-
-    ctx.bezierCurveTo(cx + v0.x, cy + v0.y - tanLen, cx + v1.x + tanLen, cy + v1.y, cx + v1.x, cy + v1.y);
-    ctx.bezierCurveTo(cx + v1.x - tanLen, cy + v1.y, cx + v3.x, cy + v3.y - tanLen, cx + v3.x, cy + v3.y);
-    ctx.bezierCurveTo(cx + v3.x, cy + v3.y + tanLen, cx + v2.x - tanLen, cy + v2.y, cx + v2.x, cy + v2.y);
-    ctx.bezierCurveTo(cx + v2.x + tanLen, cy + v2.y, cx + v0.x, cy + v0.y + tanLen, cx + v0.x, cy + v0.y);
-
-    ctx.closePath();
-    ctx.fill();
-
-    const barWidth = 4;
-    const finalBarHeight = r * 1.6;
-    const finalBarX = r + 4;
-
-    const currentBarX = finalBarX * p;
-    const currentBarHeight = finalBarHeight * p;
-
-    if (currentBarHeight > 0.5) {
         ctx.beginPath();
-        ctx.roundRect(cx + currentBarX, cy - currentBarHeight / 2, barWidth, currentBarHeight, 2);
+        ctx.moveTo(cx + v0.x, cy + v0.y); // Tip
+
+        ctx.bezierCurveTo(cx + v0.x, cy + v0.y - tanLen, cx + v1.x + tanLen, cy + v1.y, cx + v1.x, cy + v1.y);
+        ctx.bezierCurveTo(cx + v1.x - tanLen, cy + v1.y, cx + v3.x, cy + v3.y - tanLen, cx + v3.x, cy + v3.y);
+        ctx.bezierCurveTo(cx + v3.x, cy + v3.y + tanLen, cx + v2.x - tanLen, cy + v2.y, cx + v2.x, cy + v2.y);
+        ctx.bezierCurveTo(cx + v2.x + tanLen, cy + v2.y, cx + v0.x, cy + v0.y + tanLen, cx + v0.x, cy + v0.y);
+
+        ctx.closePath();
         ctx.fill();
-    }
+
+        const barWidth = 4;
+        const finalBarHeight = r * 1.6;
+        const finalBarX = r + 4;
+
+        const currentBarX = finalBarX * p;
+        const currentBarHeight = finalBarHeight * p;
+
+        if (currentBarHeight > 0.5) {
+            ctx.beginPath();
+            ctx.roundRect(cx + currentBarX, cy - currentBarHeight / 2, barWidth, currentBarHeight, 2);
+            ctx.fill();
+        }
+    }, intensity);
+
     ctx.globalAlpha = masterAlpha;
 }
 

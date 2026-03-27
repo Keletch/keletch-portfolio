@@ -13,7 +13,6 @@ export interface AboutMeProps {
     modelYOffset?: number;
     focusedText?: string;
     isFocused?: boolean;
-    textYOffset?: number;
     showStartButton?: boolean;
     startButtonPosition?: { x: number, y: number };
     onStartClick?: () => void;

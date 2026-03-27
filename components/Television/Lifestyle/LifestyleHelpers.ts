@@ -8,7 +8,8 @@ export {
     drawPlayStopButton,
     drawBackButton,
     drawMenuButton,
-    drawPixelEye
+    drawPixelEye,
+    drawTelevisionHeader
 } from '../Helpers';
 
 // Hover detection for Lifestyle elements

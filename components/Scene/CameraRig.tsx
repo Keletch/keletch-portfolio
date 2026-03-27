@@ -6,7 +6,7 @@ import { useRef, useEffect } from 'react';
 import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 interface CameraRigProps {
-    viewState: 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus' | 'tv_typical_gallery' | 'tv_settings_focus' | 'tv_mobile_focus';
+    viewState: 'default' | 'shelf_focus' | 'radio_focus' | 'tv_red_focus' | 'tv_lcd_focus' | 'tv_dirty_focus' | 'tv_typical_focus' | 'tv_lowpoly_focus' | 'tv_typical_gallery' | 'tv_settings_focus' | 'tv_mobile_focus' | 'nes_focus';
 }
 
 export function CameraRig({ viewState }: CameraRigProps) {
@@ -110,12 +110,15 @@ export function CameraRig({ viewState }: CameraRigProps) {
     const tempTargetLookAt = useRef(new THREE.Vector3());
 
     useFrame((_state, delta) => {
+        // Hold camera still while game prompt is flickering out
+        if (useSettingsStore.getState().isGamePromptFading) return;
+
         // Default camera targets
         let targetPos = defaultPos;
         let targetLookAt = defaultLookAt;
         const targetUp = new THREE.Vector3(0, 1, 0);
 
-        const dynamicTVs = ['shelf_focus', 'radio_focus', 'tv_settings_focus', 'tv_dirty_focus', 'tv_typical_focus', 'tv_typical_gallery', 'tv_lowpoly_focus', 'tv_red_focus', 'tv_lcd_focus', 'tv_mobile_focus'];
+        const dynamicTVs = ['shelf_focus', 'radio_focus', 'tv_settings_focus', 'tv_dirty_focus', 'tv_typical_focus', 'tv_typical_gallery', 'tv_lowpoly_focus', 'tv_red_focus', 'tv_lcd_focus', 'tv_mobile_focus', 'nes_focus'];
 
         if (dynamicTVs.includes(viewState)) {
             // Dynamic anchoring to physics bodies
@@ -126,6 +129,21 @@ export function CameraRig({ viewState }: CameraRigProps) {
             if (camPosNode && lookAtNode) {
                 targetPos = camPosNode.getWorldPosition(new THREE.Vector3());
                 targetLookAt = lookAtNode.getWorldPosition(new THREE.Vector3());
+
+                if (viewState === 'nes_focus') {
+                    const settings = useSettingsStore.getState();
+                    if (settings.selectedGameIndex > 0) {
+                        const gameName = settings.availableGames[settings.selectedGameIndex];
+                        const gamePosNode = scene.getObjectByName(`cartridge_${gameName}_cam_pos`);
+                        const gameLookNode = scene.getObjectByName(`cartridge_${gameName}_cam_lookat`);
+                        if (gamePosNode && gameLookNode) {
+                            targetPos = gamePosNode.getWorldPosition(new THREE.Vector3());
+                            targetLookAt = gameLookNode.getWorldPosition(new THREE.Vector3());
+                            const quat = gamePosNode.getWorldQuaternion(new THREE.Quaternion());
+                            targetUp.set(0, 1, 0).applyQuaternion(quat);
+                        }
+                    }
+                }
 
                 // Universal orientation matching: align camera UP with the TV's rotation
                 // This ensures that if the TV is tilted, the camera tilts with it

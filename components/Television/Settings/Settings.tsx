@@ -3,8 +3,7 @@ import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { SettingsProps, SETTINGS_BUTTON_CONFIG } from './SettingsTypes';
 import { THEMES } from '../Types';
-import { drawPixelEye } from '../Helpers';
-import { drawBackButton, drawMenuButton } from './SettingsHelpers';
+import { drawPixelEye, drawTelevisionHeader, drawBackButton, drawMenuButton } from '../Helpers';
 import { useTVModel } from '@/hooks/useTVModel';
 import { updateButtonHoverAnimation } from '../SharedHelpers';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
@@ -20,6 +19,7 @@ const SETTINGS_ROWS = [
     { id: 'noise', label: 'NOISE', type: 'setting' },
     { id: 'blur', label: 'VHS BLUR', type: 'setting' },
     { id: 'aberration', label: 'ABERRATION', type: 'setting' },
+    { id: 'premiumGlow', label: 'PREMIUM GLOW', type: 'setting' },
     { id: 'barrel', label: 'BARREL SCANLINE', type: 'setting' },
     { type: 'header', label: '--- AUDIO ---' },
     { id: 'musicVolume', label: 'MUSIC VOLUME', type: 'setting' },
@@ -58,7 +58,6 @@ export default function SettingsTV({
     modelYOffset = -0.3,
     focusedText = 'SETTINGS',
     isFocused = false,
-    textYOffset = 50,
     showBackButton = false,
     onBackClick,
     backButtonPosition = SETTINGS_BUTTON_CONFIG.BACK,
@@ -77,8 +76,9 @@ export default function SettingsTV({
         ambient: [0.0, 2.0],
         gravity: [-20.0, 0.0],
         fov: [15, 75],
-        musicVolume: [0.0, 2.5],
-        bubblesVolume: [0.0, 2.5]
+        musicVolume: [0.0, 1.0],
+        bubblesVolume: [0.0, 1.0],
+        premiumGlow: [0.0, 1.0]
     };
 
     const activeTheme = THEMES[theme as keyof typeof THEMES] || THEMES.toon;
@@ -124,7 +124,7 @@ export default function SettingsTV({
     const [delayedFocus, setDelayedFocus] = useState(false);
     useEffect(() => {
         if (isFocused) {
-            const t = setTimeout(() => setDelayedFocus(true), 900);
+            const t = setTimeout(() => setDelayedFocus(true), 600);
             return () => clearTimeout(t);
         } else {
             setDelayedFocus(false);
@@ -333,37 +333,25 @@ export default function SettingsTV({
                 }
 
                 if (renderedFigure === 'settings') {
+                    const premiumGlowIntensity = settings.premiumGlowIntensity;
+                    const time = state.clock.elapsedTime;
+                    const buttonColor = activeTheme.highlightColor || '#ffffff';
+
+                    // 1. HEADER (Absolute Origin Flipped)
+                    if (focusedText) {
+                        ctx.save();
+                        ctx.translate(w / 2, h / 2);
+                        if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
+                        ctx.translate(-w / 2, -h / 2);
+                        drawTelevisionHeader(ctx, focusedText, w, h, premiumGlowIntensity, steppedOpacity, time, buttonColor);
+                        ctx.restore();
+                    }
+
+                    // 2. SETTINGS ROWS (Centered Flipped)
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
                     ctx.globalAlpha = steppedOpacity;
-
-                    // TITLE
-                    const buttonColor = activeTheme.highlightColor || '#ffffff';
-                    const time = state.clock.elapsedTime;
-                    const titleJitter = Math.sin(time * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                    
-                    // Increased title opacity with flicker
-                    const titleAlpha = Math.max(0, Math.min(1.0, steppedOpacity * 1.5 + titleJitter));
-                    ctx.globalAlpha = titleAlpha;
-
-                    const jitterX = (Math.random() - 0.5) * 4;
-                    const jitterY = (Math.random() - 0.5) * 4;
-
-                    ctx.font = '900 44px "Courier New", monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-                    const titleY = -h / 2 + textYOffset - 10;
-
-                    ctx.fillStyle = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                    ctx.fillText(focusedText, jitterX + 3, titleY + jitterY + 3);
-                    ctx.fillStyle = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-                    ctx.fillText(focusedText, jitterX - 3, titleY + jitterY - 3);
-                    
-                    ctx.fillStyle = buttonColor;
-                    if (Math.random() > 0.1) {
-                        ctx.fillText(focusedText, jitterX, titleY + jitterY);
-                    }
 
                     // VERTICAL CLIPPING FOR ROWS
                     const viewportStartY = -VIEWPORT_HEIGHT / 2 + 20;
@@ -395,7 +383,8 @@ export default function SettingsTV({
                         if (isMobile && row.id === 'fov') return;
 
                         // Selection highlight
-                        const isHovered = hoveredButton?.startsWith(row.id);
+                        const hoverRowId = hoveredButton?.split('_')[0];
+                        const isHovered = hoverRowId === row.id;
                         if (isHovered) {
                             ctx.fillStyle = (activeTheme.textColor || '#ffffff') + '15';
                             ctx.fillRect(-220, rowY - ROW_HEIGHT / 2 + 5, 440, ROW_HEIGHT - 10);
@@ -421,7 +410,7 @@ export default function SettingsTV({
                         } else if (row.id === 'barrel') {
                             const val = settings.barrelScanline ? 'ON' : 'OFF';
                             ctx.textAlign = 'center';
-                            ctx.fillStyle = hoveredButton?.startsWith(row.id) ? highlightColor : textColor;
+                            ctx.fillStyle = isHovered ? highlightColor : textColor;
                             ctx.fillText(val, controlsX, rowY);
                         } else {
                             // Slider
@@ -441,6 +430,7 @@ export default function SettingsTV({
                                 else if (row.id === 'ambient') currentVal = settings.ambientIntensity;
                                 else if (row.id === 'gravity') currentVal = settings.gravityY;
                                 else if (row.id === 'fov') currentVal = settings.cameraFOV;
+                                else if (row.id === 'premiumGlow') currentVal = settings.premiumGlowIntensity;
 
                                 if (row.id === 'fov') {
                                     // Numeric input visualization instead of slider
@@ -484,8 +474,8 @@ export default function SettingsTV({
                                     // Value display (mini)
                                     ctx.font = '900 12px "Courier New", monospace';
                                     ctx.textAlign = 'left';
-                                    let displayVal = currentVal.toFixed(row.id === 'blur' || row.id === 'aberration' ? 4 : 1);
-                                    if (row.id === 'musicVolume' || row.id === 'bubblesVolume') displayVal = Math.round(currentVal * 100) + '%';
+                                    let displayVal = currentVal.toFixed(row.id === 'blur' || row.id === 'aberration' ? 2 : 1);
+                                    if (row.id === 'musicVolume' || row.id === 'bubblesVolume' || row.id === 'premiumGlow') displayVal = Math.round(currentVal * 100) + '%';
                                     if (row.id === 'scanlineCount') displayVal = Math.round(currentVal).toString();
                                     ctx.fillText(displayVal, controlsX + sliderWidth / 2 + 15, rowY);
                                     ctx.font = '900 18px "Courier New", monospace';
@@ -504,10 +494,14 @@ export default function SettingsTV({
                     ctx.fillStyle = highlightColor;
                     ctx.fillRect(235, barY, 6, barHeight);
 
-                    if (showBackButton) drawBackButton(ctx, backButtonPosition.x, backButtonPosition.y, hoverProgressRefs.current.back, buttonColor);
-                    if (showMenuButton) drawMenuButton(ctx, menuButtonPosition.x, menuButtonPosition.y, hoverProgressRefs.current.menu, buttonColor);
+                    if (showBackButton) {
+                        drawBackButton(ctx, backButtonPosition.x, backButtonPosition.y, hoverProgressRefs.current.back, buttonColor, premiumGlowIntensity);
+                    }
+                    if (showMenuButton) {
+                        drawMenuButton(ctx, menuButtonPosition.x, menuButtonPosition.y, hoverProgressRefs.current.menu, buttonColor, premiumGlowIntensity);
+                    }
 
-                    ctx.restore();
+                    ctx.restore(); // End rows/centered context
                 }
             }
             screenTextureRef.current.needsUpdate = true;

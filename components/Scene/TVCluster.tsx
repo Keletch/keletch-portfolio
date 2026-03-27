@@ -3,12 +3,13 @@ import { CuboidCollider } from '@react-three/rapier';
 import { ResettableRigidBody } from '@/components/Scene/ResettableRigidBody';
 import { useGLTF } from '@react-three/drei';
 import { ThreeEvent } from '@react-three/fiber';
-import Television from '@/components/Television';
 import Vision from '@/components/Television/Vision/Vision';
 import LifestyleTV from '@/components/Television/Lifestyle/Lifestyle';
 import SettingsTV from '@/components/Television/Settings/Settings';
+import ExtrasTV from '@/components/Television/Extras/Extras';
 import { InteractiveTVWrapper } from './InteractiveTVWrapper';
 import { BackButton3D } from '@/components/Props/BackButton3D';
+import { NESProps } from '@/components/Television/Extras/Games/NESProps';
 
 interface TVClusterProps {
     viewState: string;
@@ -99,6 +100,8 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors, 
                 )}
             </ResettableRigidBody>
 
+            <NESProps viewState={viewState} />
+
             <InteractiveTVWrapper
                 tvPosition={tv1Position}
                 colliderSize={colliders.toon.size}
@@ -117,7 +120,6 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors, 
                     invertY={true}
                     focusedText="Settings"
                     isFocused={viewState === 'tv_settings_focus'}
-                    textYOffset={40}
                     showBackButton={true}
                     backButtonPosition={{ x: 200, y: -190 }}
                     onBackClick={() => onNavigate('default')}
@@ -145,7 +147,6 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors, 
                     invertY={true}
                     focusedText="Vision"
                     isFocused={viewState === 'tv_dirty_focus'}
-                    textYOffset={40}
                     showBackButton={true}
                     backButtonPosition={{ x: 200, y: -190 }}
                     onBackClick={() => onNavigate('default')}
@@ -166,14 +167,20 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors, 
                 camLookAtOffset={[0, 0.0, 0]}
                 resetDelay={0.45}
             >
-                <Television
+                <ExtrasTV
                     modelPath="/models/LowPolyTV.glb"
                     invertY={true}
                     screenNames={LOWPOLY_SCREENS}
                     theme={themes.lowpoly as "classic"}
-                    focusedText="Extras"
+                    focusedText="EXTRAS"
                     isFocused={viewState === 'tv_lowpoly_focus'}
-                    textYOffset={40}
+                    showBackButton={true}
+                    backButtonPosition={{ x: 200, y: -190 }}
+                    onBackClick={() => onNavigate('default')}
+                    showMenuButton={true}
+                    menuButtonPosition={{ x: -200, y: -190 }}
+                    onMenuClick={() => onNavigate('shelf_focus')}
+                    onGamesClick={() => onNavigate('nes_focus')}
                 />
             </InteractiveTVWrapper>
 
@@ -192,7 +199,6 @@ export function TVCluster({ viewState, onNavigate, clusterThemes, visionColors, 
                     invertY={true}
                     focusedText="Lifestyle"
                     isFocused={viewState === 'tv_typical_focus' || viewState === 'tv_typical_gallery'}
-                    textYOffset={40}
                     showBackButton={true}
                     backButtonPosition={{ x: 200, y: -190 }}
                     onBackClick={() => onNavigate('default')}

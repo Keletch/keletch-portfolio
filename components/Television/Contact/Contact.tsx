@@ -7,7 +7,8 @@ import { drawPixelEye } from '../Helpers';
 import { useFigureTransition } from '@/hooks/useFigureTransition';
 import { useTVModel } from '@/hooks/useTVModel';
 import { updateButtonHoverAnimation } from '../SharedHelpers';
-import { checkContactButtonHover, drawBackButton, drawMenuButton, HitResult } from './ContactHelpers';
+import { checkContactButtonHover, drawBackButton, drawMenuButton, drawTelevisionHeader, HitResult } from './ContactHelpers';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 const DEFAULT_SCREEN_NAMES = ['mobileScreen'];
 
@@ -31,7 +32,6 @@ export default function ContactTV({
     modelYOffset = -0.3,
     focusedText = 'LET\'S CONNECT',
     isFocused = false,
-    textYOffset = 45, // will calculate relative to -h/2
     showBackButton = false,
     onBackClick,
     backButtonPosition = CONTACT_BUTTON_CONFIG.BACK,
@@ -70,7 +70,7 @@ export default function ContactTV({
     const [delayedFocus, setDelayedFocus] = useState(false);
     useEffect(() => {
         if (isFocused) {
-            const t = setTimeout(() => setDelayedFocus(true), 900);
+            const t = setTimeout(() => setDelayedFocus(true), 600);
             return () => clearTimeout(t);
         } else {
             setDelayedFocus(false);
@@ -223,37 +223,11 @@ export default function ContactTV({
                     ctx.restore();
                 }
 
-                // 2. FOCUSED UI STATE
                 if (renderedFigure === 'ui' && steppedOpacity > 0.01) {
                     ctx.save();
                     ctx.globalAlpha = steppedOpacity;
                     ctx.translate(w / 2, h / 2);
                     if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
-
-                    // -- Title Layer --
-                    ctx.save();
-                    const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                    const titleAlpha = Math.max(0, Math.min(1.0, steppedOpacity * 1.5 + titleJitter));
-                    ctx.globalAlpha = titleAlpha;
-                    const jx = (Math.random() - 0.5) * 4;
-                    const jy = (Math.random() - 0.5) * 4;
-                    ctx.font = '900 50px "Courier New", monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-                    const textY = -h / 2 + textYOffset;
-
-                    const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                    const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-
-                    ctx.fillStyle = activeTheme.textShadow1 ? shadow1 + '80' : shadow1;
-                    ctx.fillText(focusedText, jx + 3, textY + jy);
-
-                    ctx.fillStyle = activeTheme.textShadow2 ? shadow2 + '80' : shadow2;
-                    ctx.fillText(focusedText, jx - 3, textY + jy);
-
-                    ctx.fillStyle = buttonColor;
-                    if (Math.random() > 0.1) ctx.fillText(focusedText, jx, textY + jy);
-                    ctx.restore();
 
                     const btnJitterBase = Math.sin(state.clock.elapsedTime * 12 + 5) > 0.8 ? (Math.random() - 0.5) * 0.3 : 0;
                     const btnBaseAlpha = Math.max(0, Math.min(1, steppedOpacity + btnJitterBase));
@@ -296,6 +270,17 @@ export default function ContactTV({
                         drawMenuButton(ctx, menuButtonPosition.x, menuButtonPosition.y, hoverProgressRefs.current.menu, buttonColor);
                     }
 
+                    ctx.restore();
+                }
+
+                // Draw Header ON TOP (Clean Absolute Origin)
+                if (renderedFigure === 'ui' && steppedOpacity > 0.01 && focusedText) {
+                    const premiumGlowIntensity = useSettingsStore.getState().premiumGlowIntensity;
+                    ctx.save();
+                    ctx.translate(w / 2, h / 2);
+                    if (invertY) { ctx.rotate(Math.PI); ctx.scale(-1, 1); }
+                    ctx.translate(-w / 2, -h / 2);
+                    drawTelevisionHeader(ctx, focusedText, w, h, premiumGlowIntensity, steppedOpacity, state.clock.elapsedTime, buttonColor);
                     ctx.restore();
                 }
 

@@ -6,7 +6,10 @@ export {
     drawButtonShockwave,
     drawPlayStopButton,
     drawBackButton,
-    drawMenuButton
+    drawMenuButton,
+    drawPremiumGhostlyText,
+    drawTelevisionHeader,
+    drawTelevisionActionButton
 } from '../Helpers';
 
 export function paginateStory(

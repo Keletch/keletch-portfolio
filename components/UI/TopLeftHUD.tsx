@@ -216,13 +216,25 @@ export function TopLeftHUD({ onNavigate }: TopLeftHUDProps) {
 
     const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
         const hit = getHitResult(e);
-        setHoveredBtn(hit as HUDButton | null);
-        document.body.style.cursor = hit ? 'pointer' : 'auto';
+        if (hit) {
+            e.stopPropagation();
+            if (hoveredBtn !== hit) {
+                setHoveredBtn(hit as HUDButton);
+                document.body.style.cursor = 'pointer';
+            }
+        } else {
+            if (hoveredBtn !== null) {
+                setHoveredBtn(null);
+                document.body.style.cursor = 'auto';
+            }
+        }
     };
 
     const handlePointerOut = () => {
-        setHoveredBtn(null);
-        document.body.style.cursor = 'auto';
+        if (hoveredBtn !== null) {
+            setHoveredBtn(null);
+            document.body.style.cursor = 'auto';
+        }
     };
 
     const handleClick = (e: ThreeEvent<MouseEvent>) => {

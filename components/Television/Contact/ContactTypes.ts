@@ -12,7 +12,6 @@ export interface ContactProps {
     modelYOffset?: number;
     focusedText?: string;
     isFocused?: boolean;
-    textYOffset?: number;
     showBackButton?: boolean;
     backButtonPosition?: { x: number, y: number };
     onBackClick?: () => void;

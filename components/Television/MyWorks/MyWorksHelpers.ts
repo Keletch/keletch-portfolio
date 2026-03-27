@@ -3,13 +3,25 @@ import * as THREE from 'three';
 import { MYWORKS_BUTTON_CONFIG } from './MyWorksTypes';
 import { PROJECTS } from './MyWorksData';
 
-// Re-export drawing helpers
+import {
+    drawButtonShockwave,
+    drawPlayStopButton,
+    drawBackButton,
+    drawMenuButton,
+    drawPremiumGhostlyText,
+    drawTelevisionHeader,
+    drawTelevisionActionButton
+} from '../Helpers';
+
 export {
     drawButtonShockwave,
     drawPlayStopButton,
     drawBackButton,
-    drawMenuButton
-} from '../Helpers';
+    drawMenuButton,
+    drawPremiumGhostlyText,
+    drawTelevisionHeader,
+    drawTelevisionActionButton
+};
 
 // Hover detection for MyWorks OSD
 export function checkButtonHover(
@@ -129,8 +141,8 @@ export function drawProjectInfo(
     h: number,
     wrappedLines: string[],
     fullText: string,
-    typingStartTime: number,
     waitingForInput: boolean,
+    typingStartTime: number,
     opacity: number,
     textColor: string = '#ffffff',
     highlightColor: string = '#ffffff'
@@ -159,7 +171,6 @@ export function drawProjectInfo(
     }
 
     const highlightRGB = hexToRgb(highlightColor) || { r: 255, g: 255, b: 255 };
-    const textRGB = hexToRgb(textColor) || { r: 255, g: 255, b: 255 };
     ctx.strokeStyle = `rgba(${highlightRGB.r}, ${highlightRGB.g}, ${highlightRGB.b}, ${opacity})`;
     ctx.lineWidth = 2;
     ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
@@ -173,9 +184,6 @@ export function drawProjectInfo(
         charsToShow = Math.floor(timeSinceStart / charSpeed);
     }
 
-    const jitterX = (Math.random() - 0.5) * 3 * (1 - Math.pow(opacity, 2));
-    const jitterY = (Math.random() - 0.5) * 3 * (1 - Math.pow(opacity, 2));
-
     charsToShow = Math.min(charsToShow, fullText.length);
     const currentVisibleText = fullText.slice(0, charsToShow);
 
@@ -187,8 +195,10 @@ export function drawProjectInfo(
         const x = -maxWidth / 2;
         const y = textBoxY + (i * lineHeight);
 
-        ctx.fillStyle = `rgba(${textRGB.r}, ${textRGB.g}, ${textRGB.b}, ${opacity})`;
-        ctx.fillText(txt, x + jitterX, y + jitterY);
+        // Simple text fill with optional subtle shadow for readability
+        ctx.fillStyle = textColor;
+        ctx.globalAlpha = opacity;
+        ctx.fillText(txt, x, y);
     });
 
     ctx.restore();
@@ -298,7 +308,9 @@ export function drawFocusedText(
     h: number,
     focusedText: string,
     invertY: boolean,
-    textYOffset: number
+    textYOffset: number,
+    premiumGlowIntensity: number = 1.0,
+    time: number = Date.now() / 1000
 ) {
     ctx.save();
     ctx.translate(w / 2, h / 2);
@@ -306,20 +318,16 @@ export function drawFocusedText(
         ctx.rotate(Math.PI);
         ctx.scale(-1, 1);
     }
-    const jitterX = (Math.random() - 0.5) * 4;
-    const jitterY = (Math.random() - 0.5) * 4;
-    ctx.font = '900 50px "Courier New", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    
     const textY = -h / 2 + textYOffset;
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-    ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
-    ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-    ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-    ctx.fillStyle = '#ffffff';
-    if (Math.random() > 0.1) {
-        ctx.fillText(focusedText, jitterX, textY + jitterY);
-    }
+    
+    drawPremiumGhostlyText(ctx, focusedText, 0, textY, '900 50px "Courier New", monospace', {
+        intensity: premiumGlowIntensity,
+        textAlign: 'center',
+        textBaseline: 'top',
+        time: time
+    });
+
     ctx.restore();
 }
 

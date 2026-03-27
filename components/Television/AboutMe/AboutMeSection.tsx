@@ -40,7 +40,6 @@ export default function AboutMeSection({ viewState, onNavigate, themeOverride }:
                 invertY={true}
                 focusedText="About Me"
                 isFocused={viewState === 'tv_red_focus'}
-                textYOffset={40}
                 showStartButton={true}
                 startButtonPosition={{ x: 0, y: 190 }}
                 onStartClick={() => { }}

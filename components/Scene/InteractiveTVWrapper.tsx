@@ -114,7 +114,7 @@ export function InteractiveTVWrapper({
         return () => window.removeEventListener('pointerup', handleGlobalUp);
     }, [dragging, setGlobalDragging]);
 
-    const isFocused = viewState === focusStateName || (focusStateName === 'tv_typical_focus' && viewState === 'tv_typical_gallery');
+    const isFocused = viewState === focusStateName || (focusStateName === 'tv_typical_focus' && viewState === 'tv_typical_gallery') || (viewState === 'nes_focus' && focusStateName.startsWith('cartridge_'));
     // If ANY object is focused (incl. this one or another), ALL wrappers should be non-interactive
     const isAnyFocusActive = viewState !== 'default' && viewState !== 'shelf_focus';
     useCursor(hovered && !isAnyFocusActive, dragging ? 'grabbing' : 'pointer', 'auto');

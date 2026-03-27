@@ -31,7 +31,6 @@ export default function MyWorksSection({ viewState, onNavigate, themeOverride }:
                 invertY={true}
                 focusedText="My Works"
                 isFocused={viewState === 'tv_lcd_focus'}
-                textYOffset={40}
 
                 // Top Left: Menu
                 showMenuButton={true}

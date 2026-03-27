@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import { drawBackButton, drawMenuButton } from '../Helpers';
-
+import { drawBackButton, drawMenuButton, drawTelevisionHeader } from '../Helpers';
 // Re-export standard helpers tailored for Contact TV if needed
-export { drawBackButton, drawMenuButton };
+export { drawBackButton, drawMenuButton, drawTelevisionHeader };
 
 // Mobile screen has different aspect ratio
 // We need to adjust raycasting logic slightly differently than standard 1:1 TVs

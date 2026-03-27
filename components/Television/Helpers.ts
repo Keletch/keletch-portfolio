@@ -189,41 +189,172 @@ export function applyRetroButtonEffect(
     btnY: number,
     hoverProgress: number,
     baseColor: string,
-    drawPath: (bx: number, by: number, color: string) => void
+    drawPath: (bx: number, by: number, color: string) => void,
+    intensity: number = 1.0
 ) {
     let jx = 0;
     let jy = 0;
     let shouldDraw = true;
 
-    if (hoverProgress > 0.6) {
-        const intensity = (hoverProgress - 0.6) * 2.5;
-        jx = (Math.random() - 0.5) * 4 * intensity;
-        jy = (Math.random() - 0.5) * 4 * intensity;
+    // Use intensity to scale the effects
+    const effIntensity = hoverProgress > 0.6 ? (hoverProgress - 0.6) * 2.5 * intensity : 0;
 
-        if (Math.random() < 0.05) shouldDraw = false;
+    if (effIntensity > 0) {
+        jx = (Math.random() - 0.5) * 4 * effIntensity;
+        jy = (Math.random() - 0.5) * 4 * effIntensity;
+
+        if (Math.random() < 0.05 * effIntensity) shouldDraw = false;
     }
 
     if (!shouldDraw) return;
 
-    if (hoverProgress > 0.6) {
-        const intensity = (hoverProgress - 0.6) * 2.5;
-        const offset = Math.max(0.5, 2 * intensity);
+    if (effIntensity > 0) {
+        const offset = Math.max(0.5, 2 * effIntensity);
 
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
+        ctx.shadowBlur = 15 * effIntensity;
+        ctx.shadowColor = 'rgba(255, 0, 0, 0.8)';
         drawPath(btnX + jx - offset, btnY + jy, 'rgba(255, 0, 0, 0.8)');
         ctx.restore();
 
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
+        ctx.shadowBlur = 15 * effIntensity;
+        ctx.shadowColor = 'rgba(0, 255, 255, 0.8)';
         drawPath(btnX + jx + offset, btnY + jy, 'rgba(0, 255, 255, 0.8)');
         ctx.restore();
     }
 
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
+    if (effIntensity > 0) {
+        ctx.shadowBlur = 20 * effIntensity;
+        ctx.shadowColor = baseColor;
+    }
     drawPath(btnX + jx, btnY + jy, baseColor);
     ctx.restore();
+}
+
+/**
+ * Renders text with a premium "Ghostly" 3-pass Chromatic Aberration and holographic glow effect.
+ */
+export function drawPremiumGhostlyText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    font: string,
+    options: {
+        intensity?: number;
+        isHovered?: boolean;
+        textAlign?: CanvasTextAlign;
+        textBaseline?: CanvasTextBaseline;
+        baseColor?: string;
+        time?: number;
+        caDirection?: 'x' | 'y';
+    } = {}
+) {
+    const {
+        intensity = 1.0,
+        isHovered = false,
+        textAlign = 'center',
+        textBaseline = 'middle',
+        baseColor = '#ffffff',
+        time = Date.now() / 1000,
+        caDirection = 'x'
+    } = options;
+
+    if (intensity <= 0) {
+        ctx.save();
+        ctx.font = font;
+        ctx.textAlign = textAlign;
+        ctx.textBaseline = textBaseline;
+        ctx.fillStyle = baseColor;
+        ctx.fillText(text, x, y);
+        ctx.restore();
+        return;
+    }
+
+    ctx.save();
+    ctx.font = font;
+    ctx.textAlign = textAlign;
+    ctx.textBaseline = textBaseline;
+
+    const jitterScale = isHovered ? 4 : 2;
+    const jitterX = (Math.random() - 0.5) * jitterScale * intensity;
+    const jitterY = (Math.random() - 0.5) * jitterScale * intensity;
+    
+    // Smooth CA oscillation (Slower as requested)
+    const caOffset = (2.5 + (isHovered ? 1.5 : 0) + Math.sin(time * 2) * 0.8) * intensity;
+
+    // Pass 1: Red Offset
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+    if (caDirection === 'y') {
+        ctx.fillText(text, x + jitterX, y + jitterY - caOffset);
+    } else {
+        ctx.fillText(text, x + jitterX - caOffset, y + jitterY);
+    }
+    ctx.restore();
+
+    // Pass 2: Cyan Offset
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.7)';
+    if (caDirection === 'y') {
+        ctx.fillText(text, x + jitterX, y + jitterY + caOffset);
+    } else {
+        ctx.fillText(text, x + jitterX + caOffset, y + jitterY);
+    }
+    ctx.restore();
+
+    // Pass 3: Base with Glow
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // Premium holographic glow (Stabilized, slower pulse)
+    const glowIntensity = (25 + Math.sin(time * 1.5) * 3) * intensity;
+    ctx.shadowBlur = glowIntensity;
+    ctx.shadowColor = baseColor;
+    
+    ctx.fillStyle = baseColor;
+    if (Math.random() > 0.05) {
+        ctx.fillText(text, x + jitterX, y + jitterY);
+    }
+    ctx.restore();
+
+    ctx.restore();
+}
+
+/**
+ * Global Standard for Television Titles (HUD Headers)
+ * Based on the "Settings" TV aesthetic.
+ */
+export function drawTelevisionHeader(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    w: number,
+    h: number,
+    premiumGlowIntensity: number = 1.0,
+    opacity: number = 1.0,
+    time: number = Date.now() / 1000,
+    color: string = '#ffffff',
+    yPos?: number,
+    xPos?: number
+) {
+    const finalX = xPos !== undefined ? xPos : w / 2;
+    const finalY = yPos !== undefined ? yPos : 45;
+    
+    drawPremiumGhostlyText(ctx, text, finalX, finalY, '900 44px "Courier New", monospace', {
+        intensity: premiumGlowIntensity * opacity,
+        textAlign: 'center',
+        textBaseline: 'top',
+        baseColor: color,
+        time: time,
+        caDirection: 'y' // VERTICAL CHROMATIC ABERRATION
+    });
 }
 
 export function drawButtonShockwave(
@@ -263,7 +394,8 @@ export function drawPlayStopButton(
     hoverProgress: number,
     morphProgress: number,
     color: string = '#ffffff',
-    angle: number = 0
+    angle: number = 0,
+    intensity: number = 1.0
 ) {
     const p = hoverProgress;
     const m = morphProgress;
@@ -350,7 +482,7 @@ export function drawPlayStopButton(
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-    });
+    }, intensity);
 }
 
 export function drawBackButton(
@@ -358,7 +490,8 @@ export function drawBackButton(
     btnX: number,
     btnY: number,
     hoverProgress: number,
-    color: string = '#ffffff'
+    color: string = '#ffffff',
+    intensity: number = 1.0
 ) {
     const pBack = hoverProgress;
 
@@ -405,7 +538,7 @@ export function drawBackButton(
             ctx.fill();
             ctx.restore();
         }
-    });
+    }, intensity);
 }
 
 export function drawMenuButton(
@@ -413,7 +546,8 @@ export function drawMenuButton(
     btnX: number,
     btnY: number,
     hoverProgress: number,
-    color: string = '#ffffff'
+    color: string = '#ffffff',
+    intensity: number = 1.0
 ) {
     const pMenu = hoverProgress;
 
@@ -438,6 +572,11 @@ export function drawMenuButton(
         ctx.fillStyle = c;
         ctx.globalAlpha = masterAlpha;
 
+        // Always draw the middle bar (which is the circle in phase 1)
+        ctx.beginPath();
+        drawPixelRoundedRect(ctx, cx - width / 2, cy - height / 2, width, height, cornerRadius);
+        ctx.fill();
+
         if (phase2Progress > 0) {
             const barSpacing = 6 * phase2Progress;
             const rotationAngle = -0.5 * phase2Progress;
@@ -451,18 +590,47 @@ export function drawMenuButton(
             ctx.restore();
 
             ctx.beginPath();
-            drawPixelRoundedRect(ctx, cx - width / 2, cy - height / 2, width, height, cornerRadius);
-            ctx.fill();
-
-            ctx.beginPath();
             drawPixelRoundedRect(ctx, cx + barSpacing - width / 2, cy - height / 2, width, height, cornerRadius);
             ctx.fill();
-        } else {
-            ctx.beginPath();
-            drawPixelRoundedRect(ctx, cx - width / 2, cy - height / 2, width, height, cornerRadius);
-            ctx.fill();
         }
-    });
+    }, intensity);
+}
+
+/**
+ * Global Unified TV Button Renderer
+ * Combines shockwave animation and standard retro icons.
+ */
+export function drawTelevisionActionButton(
+    ctx: CanvasRenderingContext2D,
+    type: 'play' | 'back' | 'menu',
+    x: number,
+    y: number,
+    hoverProgress: number,
+    options: {
+        color: string;
+        time: number;
+        intensity: number;
+        morphProgress?: number; // For play/stop
+        angle?: number;
+    }
+) {
+    const { color, time, intensity, morphProgress = 0, angle = 0 } = options;
+    
+    // 1. Draw Shockwave
+    drawButtonShockwave(ctx, x, y, hoverProgress, time, color);
+    
+    // 2. Draw Specific Icon with Premium Effect
+    switch (type) {
+        case 'play':
+            drawPlayStopButton(ctx, x, y, hoverProgress, morphProgress, color, angle, intensity);
+            break;
+        case 'back':
+            drawBackButton(ctx, x, y, hoverProgress, color, intensity);
+            break;
+        case 'menu':
+            drawMenuButton(ctx, x, y, hoverProgress, color, intensity);
+            break;
+    }
 }
 
 export function drawHUDRadioIcon(
@@ -1330,5 +1498,52 @@ export function drawZoomTutorial(
     ctx.stroke();
 
     ctx.restore();
-    ctx.restore();
+}
+
+/**
+ * Draws an Atari-style Joystick icon for the Games/Extras menu.
+ */
+export function drawHUDJoystickIcon(
+    ctx: CanvasRenderingContext2D,
+    btnX: number,
+    btnY: number,
+    hoverProgress: number,
+    color: string = '#ffffff',
+    time: number = 0
+) {
+    const steppedTime = Math.floor(time * 10) / 10;
+    const masterAlpha = ctx.globalAlpha;
+    const baseSize = 20;
+    const stickLen = 12;
+
+    applyRetroButtonEffect(ctx, btnX, btnY, hoverProgress, color, (cx, cy, c) => {
+        ctx.strokeStyle = c;
+        ctx.fillStyle = c;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = masterAlpha;
+
+        // 1. Base (Squared bottom)
+        const bx = cx - baseSize / 2;
+        const by = cy + 4;
+        ctx.fillRect(bx, by, baseSize, 10);
+        
+        // 2. The Stick with tilt animation
+        const tilt = Math.sin(steppedTime * 5) * (1 + hoverProgress * 6);
+        const stickX = cx + tilt;
+        const stickTopY = cy - stickLen;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + 4);
+        ctx.lineTo(stickX, stickTopY);
+        ctx.stroke();
+
+        // 3. Ball on top
+        drawPixelCircle(ctx, stickX, stickTopY, 4, 1.5);
+
+        // 4. Little iconic red button on base
+        if (c.toLowerCase() === color.toLowerCase() || c.startsWith('rgba(')) {
+             ctx.fillStyle = '#ff3333';
+             ctx.fillRect(cx - 7, cy + 6, 3, 3);
+        }
+    });
 }

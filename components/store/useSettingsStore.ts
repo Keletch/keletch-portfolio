@@ -9,7 +9,7 @@ export const THEMES = [
 
 export type ThemeName = typeof THEMES[number];
 
-interface SettingsState {
+export interface SettingsState {
     theme: ThemeName;
     curveIntensity: number;
     scanlineOpacity: number;
@@ -24,6 +24,7 @@ interface SettingsState {
     cameraFOV: number;
     musicVolume: number;
     bubblesVolume: number;
+    premiumGlowIntensity: number;
     hasDoneZoomThisSession: boolean;
 
     globalResetTrigger: number;
@@ -33,6 +34,10 @@ interface SettingsState {
 
     isTopDownView: boolean;
     isDragging: boolean;
+    activeGamePrompt: string | null;
+    isGamePromptFading: boolean;
+    availableGames: string[];
+    selectedGameIndex: number;
 
     // Actions
     setGlobalResetTrigger: (time: number) => void;
@@ -42,6 +47,9 @@ interface SettingsState {
     setTopDownView: (val: boolean) => void;
     toggleTopDownView: () => void;
     setDragging: (val: boolean) => void;
+    setActiveGamePrompt: (game: string | null) => void;
+    setGamePromptFading: (val: boolean) => void;
+    setSelectedGameIndex: (index: number) => void;
     setTheme: (theme: ThemeName) => void;
     nextTheme: () => void;
     prevTheme: () => void;
@@ -70,6 +78,8 @@ interface SettingsState {
     decMusicVolume: () => void;
     incBubblesVolume: () => void;
     decBubblesVolume: () => void;
+    incPremiumGlow: () => void;
+    decPremiumGlow: () => void;
     setNumericSetting: (id: string, value: number) => void;
     setHasDoneZoomThisSession: (val: boolean) => void;
 }
@@ -91,6 +101,7 @@ export const useSettingsStore = create<SettingsState>()(
             cameraFOV: 35,
             musicVolume: 0.8,
             bubblesVolume: 0.8,
+            premiumGlowIntensity: 1.0,
             hasDoneZoomThisSession: false,
 
             globalResetTrigger: 0,
@@ -99,6 +110,10 @@ export const useSettingsStore = create<SettingsState>()(
             itemsReadyCount: 0,
             isTopDownView: false,
             isDragging: false,
+            activeGamePrompt: null,
+            isGamePromptFading: false,
+            availableGames: ['SELECT GAME', 'QWERTYSHOOT'],
+            selectedGameIndex: 0,
 
             setGlobalResetTrigger: (time: number) => set({ globalResetTrigger: time, itemsReadyCount: 0, globalUnfreezeTrigger: 0 }),
 
@@ -119,6 +134,9 @@ export const useSettingsStore = create<SettingsState>()(
             setTopDownView: (val: boolean) => set({ isTopDownView: val }),
             toggleTopDownView: () => set(state => ({ isTopDownView: !state.isTopDownView })),
             setDragging: (val: boolean) => set({ isDragging: val }),
+            setActiveGamePrompt: (game: string | null) => set({ activeGamePrompt: game }),
+            setGamePromptFading: (val: boolean) => set({ isGamePromptFading: val }),
+            setSelectedGameIndex: (index) => set({ selectedGameIndex: index }),
             setTheme: (theme: ThemeName) => set({ theme }),
 
             nextTheme: () => set((state) => {
@@ -162,11 +180,14 @@ export const useSettingsStore = create<SettingsState>()(
             incFOV: () => set((state) => ({ cameraFOV: Math.min(75, state.cameraFOV + 5) })),
             decFOV: () => set((state) => ({ cameraFOV: Math.max(15, state.cameraFOV - 5) })),
 
-            incMusicVolume: () => set((state) => ({ musicVolume: Math.min(2.5, +(state.musicVolume + 0.1).toFixed(1)) })),
+            incMusicVolume: () => set((state) => ({ musicVolume: Math.min(1.0, +(state.musicVolume + 0.1).toFixed(1)) })),
             decMusicVolume: () => set((state) => ({ musicVolume: Math.max(0.0, +(state.musicVolume - 0.1).toFixed(1)) })),
 
-            incBubblesVolume: () => set((state) => ({ bubblesVolume: Math.min(2.5, +(state.bubblesVolume + 0.1).toFixed(1)) })),
+            incBubblesVolume: () => set((state) => ({ bubblesVolume: Math.min(1.0, +(state.bubblesVolume + 0.1).toFixed(1)) })),
             decBubblesVolume: () => set((state) => ({ bubblesVolume: Math.max(0.0, +(state.bubblesVolume - 0.1).toFixed(1)) })),
+
+            incPremiumGlow: () => set((state) => ({ premiumGlowIntensity: Math.min(1.0, +(state.premiumGlowIntensity + 0.1).toFixed(2)) })),
+            decPremiumGlow: () => set((state) => ({ premiumGlowIntensity: Math.max(0.0, +(state.premiumGlowIntensity - 0.1).toFixed(2)) })),
 
             setNumericSetting: (id: string, value: number) => set(() => {
                 const map: Record<string, string> = {
@@ -181,7 +202,8 @@ export const useSettingsStore = create<SettingsState>()(
                     gravity: 'gravityY',
                     fov: 'cameraFOV',
                     musicVolume: 'musicVolume',
-                    bubblesVolume: 'bubblesVolume'
+                    bubblesVolume: 'bubblesVolume',
+                    premiumGlow: 'premiumGlowIntensity'
                 };
                 const prop = map[id] || id;
                 const bounds: Record<string, [number, number]> = {
@@ -195,8 +217,9 @@ export const useSettingsStore = create<SettingsState>()(
                     ambientIntensity: [0.0, 2.0],
                     gravityY: [-20.0, 0.0],
                     cameraFOV: [15, 75],
-                    musicVolume: [0.0, 2.5],
-                    bubblesVolume: [0.0, 2.5]
+                    musicVolume: [0.0, 1.0],
+                    bubblesVolume: [0.0, 1.0],
+                    premiumGlowIntensity: [0.0, 1.0]
                 };
                 const [min, max] = bounds[prop] || [0, 1];
                 return { [prop]: Math.max(min, Math.min(max, value)) };
@@ -205,6 +228,15 @@ export const useSettingsStore = create<SettingsState>()(
         }),
         {
             name: 'portfolio-settings',
+            version: 3,
+            migrate: (persistedState: unknown, version: number) => {
+                const state = persistedState as Record<string, unknown>;
+                if (version < 3 && state) {
+                    if (typeof state.musicVolume === 'number' && state.musicVolume > 1.0) state.musicVolume = 1.0;
+                    if (typeof state.bubblesVolume === 'number' && state.bubblesVolume > 1.0) state.bubblesVolume = 1.0;
+                }
+                return state;
+            },
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => ({
                 theme: state.theme,
@@ -220,7 +252,8 @@ export const useSettingsStore = create<SettingsState>()(
                 gravityY: state.gravityY,
                 cameraFOV: state.cameraFOV,
                 musicVolume: state.musicVolume,
-                bubblesVolume: state.bubblesVolume
+                bubblesVolume: state.bubblesVolume,
+                premiumGlowIntensity: state.premiumGlowIntensity
             })
         }
     )

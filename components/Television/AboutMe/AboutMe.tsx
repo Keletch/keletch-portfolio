@@ -3,7 +3,8 @@ import { useFrame, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AboutMeProps, ABOUTME_THEME, ABOUTME_BUTTON_CONFIG } from './AboutMeTypes';
 import { THEMES } from '../Types';
-import { drawPixelEye, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave, paginateStory, drawNeuralMesh, drawLiquidMetal, drawHyperPulse, drawAudioWaveform, drawOrbitalRings } from './AboutMeHelpers';
+import { drawPixelEye, drawPlayStopButton, drawBackButton, drawMenuButton, drawButtonShockwave, paginateStory, drawNeuralMesh, drawLiquidMetal, drawHyperPulse, drawAudioWaveform, drawOrbitalRings, drawTelevisionHeader } from './AboutMeHelpers';
+import { useSettingsStore } from '@/components/store/useSettingsStore';
 
 interface ThemeOverride {
     bgColor: string;
@@ -39,7 +40,6 @@ export default function AboutMeTV({
     modelYOffset = -0.3,
     focusedText,
     isFocused = false,
-    textYOffset = 60,
     showStartButton = false,
     startButtonPosition,
     onStartClick,
@@ -63,13 +63,14 @@ export default function AboutMeTV({
     const [startButtonHovered, setStartButtonHovered] = useState(false);
     const [backButtonHovered, setBackButtonHovered] = useState(false);
     const [menuButtonHovered, setMenuButtonHovered] = useState(false);
+    const premiumGlowIntensity = useSettingsStore(state => state.premiumGlowIntensity);
 
     // Reset UI state when losing focus
     const [delayedUI, setDelayedUI] = useState(false);
 
     useEffect(() => {
         if (isFocused) {
-            const t = setTimeout(() => setDelayedUI(true), 900);
+            const t = setTimeout(() => setDelayedUI(true), 600);
             return () => clearTimeout(t);
         } else {
             setDelayedUI(false);
@@ -80,7 +81,7 @@ export default function AboutMeTV({
         }
     }, [isFocused]);
 
-    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : null, 0);
+    const { renderedFigure: renderedUI, transitionOpacity: uiOpacityRef } = useFigureTransition(delayedUI ? 'ui' : 'eye', 0);
 
     const paginationResult = useMemo(() => {
         if (!enableStoryMode || !storyContent) {
@@ -127,9 +128,9 @@ export default function AboutMeTV({
     const currentFigureProp = (storyMode && storyFigures && storyFigures[actualParagraphIndex]) ? storyFigures[actualParagraphIndex] : 'eye';
 
     const {
-        renderedFigure,
-        transitionOpacity: transitionOpacityRef
-    } = useFigureTransition(currentFigureProp);
+        renderedFigure: internalFigure,
+        transitionOpacity: internalOpacityRef
+    } = useFigureTransition(currentFigureProp, 0, 1.5);
 
     const {
         renderedFigure: renderedStoryFigure,
@@ -297,6 +298,9 @@ export default function AboutMeTV({
                 ctx.fillStyle = activeTheme.baseColor;
                 ctx.fillRect(0, 0, w, h);
 
+                const uiOpacityVal = uiOpacityRef.current;
+                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
+
                 const drawContent = (type: string | null, alpha: number) => {
                     ctx.save();
                     ctx.globalAlpha = alpha;
@@ -340,11 +344,16 @@ export default function AboutMeTV({
                     ctx.restore();
                 };
 
-                const steps = 5;
-                const transitionOpacity = transitionOpacityRef.current;
-                const steppedOpacity = Math.floor(transitionOpacity * steps) / steps;
-                if (steppedOpacity > 0.05) {
-                    drawContent(renderedFigure, steppedOpacity);
+                // 1. STABLE CONTENT (Eye / Neural Mesh / etc.)
+                if (internalFigure) {
+                    const internalOpacityVal = internalOpacityRef.current;
+                    const internalStepped = Math.floor(internalOpacityVal * 10) / 10;
+                    
+                    // The eye should stay solid (no flicker) during the 900ms entrance.
+                    // figureStepped handles the internal figure-to-figure flicker.
+                    if (internalStepped > 0.05) {
+                        drawContent(internalFigure, internalStepped);
+                    }
                 }
 
                 // Vignette & Glow (Standard wrapper)
@@ -357,10 +366,11 @@ export default function AboutMeTV({
 
                 // Story Text Rendering
                 const storyOpacity = storyOpacityRef.current;
-                const storyStepped = Math.floor(storyOpacity * steps) / steps;
+                const storyStepped = Math.floor(storyOpacity * 10) / 10;
 
                 if (renderedStoryFigure === 'story' && storyStepped > 0.01) {
                     ctx.save();
+                    ctx.globalAlpha = storyStepped;
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
                         ctx.rotate(Math.PI);
@@ -374,10 +384,7 @@ export default function AboutMeTV({
                     const totalWidth = maxWidth + (padding * 2);
                     
                     const borderColor = activeTheme.highlightColor || '#ffffff';
-                    const br = parseInt(borderColor.slice(1, 3), 16);
-                    const bg = parseInt(borderColor.slice(3, 5), 16);
-                    const bb = parseInt(borderColor.slice(5, 7), 16);
-                    ctx.strokeStyle = `rgba(${br}, ${bg}, ${bb}, ${storyStepped})`;
+                    ctx.strokeStyle = borderColor;
                     ctx.lineWidth = 2;
                     ctx.strokeRect(-totalWidth / 2, textBoxY - padding, totalWidth, boxHeight);
 
@@ -431,58 +438,18 @@ export default function AboutMeTV({
                     ctx.restore();
                 }
 
-                // UI Overlay (Focused Text & Buttons)
-                const uiOpacityVal = uiOpacityRef.current;
-                const uiSteppedOpacity = Math.floor(uiOpacityVal * 10) / 10;
-
-                if (uiSteppedOpacity > 0.01) {
+                if (renderedUI === 'ui' && uiSteppedOpacity > 0.01) {
                     ctx.save();
                     ctx.globalAlpha = uiSteppedOpacity;
 
-                    // Focused Text
-                    if (focusedText) {
-                        ctx.save();
-
-                        const titleJitter = Math.sin(state.clock.elapsedTime * 15) > 0.8 ? (Math.random() - 0.5) * 0.2 : 0;
-                        // Increased opacity: use a more aggressive alpha for the title
-                        const titleAlpha = Math.max(0, Math.min(1.0, uiSteppedOpacity * 1.5 + titleJitter));
-                        ctx.globalAlpha = titleAlpha;
-
-                        ctx.translate(w / 2, h / 2);
-                        if (invertY) {
-                            ctx.rotate(Math.PI);
-                            ctx.scale(-1, 1);
-                        }
-                        const jitterX = (Math.random() - 0.5) * 4;
-                        const jitterY = (Math.random() - 0.5) * 4;
-                        ctx.font = '900 50px "Courier New", monospace';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'top';
-                        const textY = -h / 2 + textYOffset;
-                        const shadow1 = activeTheme.textShadow1 || 'rgba(255, 0, 0, 0.5)';
-                        const shadow2 = activeTheme.textShadow2 || 'rgba(0, 255, 255, 0.5)';
-
-                        ctx.fillStyle = (activeTheme.textShadow1) ? shadow1 + '80' : shadow1;
-                        ctx.fillText(focusedText, jitterX + 4, textY + jitterY);
-
-                        ctx.fillStyle = (activeTheme.textShadow2) ? shadow2 + '80' : shadow2;
-                        ctx.fillText(focusedText, jitterX - 4, textY + jitterY);
-
-                        ctx.fillStyle = buttonColor;
-                        if (Math.random() > 0.1) {
-                            ctx.fillText(focusedText, jitterX, textY + jitterY);
-                        }
-                        ctx.restore();
-                    }
-
-                    // Buttons
+                    // 1. HUD ELEMENTS LAYER (Buttons, Pagination)
                     ctx.save();
                     ctx.translate(w / 2, h / 2);
                     if (invertY) {
                         ctx.rotate(Math.PI);
                         ctx.scale(-1, 1);
                     }
-
+                    
                     const btnJitterBase = Math.sin(state.clock.elapsedTime * 12 + 5) > 0.8 ? (Math.random() - 0.5) * 0.3 : 0;
                     const btnBaseAlpha = Math.max(0, Math.min(1, uiSteppedOpacity + btnJitterBase));
                     ctx.globalAlpha = btnBaseAlpha;
@@ -502,7 +469,7 @@ export default function AboutMeTV({
                         const morphTarget = storyMode ? 1 : 0;
                         morphProgressRef.current += (morphTarget - morphProgressRef.current) * 0.15;
                         drawButtonShockwave(ctx, btnX, btnY, hoverProgress, state.clock.elapsedTime, buttonColor);
-                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current, buttonColor);
+                        drawPlayStopButton(ctx, btnX, btnY, hoverProgress, morphProgressRef.current, buttonColor, 0, premiumGlowIntensity);
                     }
 
                     if (showBackButton) {
@@ -517,12 +484,9 @@ export default function AboutMeTV({
                             }
                             const targetBack = isBackHover ? 1 : 0;
                             screenTextureRef.current.userData.hoverAnimBack += (targetBack - screenTextureRef.current.userData.hoverAnimBack) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnimBack) < 0.001) {
-                                screenTextureRef.current.userData.hoverAnimBack = 0;
-                            }
                             hoverProgressBack = screenTextureRef.current.userData.hoverAnimBack;
                         }
-                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, buttonColor);
+                        drawBackButton(ctx, btnBackX, btnBackY, hoverProgressBack, buttonColor, premiumGlowIntensity);
                     }
 
                     if (showMenuButton) {
@@ -537,20 +501,31 @@ export default function AboutMeTV({
                             }
                             const targetMenu = isMenuHover ? 1 : 0;
                             screenTextureRef.current.userData.hoverAnimMenu += (targetMenu - screenTextureRef.current.userData.hoverAnimMenu) * 0.1;
-                            if (Math.abs(screenTextureRef.current.userData.hoverAnimMenu) < 0.001) {
-                                screenTextureRef.current.userData.hoverAnimMenu = 0;
-                            }
                             hoverProgressMenu = screenTextureRef.current.userData.hoverAnimMenu;
                         }
-                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, buttonColor);
+                        drawMenuButton(ctx, btnMenuX, btnMenuY, hoverProgressMenu, buttonColor, premiumGlowIntensity);
+                    }
+
+                    ctx.restore(); // END BUTTONS LAYER
+
+                    // 2. HEADER LAYER (Always on top)
+                    if (focusedText) {
+                        ctx.save();
+                        ctx.translate(w / 2, h / 2);
+                        if (invertY) {
+                            ctx.rotate(Math.PI);
+                            ctx.scale(-1, 1);
+                        }
+                        ctx.translate(-w / 2, -h / 2);
+                        drawTelevisionHeader(ctx, focusedText, w, h, premiumGlowIntensity, uiSteppedOpacity, state.clock.elapsedTime, buttonColor);
+                        ctx.restore();
                     }
 
                     ctx.globalCompositeOperation = 'source-over';
-                    ctx.restore();
-                    ctx.restore(); // End of UI Overlay save block
+                    ctx.restore(); // END UI WRAPPER
                 }
             }
-            screenTextureRef.current.needsUpdate = true;
+            if (screenTextureRef.current) screenTextureRef.current.needsUpdate = true;
         }
     });
 

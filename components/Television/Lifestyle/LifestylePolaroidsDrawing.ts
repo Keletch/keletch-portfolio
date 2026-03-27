@@ -22,7 +22,7 @@ interface ActivePolaroid {
     indexInSequence: number;
 }
 export let activePolaroids: ActivePolaroid[] = [];
-let spawnTimer = SPAWN_INTERVAL - 2.1; // Delay first polaroid by 2.1s (1.05s focus + 1.0s eye fade) to match eye flicker entrance
+let spawnTimer = SPAWN_INTERVAL - 0.9; // Delay first polaroid by 0.9s to match eye flicker entrance
 let sequenceCounter = 0;
 let availableIndices: number[] = [];
 
@@ -302,11 +302,8 @@ function drawSinglePolaroid(
     // --- Draw the actual Polaroid shape ---
     ctx.save();
 
-    // Async Flicker Offset so polaroids don't blink globally perfectly in sync
-    // Only apply flicker during the TV focus fade or the Polaroid exit slide phase
-    const isFlickering = globalProgress < 0.99 || exitAlpha < 0.99;
-    const flickerJitter = isFlickering && Math.sin(time * 10 + indexInSequence * 3) > 0.8 ? ((Math.random() - 0.5) * 0.3) : 0;
-    const flickerBase = Math.max(0, Math.min(1, globalAlphaMult + flickerJitter));
+    // Sync focal flicker with global transition hook
+    const flickerBase = globalAlphaMult;
 
     // Global TV Focus alpha + Local Exit alpha + Overall Flicker multiplier
     ctx.globalAlpha = Math.min(globalProgress, exitAlpha) * flickerBase;
