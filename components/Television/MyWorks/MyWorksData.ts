@@ -8,14 +8,14 @@ export const PROJECTS = [
         link: "https://galeria.chu.mx/"
     },
     {
-        title: "HUC E-Commerce System",
+        title: "E-Commerce System",
         stack: "WooCommerce / PayU API / ManyChat",
         desc: "Automated payment gateway & asynchronous webhook routing.",
         videoSrc: "/works/tiendaHUC.webm",
         link: "https://tienda.hyenukchu.com/"
     },
     {
-        title: "Campus HUC (LMS)",
+        title: "Campus (LMS)",
         stack: "Cloudflare Workers / KV Storage / Notion API",
         desc: "Edge-computed frontend with cached API data for ultra-low latency.",
         videoSrc: "/works/campusHUC.webm",
